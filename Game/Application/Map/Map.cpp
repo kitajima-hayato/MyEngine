@@ -218,8 +218,6 @@ void Map::Update()
 				ImGui::TextWrapped("%s", message.c_str());
 			}
 
-			ImGui::Separator();
-
 			// ------------------------
 			// Edit Settings
 			// ------------------------
