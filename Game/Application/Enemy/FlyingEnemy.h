@@ -26,10 +26,15 @@ class FlyingEnemy :
     /// </summary>
 	void Action() override;
 
+    /// <summary>
+	/// トランスフォームの設定。FlyingEnemyはY軸方向に浮遊するため、baseYを更新して高さの基準とする
+    /// </summary>
+    /// <param name="transform"></param>
+    void SetTranslate(const Vector3& translate) override;
 
 private:
     /// 元の高さ（初期位置Y）
-    float baseY;         
+    float baseY = 0.0f;
     float timer = 0.0f;
 
 
