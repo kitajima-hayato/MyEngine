@@ -1,10 +1,11 @@
 #pragma once
-#include "EnemyBase.h"
-/// 基底クラス<BaseEnemy>を継承
+#include "../EnemyBase/EnemyBase.h"
+#include "../EnemyBase/FloatingEnemyBase.h"
+/// 基底クラス<FloatingEnemyBase>を継承
 class FlyingEnemy :
-    public EnemyBase
+    public FloatingEnemyBase
 {
-    public:
+public:
     /// <summary>
     /// 初期化処理
     /// </summary>
@@ -24,22 +25,13 @@ class FlyingEnemy :
     /// <summary>
     /// 攻撃処理
     /// </summary>
-	void Action() override;
+    void Action() override;
 
     /// <summary>
-	/// トランスフォームの設定。FlyingEnemyはY軸方向に浮遊するため、baseYを更新して高さの基準とする
+    /// 位置情報の設定
     /// </summary>
-    /// <param name="transform"></param>
-    void SetTranslate(const Vector3& translate) override;
-
-private:
-    /// 元の高さ（初期位置Y）
-    float baseY = 0.0f;
-    float timer = 0.0f;
-
-
-    
-
+    /// <param name="translate"></param>
+    void SetTranslate(const Vector3& translate)override;
 
 };
 

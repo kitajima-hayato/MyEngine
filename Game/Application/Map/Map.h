@@ -3,7 +3,7 @@
 #include "MyMath.h"
 #include "Game/Application/Block/Block.h"
 #include "Game/Application/Block/BlockType.h"
-#include "Game/Application/Enemy/EnemyType.h"
+#include "Game/Application/Enemy/Types/EnemyType.h"
 #include "Game/Particle/ParticleSystem.h"
 #include "Game/Particle/ModelParticleManager.h"
 #include <cstdint>

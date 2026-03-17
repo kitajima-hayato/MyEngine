@@ -7,9 +7,11 @@
 /// </summary>
 
 /// エネミー全てのファクトリークラス
-#include "EnemyBase.h"
-#include "NormalEnemy.h"
-#include "FlyingEnemy.h"
+#include "../EnemyBase/EnemyBase.h"
+class NormalEnemy;
+class FlyingEnemy;
+class SideMoveFlyingEnemy;
+class SideMoveEnemy;
 class EnemyFactory
 {
 public:

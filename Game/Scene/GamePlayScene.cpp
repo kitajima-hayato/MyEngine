@@ -39,6 +39,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	// ノードに応じたステージを初期化
 	stageKey = key.empty() ? "1-1" : key.c_str();
 	map->Initialize(stageKey);
+	mapCollisionQuery.SetMap(map.get());
 
 
 	collision_ = std::make_unique<CollisionManager>();
@@ -101,14 +102,14 @@ void GamePlayScene::Update()
 	stageStartEventFlag_ = startCam_->IsRunning();
 	isPlayerControlLocked_ = stageStartEventFlag_;
 	player->SetControlEnabled(!isPlayerControlLocked_);
-	
+
 	// マップの更新
 	map->Update();
 	// プレイヤーの更新
 	player->Update();
-	
 
-	
+
+
 
 	// エネミーレイヤーが変更されたらエネミーを再生成
 	if (map->ConsumeEnemyLayerDirtyFlag()) {
@@ -123,7 +124,7 @@ void GamePlayScene::Update()
 		player->SetControlEnabled(true);
 	}
 
-	
+
 
 	// フォローカメラ
 	if (!startCam_->IsRunning())
@@ -150,8 +151,15 @@ void GamePlayScene::Update()
 
 	// 敵の更新
 	for (auto& enemy : enemies) {
+		if (!enemy) continue;
 		enemy->Update();
 	}
+
+	// 敵同士の重なり解消
+	ResolveEnemyVsEnemy();
+
+	// 当たり判定
+	CheckCollision();
 
 	// 当たり判定
 	CheckCollision();
@@ -163,10 +171,10 @@ void GamePlayScene::Update()
 	// プレイヤーがゴールに触れていたらシーン遷移
 	bool isGoal = player->GetIsGoal();
 	if (isGoal) {
-		sceneManager->ChangeSceneWithTransition("STAGECLEAR",TransitionType::Normal);
+		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Normal);
 	}
 
-	
+
 
 	// ImGuiの描画
 	DrawImgui();
@@ -249,6 +257,12 @@ void GamePlayScene::GenerateEnemy()
 			case EnemyType::FlyingEnemy:
 				enemyId = "FlyingEnemy";
 				break;
+			case EnemyType::SideMoveFlyingEnemy:
+				enemyId = "SideMoveFlyingEnemy";
+				break;
+			case EnemyType::SideMoveEnemy:
+				enemyId = "SideMoveEnemy";
+				break;
 			default:
 				continue;
 			}
@@ -259,6 +273,7 @@ void GamePlayScene::GenerateEnemy()
 			if (!enemy) continue;
 			// エネミーの初期化
 			enemy->Initialize();
+			enemy->SetMapQuery(&mapCollisionQuery);
 			// マップ上の位置にセット
 			Vector3 enemyPos = map->GetMapChipPositionByIndex(x, y);
 			// オフセット
@@ -284,10 +299,11 @@ void GamePlayScene::CheckCollision()
 	/// エネミー全種
 	for (auto& enemy : enemies) {
 		if (!enemy)continue;
-
+		// 生存していたら当たり判定をとる
 		if (enemy->IsAlive()) {
 			collision_->AddCollider(enemy.get());
 		}
+		
 	}
 	// 衝突判定実行
 	collision_->CheckAllCollisions();
@@ -296,26 +312,90 @@ void GamePlayScene::CheckCollision()
 
 void GamePlayScene::UpdateStartCamera(float dt)
 {
-	
+
 }
 
 
 
 void GamePlayScene::SpritesInitialize()
 {
-	
+
 }
 
 void GamePlayScene::SpritesUpdate()
 {
-	
+
 }
 
 void GamePlayScene::SpritesDraw()
 {
 }
 
+bool GamePlayScene::IsAABBOverlap(const AABB& a, const AABB& b)
+{
+	return (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+		(a.min.y <= b.max.y && a.max.y >= b.min.y) &&
+		(a.min.z <= b.max.z && a.max.z >= b.min.z);
+}
+void GamePlayScene::CorrectEnemyOverlap(EnemyBase* enemyA, EnemyBase* enemyB)
+{
+	// どちらかがnullptrなら処理しない
+	if (!enemyA || !enemyB) {
+		return;
+	}
+	
+	AABB a = enemyA->GetAABB();
+	AABB b = enemyB->GetAABB();
+	// AABB同士が重なっていないなら処理しない
+	if (!IsAABBOverlap(a, b)) {
+		return;
+	}
+	// 重なっている場合、x軸方向に修正する
+	Vector3 posA = enemyA->GetTranslate();
+	Vector3 posB = enemyB->GetTranslate();
 
+	// x軸方向の重なり量
+	float overlapLeft = b.max.x - a.min.x;
+	float overlapRight = a.max.x - b.min.x;
+	float correctionX = (overlapLeft < overlapRight) ? overlapLeft : -overlapRight;
+
+	// 半分ずつ離す
+	float push = correctionX * 0.5f;
+
+	posA.x += push;
+	posB.x -= push;
+
+	enemyA->SetTranslate(posA);
+	enemyB->SetTranslate(posB);
+
+	// 互いに反転
+	Vector3 velA = enemyA->GetVelocity();
+	Vector3 velB = enemyB->GetVelocity();
+
+	velA.x *= -1.0f;
+	velB.x *= -1.0f;
+
+	enemyA->SetVelocity(velA);
+	enemyB->SetVelocity(velB);
+}
+void GamePlayScene::ResolveEnemyVsEnemy()
+{
+	const size_t count = enemies.size();
+
+	for (size_t i = 0; i < count; ++i) {
+		if (!enemies[i] || !enemies[i]->IsAlive()) {
+			continue;
+		}
+
+		for (size_t j = i + 1; j < count; ++j) {
+			if (!enemies[j] || !enemies[j]->IsAlive()) {
+				continue;
+			}
+
+			CorrectEnemyOverlap(enemies[i].get(), enemies[j].get());
+		}
+	}
+}
 
 void GamePlayScene::Finalize()
 {
@@ -334,7 +414,7 @@ void GamePlayScene::DrawImgui()
 #ifdef USE_IMGUI
 	ImGui::Begin("Camera Settings / GamePlayScene");
 	// 読み込んでいるマップデータのキー
-	ImGui::Text("SelectedStage:%s",stageKey);
+	ImGui::Text("SelectedStage:%s", stageKey);
 	//==============================
 	// Start Camera Intro Tuning UI
 	//==============================

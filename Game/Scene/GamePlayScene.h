@@ -2,7 +2,7 @@
 #include "Audio.h"    
 #include "engine/InsideScene/BaseScene.h"
 #include "engine/math/MyMath.h"
-#include "Game/Application/Enemy/EnemyFactory.h"
+#include "Game/Application/Enemy/Factory/EnemyFactory.h"
 #include "Game/Application/BackGround.h"
 #include "Game/Camera/CameraController.h"
 #include "Game/Particle/ParticleSystem.h"
@@ -11,6 +11,8 @@
 #include "Game/Camera/StartCamPhase.h"
 #include "Game/Application/UI/DamageFeedBack.h"
 #include "engine/base/DirectXCommon.h"
+#include "Game/Collision/MapCollisionQuery.h"
+#include <Game/Collision/Collider.h>
 /// <summary>
 /// ゲームプレイシーン
 /// ゲームプレイ中のシーンを管理する
@@ -85,7 +87,18 @@ public:
 	void SpritesUpdate();
 	void SpritesDraw();
 
-
+	/// <summary>
+	/// AABB同士の当たり判定
+	/// </summary>
+	bool IsAABBOverlap(const AABB& a, const AABB& b);
+	/// <summary>
+	/// エネミー同士の重なりを修正
+	/// </summary>
+	void CorrectEnemyOverlap(EnemyBase* leftEnemy, EnemyBase* rightEnemy);
+	/// <summary>
+	/// エネミー同士の重なりを修正する処理
+	/// </summary>
+	void ResolveEnemyVsEnemy();
 	
 
 private:
@@ -147,12 +160,7 @@ private:
 	// エネミー配置のオフセット
 	float enemySpawnOffset_ = 0.5f;
 
-	
-	
-
 	std::unique_ptr<ParticleSystem>testParticle_;
-
-	
 
 	bool isPlayerControlLocked_ = false;
 	
@@ -163,5 +171,9 @@ private:
 	Vector3 baseCameraPos_ = {};
 
 	std::string stageKey;
+
+	MapCollisionQuery mapCollisionQuery;
+
 };
+
 

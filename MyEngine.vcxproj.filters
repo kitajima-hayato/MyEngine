@@ -48,16 +48,16 @@
     <ClCompile Include="Game\Particle\ParticleManager.cpp">
       <Filter>Game\Particle</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\Enemy\EnemyBase.cpp">
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\EnemyBase.cpp">
       <Filter>Game\Application\Enemy</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\Enemy\EnemyFactory.cpp">
+    <ClCompile Include="Game\Application\Enemy\Factory\EnemyFactory.cpp">
       <Filter>Game\Application\Enemy</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\Enemy\FlyingEnemy.cpp">
+    <ClCompile Include="Game\Application\Enemy\Flying\FlyingEnemy.cpp">
       <Filter>Game\Application\Enemy</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\Enemy\NormalEnemy.cpp">
+    <ClCompile Include="Game\Application\Enemy\Ground\NormalEnemy.cpp">
       <Filter>Game\Application\Enemy</Filter>
     </ClCompile>
     <ClCompile Include="engine\InsideScene\Framework.cpp">
@@ -192,6 +192,11 @@
     <ClCompile Include="Game\Particle\ParticlePresets.cpp">
       <Filter>Game\Particle</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.cpp" />
+    <ClCompile Include="Game\Application\Map\IMapCollisionQuery.cpp" />
+    <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -234,16 +239,16 @@
     <ClInclude Include="Game\Particle\ParticleManager.h">
       <Filter>Game\Particle</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\EnemyBase.h">
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\EnemyBase.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\EnemyFactory.h">
+    <ClInclude Include="Game\Application\Enemy\Factory\EnemyFactory.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\FlyingEnemy.h">
+    <ClInclude Include="Game\Application\Enemy\Flying\FlyingEnemy.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\NormalEnemy.h">
+    <ClInclude Include="Game\Application\Enemy\Ground\NormalEnemy.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
     <ClInclude Include="engine\InsideScene\Framework.h">
@@ -330,7 +335,7 @@
     <ClInclude Include="Game\Camera\CameraController.h">
       <Filter>Game\Camera</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\EnemyType.h">
+    <ClInclude Include="Game\Application\Enemy\Types\EnemyType.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
     <ClInclude Include="Game\Application\Player\Player.h">
@@ -385,6 +390,11 @@
       <Filter>Game\Particle</Filter>
     </ClInclude>
     <ClInclude Include="Game\Application\Block\HazardType.h" />
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
+    <ClInclude Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.h" />
+    <ClInclude Include="Game\Application\Map\IMapCollisionQuery.h" />
+    <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">

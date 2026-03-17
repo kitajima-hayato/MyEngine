@@ -145,8 +145,8 @@ void Map::Update()
 			}
 
 			// ------------------------------------------------------------
-// Enemy Save/Load (auto file name from mapFileName)
-// ------------------------------------------------------------
+			// Enemy Save/Load (auto file name from mapFileName)
+			// ------------------------------------------------------------
 			ImGui::Separator();
 			std::string mapBase = MakeBaseName(mapFileName);
 			std::string enemyCsv = mapBase + "_EnemyLayer.csv";
@@ -258,6 +258,8 @@ void Map::Update()
 				"None",
 				"NormalEnemy",
 				"FlyingEnemy",
+				"SideMoveFlyingEnemy",
+				"SideMoveEnemy",
 			};
 
 			if (static_cast<EditLayerMode>(editModeInt) == EditLayerMode::Block) {
