@@ -1,6 +1,6 @@
-#include "NormalEnemy.h"
+#include "FlyingEnemy.h"
 
-void NormalEnemy::Initialize()
+void FlyingEnemy::Initialize()
 {
 	/// @仮スタッツ
 	stats = {
@@ -9,7 +9,7 @@ void NormalEnemy::Initialize()
 		// Rotate
 		{0.0f, 0.0f, 0.0f},
 		// Translate
-		{4.0f, -3.0f, 20.0f}
+		//{5.0f, -3.0f, 0.0f},
 		},
 		// 生存フラグ
 		true,
@@ -20,6 +20,9 @@ void NormalEnemy::Initialize()
 		// 攻撃力
 		1
 	};
+	
+	timer = 0.0f;
+	
 
 	/// Object3Dの初期化
 	model = std::make_unique<Object3D>();
@@ -28,9 +31,12 @@ void NormalEnemy::Initialize()
 	model->SetModel("GamePlay/Enemies/tentativeenemy");
 	/// トランスフォームの設定
 	model->SetTransform(stats.transform);
+
+	baseY = stats.transform.translate.y;
 }
 
-void NormalEnemy::Update()
+
+void FlyingEnemy::Update()
 {
 	if (stats.isAlive) {
 		/// 挙動処理
@@ -42,10 +48,9 @@ void NormalEnemy::Update()
 		/// モデルの更新
 		model->Update();
 	}
-	
 }
 
-void NormalEnemy::Draw()
+void FlyingEnemy::Draw()
 {
 	if (stats.isAlive) {
 		/// モデルの描画
@@ -53,17 +58,19 @@ void NormalEnemy::Draw()
 	}
 }
 
-void NormalEnemy::Move()
-{
+void FlyingEnemy::Move()
+{ 
+	FloatingEnemyBase::UpdateFloating();
 }
 
-void NormalEnemy::Action()
+void FlyingEnemy::Action()
 {
+	
 }
 
-void NormalEnemy::OnStomped()
+void FlyingEnemy::SetTranslate(const Vector3& translate)
 {
-	// 踏みつけられたら死亡
-	stats.isAlive = false;
-	stats.health = 0;
+	EnemyBase::SetTranslate(translate);
+	baseY = translate.y;     
 }
+

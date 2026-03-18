@@ -108,15 +108,16 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.cpp" />
     <ClCompile Include="Game\Scene\Transition\BallWipeTransition.cpp" />
     <ClCompile Include="Game\Application\UI\DamageFeedBack.cpp" />
     <ClCompile Include="Game\Application\UI\GamePlayHUD.cpp" />
     <ClCompile Include="Game\Camera\CameraController.cpp" />
     <ClCompile Include="Game\Application\BackGround.cpp" />
     <ClCompile Include="Game\Collision\CollisionManager.cpp" />
-    <ClCompile Include="Game\Application\Enemy\FlyingEnemy.cpp" />
-    <ClCompile Include="Game\Application\Enemy\EnemyBase.cpp" />
-    <ClCompile Include="Game\Application\Enemy\EnemyFactory.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Flying\FlyingEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\EnemyBase.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Factory\EnemyFactory.cpp" />
     <ClCompile Include="Game\Collision\Collider.cpp" />
     <ClCompile Include="Game\Application\Map\CsvLoader.cpp" />
     <ClCompile Include="Game\Application\Block\Block.cpp" />
@@ -134,6 +135,7 @@
     <ClCompile Include="engine\base\ImGuiManager.cpp" />
     <ClCompile Include="Game\Loader\LevelLoader.cpp" />
     <ClCompile Include="Game\Scene\Transition\ITransitionEffect.cpp" />
+    <ClCompile Include="Game\Application\Map\IMapCollisionQuery.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="engine\math\MakeMatrix.cpp" />
     <ClCompile Include="engine\3d\Model.cpp" />
@@ -154,7 +156,7 @@
     <ClCompile Include="engine\base\SrvManager.cpp" />
     <ClCompile Include="Game\Scene\TitleScene.cpp" />
     <ClCompile Include="Game\Application\StageType.cpp" />
-    <ClCompile Include="Game\Application\Enemy\NormalEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\NormalEnemy.cpp" />
     <ClCompile Include="engine\3d\SkyBox\SkyBox.cpp" />
     <ClCompile Include="engine\2d\RenderTexture.cpp" />
     <ClCompile Include="Game\Application\Player\Player.cpp" />
@@ -169,18 +171,22 @@
     <ClCompile Include="Game\Particle\ParticlePresets.cpp" />
     <ClCompile Include="Game\Particle\ModelParticleManager.cpp" />
     <ClCompile Include="Game\Scene\Transition\TransitionManager.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.cpp" />
+    <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
     <ClInclude Include="Game\Scene\Transition\BallWipeTransition.h" />
     <ClInclude Include="Game\Application\UI\DamageFeedBack.h" />
     <ClInclude Include="Game\Application\UI\GamePlayHUD.h" />
-    <ClInclude Include="Game\Application\Enemy\EnemyType.h" />
+    <ClInclude Include="Game\Application\Enemy\Types\EnemyType.h" />
     <ClInclude Include="Game\Camera\CameraController.h" />
     <ClInclude Include="Game\Application\BackGround.h" />
     <ClInclude Include="Game\Collision\CollisionManager.h" />
-    <ClInclude Include="Game\Application\Enemy\FlyingEnemy.h" />
-    <ClInclude Include="Game\Application\Enemy\EnemyBase.h" />
-    <ClInclude Include="Game\Application\Enemy\EnemyFactory.h" />
+    <ClInclude Include="Game\Application\Enemy\Flying\FlyingEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\EnemyBase.h" />
+    <ClInclude Include="Game\Application\Enemy\Factory\EnemyFactory.h" />
     <ClInclude Include="Game\Collision\Collider.h" />
     <ClInclude Include="Game\Application\Block\BlockType.h" />
     <ClInclude Include="Game\Application\Map\CsvLoader.h" />
@@ -217,7 +223,7 @@
     <ClInclude Include="engine\base\SrvManager.h" />
     <ClInclude Include="Game\Scene\TitleScene.h" />
     <ClInclude Include="Game\Application\StageType.h" />
-    <ClInclude Include="Game\Application\Enemy\NormalEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\NormalEnemy.h" />
     <ClInclude Include="Game\Loader\LevelLoader.h" />
     <ClInclude Include="engine\3d\SkyBox\SkyBox.h" />
     <ClInclude Include="engine\2d\RenderTexture.h" />
@@ -235,6 +241,10 @@
     <ClInclude Include="Game\Scene\Transition\TransitionManager.h" />
     <ClInclude Include="Game\Scene\Transition\ITransitionEffect.h" />
     <ClInclude Include="Game\Application\Block\HazardType.h" />
+    <ClInclude Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.h" />
+    <ClInclude Include="Game\Application\Map\IMapCollisionQuery.h" />
+    <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
