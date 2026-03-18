@@ -2,7 +2,7 @@
 #include <algorithm>
 #include "Input.h"
 #include "Game/Particle/ParticlePresets.h"
-#include "Game/Application/Enemy/EnemyBase.h"
+#include "Game/Application/Enemy/EnemyBase/EnemyBase.h"
 #ifdef USE_IMGUI
 #include "engine/base/ImGuiManager.h"
 #endif

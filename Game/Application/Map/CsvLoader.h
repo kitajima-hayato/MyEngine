@@ -5,7 +5,7 @@
 #include <sstream>
 #include "Game/Application/Block/BlockType.h"
 #include "Game/Application/Block/HazardType.h"
-#include "Game/Application/Enemy/EnemyType.h"
+#include "Game/Application/Enemy/Types/EnemyType.h"
 
 class CsvLoader
 {

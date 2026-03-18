@@ -1,9 +1,7 @@
 #pragma once
-#include "EnemyBase.h"
-/// 基底クラス<Bas8eEnemy>を継承
-/// ノーマルエネミークラス
-class NormalEnemy :
-	public EnemyBase
+#include "../EnemyBase/EnemyBase.h"
+class SideMoveEnemy :
+    public EnemyBase
 {
 	/// <summary>
 	/// 初期化処理
@@ -30,7 +28,5 @@ class NormalEnemy :
 	/// 踏みつけられたら死亡
 	/// </summary>
 	void OnStomped() override;
-
-
 };
 

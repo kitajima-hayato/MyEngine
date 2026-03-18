@@ -2,6 +2,7 @@
 #include "engine/math/MyMath.h"
 #include "engine/3d/Object3D.h"
 #include "Game/Collision/Collider.h"
+#include "Game/Application/Map/IMapCollisionQuery.h"
 
 /// <summary>
 /// エネミーの基本構造
@@ -94,11 +95,24 @@ public:
 	virtual Vector3 GetRotate() const { return stats.transform.rotate; }
 	virtual void SetTranslate(const Vector3& translate) { stats.transform.translate = translate; }
 	virtual Vector3 GetTranslate() const { return stats.transform.translate; }
+	virtual void AddTranslate(const Vector3& offset) { stats.transform.translate += offset; }
+	/// エネミーのvelocity設定/取得
+	virtual void SetVelocity(const Vector3& velocity) { stats.velocity = velocity; }
+	virtual Vector3 GetVelocity() const { return stats.velocity; }
+
+
+	/// <summary>
+	/// マップ衝突クエリーのセット
+	/// </summary>
+	/// <param name="mapQuery">マップクエリー</param>
+	void SetMapQuery(IMapCollisionQuery* mapQuery) { this->mapQuery = mapQuery; }
 
 protected:
 	/// エネミーのステータス
 	Stats stats;
 	/// エネミーの3Dオブジェクト
 	std::unique_ptr<Object3D> model;
+	/// マップ衝突クエリー
+	IMapCollisionQuery* mapQuery = nullptr;
 };
 
