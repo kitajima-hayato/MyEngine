@@ -55,23 +55,23 @@ void SideMoveEnemy::Draw()
 void SideMoveEnemy::Move()
 {
 	// 横移動の挙動を実装
-	if(!mapQuery) {
+	if (!mapQuery) {
 		// マップクエリーが設定されていない場合は、単純に速度分だけ移動する
-		stats.transform.translate.x = stats.velocity.x;
+		stats.transform.translate.x += stats.velocity.x;
 		return;
 	}
 
 	// 移動方向の取得
-	float dir = (stats.velocity.x >= 0) ? 0.5f : -0.5f;
+	float dir = (stats.velocity.x >= 0.0f) ? 1.0f : -1.0f;
 
-	// 次の位置を計算
+	// 現在位置とスケール
 	const Vector3& pos = stats.transform.translate;
 	const Vector3& scale = stats.transform.scale;
 
-	// エネミーの右端と左端の座標を計算
-	float probeX = pos.x + dir * (scale.x * 0.5f + 0.05f); 
+	// 進行方向側を少し先読み
+	float probeX = pos.x + dir * (scale.x * 0.5f + 0.05f);
 
-	// 上下２点をプローブして、どちらかが壁なら方向転換
+	// 上下2点をプローブして、どちらかが壁なら方向転換
 	float upperY = pos.y + scale.y * 0.25f;
 	float lowerY = pos.y - scale.y * 0.25f;
 
@@ -79,11 +79,13 @@ void SideMoveEnemy::Move()
 	Vector3 lowerProbe{ probeX, lowerY, pos.z };
 
 	bool hitWall = mapQuery->IsWallAt(upperProbe) || mapQuery->IsWallAt(lowerProbe);
+
 	// 壁に当たっていたら方向転換して終了
 	if (hitWall) {
-		stats.velocity.x *= -0.5f;
+		stats.velocity.x *= -1.0f;
 		return;
 	}
+
 	stats.transform.translate.x += stats.velocity.x;
 }
 
