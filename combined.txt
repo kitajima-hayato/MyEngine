@@ -11,18 +11,31 @@
 └── └── └── ├── BlockType.h
 └── └── └── └── HazardType.h
 └── └── ├── Enemy/
-└── └── └── ├── EnemyBase.cpp
-└── └── └── ├── EnemyBase.h
-└── └── └── ├── EnemyFactory.cpp
-└── └── └── ├── EnemyFactory.h
-└── └── └── ├── EnemyType.h
-└── └── └── ├── FlyingEnemy.cpp
-└── └── └── ├── FlyingEnemy.h
-└── └── └── ├── NormalEnemy.cpp
-└── └── └── └── NormalEnemy.h
+└── └── └── ├── EnemyBase/
+└── └── └── └── ├── EnemyBase.cpp
+└── └── └── └── ├── EnemyBase.h
+└── └── └── └── ├── FloatingEnemyBase.cpp
+└── └── └── └── └── FloatingEnemyBase.h
+└── └── └── ├── Factory/
+└── └── └── └── ├── EnemyFactory.cpp
+└── └── └── └── └── EnemyFactory.h
+└── └── └── ├── Flying/
+└── └── └── └── ├── FlyingEnemy.cpp
+└── └── └── └── ├── FlyingEnemy.h
+└── └── └── └── ├── SideMoveFlyingEnemy.cpp
+└── └── └── └── └── SideMoveFlyingEnemy.h
+└── └── └── ├── Ground/
+└── └── └── └── ├── NormalEnemy.cpp
+└── └── └── └── ├── NormalEnemy.h
+└── └── └── └── ├── SideMoveEnemy.cpp
+└── └── └── └── └── SideMoveEnemy.h
+└── └── └── └── Types/
+└── └── └──     └── EnemyType.h
 └── └── ├── Map/
 └── └── └── ├── CsvLoader.cpp
 └── └── └── ├── CsvLoader.h
+└── └── └── ├── IMapCollisionQuery.cpp
+└── └── └── ├── IMapCollisionQuery.h
 └── └── └── ├── Map.cpp
 └── └── └── └── Map.h
 └── └── ├── ModelList.cpp
@@ -50,7 +63,9 @@
 └── └── ├── Collider.cpp
 └── └── ├── Collider.h
 └── └── ├── CollisionManager.cpp
-└── └── └── CollisionManager.h
+└── └── ├── CollisionManager.h
+└── └── ├── MapCollisionQuery.cpp
+└── └── └── MapCollisionQuery.h
 └── ├── Loader/
 └── └── ├── LevelLoader.cpp
 └── └── └── LevelLoader.h
@@ -89,9 +104,7 @@
 └──         ├── ITransitionEffect.h
 └──         ├── TransitionManager.cpp
 └──         └── TransitionManager.h
-├── HazardType.h
 ├── Lib/
-├── Map.cpp
 ├── MyEngine.vcxproj
 ├── MyEngine.vcxproj.filters
 ├── engine/
@@ -679,7 +692,7 @@ enum class HazardType : uint32_t {
 };
 
 ============================================================
-File Path: Game/Application/Enemy/EnemyBase.cpp
+File Path: Game/Application/Enemy/EnemyBase/EnemyBase.cpp
 ============================================================
 #include "EnemyBase.h"
 
@@ -687,12 +700,13 @@ File Path: Game/Application/Enemy/EnemyBase.cpp
 
 
 ============================================================
-File Path: Game/Application/Enemy/EnemyBase.h
+File Path: Game/Application/Enemy/EnemyBase/EnemyBase.h
 ============================================================
 #pragma once
 #include "engine/math/MyMath.h"
 #include "engine/3d/Object3D.h"
 #include "Game/Collision/Collider.h"
+#include "Game/Application/Map/IMapCollisionQuery.h"
 
 /// <summary>
 /// エネミーの基本構造
@@ -785,21 +799,83 @@ public:
 	virtual Vector3 GetRotate() const { return stats.transform.rotate; }
 	virtual void SetTranslate(const Vector3& translate) { stats.transform.translate = translate; }
 	virtual Vector3 GetTranslate() const { return stats.transform.translate; }
+	virtual void AddTranslate(const Vector3& offset) { stats.transform.translate += offset; }
+	/// エネミーのvelocity設定/取得
+	virtual void SetVelocity(const Vector3& velocity) { stats.velocity = velocity; }
+	virtual Vector3 GetVelocity() const { return stats.velocity; }
+
+
+	/// <summary>
+	/// マップ衝突クエリーのセット
+	/// </summary>
+	/// <param name="mapQuery">マップクエリー</param>
+	void SetMapQuery(IMapCollisionQuery* mapQuery) { this->mapQuery = mapQuery; }
 
 protected:
 	/// エネミーのステータス
 	Stats stats;
 	/// エネミーの3Dオブジェクト
 	std::unique_ptr<Object3D> model;
+	/// マップ衝突クエリー
+	IMapCollisionQuery* mapQuery = nullptr;
 };
 
 
 
 ============================================================
-File Path: Game/Application/Enemy/EnemyFactory.cpp
+File Path: Game/Application/Enemy/EnemyBase/FloatingEnemyBase.cpp
+============================================================
+#include "FloatingEnemyBase.h"
+#include <numbers>
+
+void FloatingEnemyBase::UpdateFloating()
+{
+	// Y軸方向に浮遊する挙動を実装
+	// ふり幅と速度を調整して、自然な浮遊感を出す
+	const float amplitude = 2.0f;
+	const float frequency = 0.01f;
+
+	timer += frequency;
+	// timerの値を元に、正弦波を使ってY軸方向のオフセットを計算
+	float offsetY = std::sin(timer * radian * std::numbers::pi_v<float>) * amplitude;
+	// baseYにオフセットを加えて、Y軸方向の位置を更新
+	stats.transform.translate.y = baseY + offsetY;
+}
+
+
+============================================================
+File Path: Game/Application/Enemy/EnemyBase/FloatingEnemyBase.h
+============================================================
+#pragma once
+#include "EnemyBase.h"
+
+class FloatingEnemyBase : public EnemyBase
+{
+protected: // 派生クラスでアクセス可能なメンバ
+    /// <summary>
+    /// 浮遊の共通処理 / ふわふわと浮遊する挙動
+    /// </summary>
+    void UpdateFloating();
+
+    // 元の高さ（初期位置Y）
+    float baseY = 0.0f;
+	// 経過時間
+   	float timer = 0.0f;
+	// ラジアンの定数（2πで1周）
+    const float radian = 2.0f;
+};
+
+
+
+============================================================
+File Path: Game/Application/Enemy/Factory/EnemyFactory.cpp
 ============================================================
 #include "EnemyFactory.h"
 #include <Logger.h>
+#include "../Ground/NormalEnemy.h"
+#include "../Flying/FlyingEnemy.h"
+#include "../Flying/SideMoveFlyingEnemy.h"
+#include "../Ground/SideMoveEnemy.h"
 
 std::unique_ptr<EnemyBase> EnemyFactory::CreateEnemy(const std::string& type)
 {
@@ -813,13 +889,22 @@ std::unique_ptr<EnemyBase> EnemyFactory::CreateEnemy(const std::string& type)
 		auto enemy = std::make_unique<FlyingEnemy>();
 		return enemy;
 	}
+	else if (type == "SideMoveFlyingEnemy")
+	{
+		auto enemy = std::make_unique<SideMoveFlyingEnemy>();
+		return enemy;
+	}
+	else if (type == "SideMoveEnemy") {
+		auto enemy = std::make_unique<SideMoveEnemy>();
+		return enemy;
+	}
 	Logger::Log("\nEnemy generation failed\nNo matching data found\n		or\nSpelling error\n\n");
 	return nullptr; // 対応するエネミーがない場合はnullptrを返す
 }
 
 
 ============================================================
-File Path: Game/Application/Enemy/EnemyFactory.h
+File Path: Game/Application/Enemy/Factory/EnemyFactory.h
 ============================================================
 #pragma once
 #include <memory>
@@ -830,9 +915,11 @@ File Path: Game/Application/Enemy/EnemyFactory.h
 /// </summary>
 
 /// エネミー全てのファクトリークラス
-#include "EnemyBase.h"
-#include "NormalEnemy.h"
-#include "FlyingEnemy.h"
+#include "../EnemyBase/EnemyBase.h"
+class NormalEnemy;
+class FlyingEnemy;
+class SideMoveFlyingEnemy;
+class SideMoveEnemy;
 class EnemyFactory
 {
 public:
@@ -848,20 +935,7 @@ public:
 
 
 ============================================================
-File Path: Game/Application/Enemy/EnemyType.h
-============================================================
-#pragma once
-
-
-enum class EnemyType {
-
-	None = 0,
-	NormalEnemy = 1,
-	FlyingEnemy = 2,
-};
-
-============================================================
-File Path: Game/Application/Enemy/FlyingEnemy.cpp
+File Path: Game/Application/Enemy/Flying/FlyingEnemy.cpp
 ============================================================
 #include "FlyingEnemy.h"
 
@@ -925,16 +999,7 @@ void FlyingEnemy::Draw()
 
 void FlyingEnemy::Move()
 { 
-	// Y軸方向に浮遊する挙動を実装
-	// ふり幅と速度を調整して、自然な浮遊感を出す
-	const float amplitude = 2.0f;
-	const float frequency = 0.01f;
-
-	timer += frequency;
-	// timerの値を元に、正弦波を使ってY軸方向のオフセットを計算
-	float offsetY = std::sin(timer * 2.0f * 3.14159265f) * amplitude;
-	// baseYにオフセットを加えて、Y軸方向の位置を更新
-	stats.transform.translate.y = baseY + offsetY;
+	FloatingEnemyBase::UpdateFloating();
 }
 
 void FlyingEnemy::Action()
@@ -945,22 +1010,22 @@ void FlyingEnemy::Action()
 void FlyingEnemy::SetTranslate(const Vector3& translate)
 {
 	EnemyBase::SetTranslate(translate);
-	baseY = translate.y;      
-	timer = 0.0f;             
+	baseY = translate.y;     
 }
 
 
 
 ============================================================
-File Path: Game/Application/Enemy/FlyingEnemy.h
+File Path: Game/Application/Enemy/Flying/FlyingEnemy.h
 ============================================================
 #pragma once
-#include "EnemyBase.h"
-/// 基底クラス<BaseEnemy>を継承
+#include "../EnemyBase/EnemyBase.h"
+#include "../EnemyBase/FloatingEnemyBase.h"
+/// 基底クラス<FloatingEnemyBase>を継承
 class FlyingEnemy :
-    public EnemyBase
+    public FloatingEnemyBase
 {
-    public:
+public:
     /// <summary>
     /// 初期化処理
     /// </summary>
@@ -980,29 +1045,166 @@ class FlyingEnemy :
     /// <summary>
     /// 攻撃処理
     /// </summary>
-	void Action() override;
+    void Action() override;
 
     /// <summary>
-	/// トランスフォームの設定。FlyingEnemyはY軸方向に浮遊するため、baseYを更新して高さの基準とする
+    /// 位置情報の設定
     /// </summary>
-    /// <param name="transform"></param>
-    void SetTranslate(const Vector3& translate) override;
-
-private:
-    /// 元の高さ（初期位置Y）
-    float baseY = 0.0f;
-    float timer = 0.0f;
-
-
-    
-
+    /// <param name="translate"></param>
+    void SetTranslate(const Vector3& translate)override;
 
 };
 
 
 
 ============================================================
-File Path: Game/Application/Enemy/NormalEnemy.cpp
+File Path: Game/Application/Enemy/Flying/SideMoveFlyingEnemy.cpp
+============================================================
+#include "SideMoveFlyingEnemy.h"
+
+void SideMoveFlyingEnemy::Initialize()
+{
+	/// @仮スタッツ
+	stats = {
+		// scale
+		{{1.0f, 1.0f, 1.0f},
+		// Rotate
+		{0.0f, 0.0f, 0.0f},
+		// Translate
+		//{5.0f, -3.0f, 0.0f},
+		},
+		// 生存フラグ
+		true,
+		// 速度
+		{0.1f, 0.1f, 0.0f},
+		// 体力
+		1,
+		// 攻撃力
+		1
+	};
+	// タイマーの初期化
+	timer = 0.0f;
+	// Object3Dの初期化
+	model = std::make_unique<Object3D>();
+	model->Initialize();
+	// モデルの設定
+	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	// トランスフォームの設定
+	model->SetTransform(stats.transform);
+	// baseYの設定
+	baseY = stats.transform.translate.y;
+
+}
+
+void SideMoveFlyingEnemy::Update()
+{
+	// 生存していたら
+	if (stats.isAlive) {
+		// 挙動処理
+		Move();
+		// 攻撃処理
+		Action();
+		// トランスフォームの反映
+		model->SetTransform(stats.transform);
+		// モデルの更新
+		model->Update();
+	}
+}
+
+void SideMoveFlyingEnemy::Draw()
+{
+	// 生存していたら描画する
+	if (stats.isAlive) {
+		model->Draw();
+	}
+}
+
+void SideMoveFlyingEnemy::Move()
+{
+	// ふわふわ浮く挙動
+	FloatingEnemyBase::UpdateFloating();
+	// 左に流れる処理
+	SideMove();
+	// 画面外に出たら消す
+	if(stats.transform.translate.x < leftBorder_) {
+		stats.isAlive = false;
+	}
+
+}
+
+void SideMoveFlyingEnemy::Action()
+{
+}
+
+void SideMoveFlyingEnemy::SetTranslate(const Vector3& translate)
+{
+	// 位置を設定する際に、baseYも更新するようにオーバーライド
+	EnemyBase::SetTranslate(translate);
+	baseY = translate.y; 
+}
+
+void SideMoveFlyingEnemy::SideMove()
+{
+	// X軸方向に速度分だけ移動させる
+	stats.transform.translate.x -=  stats.velocity.x;
+}
+
+
+============================================================
+File Path: Game/Application/Enemy/Flying/SideMoveFlyingEnemy.h
+============================================================
+#pragma once
+#include "../EnemyBase/FloatingEnemyBase.h"
+class SideMoveFlyingEnemy :
+    public FloatingEnemyBase
+{
+    public:
+    /// <summary>
+    /// 初期化処理
+    /// </summary>
+    void Initialize() override;
+
+    /// <summary>
+    /// 更新処理
+    /// </summary>
+    void Update() override;
+
+    /// <summary>
+    /// 描画処理
+    /// </summary>
+    void Draw() override;
+
+    /// <summary>
+    /// 動作処理
+    /// </summary>
+    void Move() override;
+
+    /// <summary>
+    /// 攻撃処理
+    /// </summary>
+	void Action() override;
+
+    /// <summary>
+    /// 位置情報の設定
+    /// </summary>
+    /// <param name="translate">設定する位置情報</param>
+    void SetTranslate(const Vector3& translate)override;
+
+	/// <summary>
+	/// 飛行しながら左右に移動する処理
+	/// </summary>
+	void SideMove();
+
+private:
+	// 画面外としての左端の座標
+	float leftBorder_ = -10.0f;
+
+};
+
+
+
+============================================================
+File Path: Game/Application/Enemy/Ground/NormalEnemy.cpp
 ============================================================
 #include "NormalEnemy.h"
 
@@ -1027,34 +1229,33 @@ void NormalEnemy::Initialize()
 		1
 	};
 
-	/// Object3Dの初期化
+	// Object3Dの初期化
 	model = std::make_unique<Object3D>();
 	model->Initialize();
-	/// モデルの設定
+	// モデルの設定
 	model->SetModel("GamePlay/Enemies/tentativeenemy");
-	/// トランスフォームの設定
+	// トランスフォームの設定
 	model->SetTransform(stats.transform);
 }
 
 void NormalEnemy::Update()
 {
 	if (stats.isAlive) {
-		/// 挙動処理
+		// 挙動処理
 		Move();
-		/// 攻撃処理
+		// 攻撃処理
 		Action();
-		/// トランスフォームの反映
+		// トランスフォームの反映
 		model->SetTransform(stats.transform);
-		/// モデルの更新
+		// モデルの更新
 		model->Update();
 	}
-	
 }
 
 void NormalEnemy::Draw()
 {
+	// 生存していたらモデルを描画する
 	if (stats.isAlive) {
-		/// モデルの描画
 		model->Draw();
 	}
 }
@@ -1076,10 +1277,10 @@ void NormalEnemy::OnStomped()
 
 
 ============================================================
-File Path: Game/Application/Enemy/NormalEnemy.h
+File Path: Game/Application/Enemy/Ground/NormalEnemy.h
 ============================================================
 #pragma once
-#include "EnemyBase.h"
+#include "../EnemyBase/EnemyBase.h"
 /// 基底クラス<Bas8eEnemy>を継承
 /// ノーマルエネミークラス
 class NormalEnemy :
@@ -1115,6 +1316,164 @@ class NormalEnemy :
 };
 
 
+
+============================================================
+File Path: Game/Application/Enemy/Ground/SideMoveEnemy.cpp
+============================================================
+#include "SideMoveEnemy.h"
+
+void SideMoveEnemy::Initialize()
+{
+	/// @仮スタッツ
+	stats = {
+		// scale
+		{{1.0f, 1.0f, 1.0f},
+		// Rotate
+		{0.0f, 0.0f, 0.0f},
+		// Translate
+		//{4.0f, -3.0f, 20.0f}
+		},
+		// 生存フラグ
+		true,
+		// 速度
+		{0.1f, 0.1f, 0.0f},
+		// 体力
+		1,
+		// 攻撃力
+		1
+	};
+
+	// Object3Dの初期化
+	model = std::make_unique<Object3D>();
+	model->Initialize();
+	// モデルの設定
+	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	// トランスフォームの設定
+	model->SetTransform(stats.transform);
+}
+
+void SideMoveEnemy::Update()
+{
+	if (stats.isAlive) {
+		// 挙動処理
+		Move();
+		// 攻撃処理
+		Action();
+		// トランスフォームの反映
+		model->SetTransform(stats.transform);
+		// モデルの更新
+		model->Update();
+	}
+}
+
+void SideMoveEnemy::Draw()
+{
+	// 生存していたらモデルを描画する
+	if (stats.isAlive) {
+		model->Draw();
+	}
+}
+
+void SideMoveEnemy::Move()
+{
+	// 横移動の挙動を実装
+	if (!mapQuery) {
+		// マップクエリーが設定されていない場合は、単純に速度分だけ移動する
+		stats.transform.translate.x += stats.velocity.x;
+		return;
+	}
+
+	// 移動方向の取得
+	float dir = (stats.velocity.x >= 0.0f) ? 1.0f : -1.0f;
+
+	// 現在位置とスケール
+	const Vector3& pos = stats.transform.translate;
+	const Vector3& scale = stats.transform.scale;
+
+	// 進行方向側を少し先読み
+	float probeX = pos.x + dir * (scale.x * 0.5f + 0.05f);
+
+	// 上下2点をプローブして、どちらかが壁なら方向転換
+	float upperY = pos.y + scale.y * 0.25f;
+	float lowerY = pos.y - scale.y * 0.25f;
+
+	Vector3 upperProbe{ probeX, upperY, pos.z };
+	Vector3 lowerProbe{ probeX, lowerY, pos.z };
+
+	bool hitWall = mapQuery->IsWallAt(upperProbe) || mapQuery->IsWallAt(lowerProbe);
+
+	// 壁に当たっていたら方向転換して終了
+	if (hitWall) {
+		stats.velocity.x *= -1.0f;
+		return;
+	}
+
+	stats.transform.translate.x += stats.velocity.x;
+}
+
+void SideMoveEnemy::Action()
+{
+}
+
+void SideMoveEnemy::OnStomped()
+{
+	// 踏みつけられたら死亡
+	stats.isAlive = false;
+	stats.health = 0;
+}
+
+
+============================================================
+File Path: Game/Application/Enemy/Ground/SideMoveEnemy.h
+============================================================
+#pragma once
+#include "../EnemyBase/EnemyBase.h"
+class SideMoveEnemy :
+    public EnemyBase
+{
+	/// <summary>
+	/// 初期化処理
+	/// </summary>
+	void Initialize() override;
+	/// <summary>
+	/// 更新処理
+	/// </summary>
+	void Update() override;
+	/// <summary>
+	///  描画処理
+	/// </summary>
+	void Draw() override;
+	/// <summary>
+	/// 動作処理
+	/// </summary>
+	void Move() override;
+	/// <summary>
+	/// 攻撃処理
+	/// </summary>
+	void Action() override;
+
+	/// <summary>
+	/// 踏みつけられたら死亡
+	/// </summary>
+	void OnStomped() override;
+};
+
+
+
+============================================================
+File Path: Game/Application/Enemy/Types/EnemyType.h
+============================================================
+#pragma once
+
+
+enum class EnemyType {
+
+	None = 0,
+	NormalEnemy = 1,
+	FlyingEnemy = 2,
+	SideMoveFlyingEnemy = 3,
+	SideMoveEnemy = 4,
+};
 
 ============================================================
 File Path: Game/Application/Map/CsvLoader.cpp
@@ -1342,7 +1701,7 @@ File Path: Game/Application/Map/CsvLoader.h
 #include <sstream>
 #include "Game/Application/Block/BlockType.h"
 #include "Game/Application/Block/HazardType.h"
-#include "Game/Application/Enemy/EnemyType.h"
+#include "Game/Application/Enemy/Types/EnemyType.h"
 
 class CsvLoader
 {
@@ -1387,6 +1746,34 @@ private:
 	static const std::string frontFilePath;
 	static const std::string extensionCsv_;
 
+};
+
+
+
+============================================================
+File Path: Game/Application/Map/IMapCollisionQuery.cpp
+============================================================
+#include "IMapCollisionQuery.h"
+
+
+============================================================
+File Path: Game/Application/Map/IMapCollisionQuery.h
+============================================================
+#pragma once
+#include "MyMath.h"
+#include "Game/Application/Block/BlockType.h"
+class IMapCollisionQuery
+{
+public:
+	/// <summary>
+	/// マップの衝突クエリーインターフェース
+	/// </summary>
+	virtual ~IMapCollisionQuery() = default;
+
+	/// <summary>
+	/// 座標からマップチップのインデックスを取得
+	/// </summary>
+	virtual bool IsWallAt(const Vector3& position) const = 0;
 };
 
 
@@ -1541,8 +1928,8 @@ void Map::Update()
 			}
 
 			// ------------------------------------------------------------
-// Enemy Save/Load (auto file name from mapFileName)
-// ------------------------------------------------------------
+			// Enemy Save/Load (auto file name from mapFileName)
+			// ------------------------------------------------------------
 			ImGui::Separator();
 			std::string mapBase = MakeBaseName(mapFileName);
 			std::string enemyCsv = mapBase + "_EnemyLayer.csv";
@@ -1654,6 +2041,8 @@ void Map::Update()
 				"None",
 				"NormalEnemy",
 				"FlyingEnemy",
+				"SideMoveFlyingEnemy",
+				"SideMoveEnemy",
 			};
 
 			if (static_cast<EditLayerMode>(editModeInt) == EditLayerMode::Block) {
@@ -2220,7 +2609,7 @@ File Path: Game/Application/Map/Map.h
 #include "MyMath.h"
 #include "Game/Application/Block/Block.h"
 #include "Game/Application/Block/BlockType.h"
-#include "Game/Application/Enemy/EnemyType.h"
+#include "Game/Application/Enemy/Types/EnemyType.h"
 #include "Game/Particle/ParticleSystem.h"
 #include "Game/Particle/ModelParticleManager.h"
 #include <cstdint>
@@ -2549,7 +2938,7 @@ File Path: Game/Application/Player/Player.cpp
 #include <algorithm>
 #include "Input.h"
 #include "Game/Particle/ParticlePresets.h"
-#include "Game/Application/Enemy/EnemyBase.h"
+#include "Game/Application/Enemy/EnemyBase/EnemyBase.h"
 #ifdef USE_IMGUI
 #include "engine/base/ImGuiManager.h"
 #endif
@@ -5108,6 +5497,69 @@ private:
 	std::vector<Collider*>colliders;
 	
 	
+};
+
+
+
+============================================================
+File Path: Game/Collision/MapCollisionQuery.cpp
+============================================================
+#include "MapCollisionQuery.h"
+
+bool MapCollisionQuery::IsWallAt(const Vector3& position) const
+{
+	// マップが無い場合は衝突無し
+	if (!map_) {
+		return false;
+	}
+
+	// 座標からマップチップのインデックスを取得
+	IndexSet indexSet = map_->GetMapChipIndexSetByPosition(position);
+	BlockType blockType = map_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
+
+	// ブロックタイプがAir以外なら壁とみなす
+	return blockType != BlockType::Air;
+
+}
+
+
+============================================================
+File Path: Game/Collision/MapCollisionQuery.h
+============================================================
+#pragma once
+#include "Game/Application/Map/IMapCollisionQuery.h"
+#include "Game/Application/Map/Map.h"
+
+
+class MapCollisionQuery :
+    public IMapCollisionQuery
+{
+public:
+	/// <summary>
+	/// コンストラクタ
+	/// </summary>
+	MapCollisionQuery() = default;
+	/// <summary>
+	/// マップ衝突クエリー
+	/// </summary>
+	/// <param name="map"></param>
+	explicit MapCollisionQuery(Map* map) : map_(map) {}
+
+	/// <summary>
+	/// 座標からマップチップのインデックスを取得
+	/// </summary>
+	/// <param name="position">調べる座標</param>
+	/// <returns>ブロックがあるか</returns>
+	bool IsWallAt(const Vector3& position)const override;
+
+	/// <summary>
+	/// マップの設定
+	/// </summary>
+	/// <param name="map">マップのポインタ</param>
+	void SetMap(Map* map) { map_ = map; }
+
+private:
+	Map* map_ = nullptr;
 };
 
 
@@ -7745,6 +8197,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	// ノードに応じたステージを初期化
 	stageKey = key.empty() ? "1-1" : key.c_str();
 	map->Initialize(stageKey);
+	mapCollisionQuery.SetMap(map.get());
 
 
 	collision_ = std::make_unique<CollisionManager>();
@@ -7807,14 +8260,14 @@ void GamePlayScene::Update()
 	stageStartEventFlag_ = startCam_->IsRunning();
 	isPlayerControlLocked_ = stageStartEventFlag_;
 	player->SetControlEnabled(!isPlayerControlLocked_);
-	
+
 	// マップの更新
 	map->Update();
 	// プレイヤーの更新
 	player->Update();
-	
 
-	
+
+
 
 	// エネミーレイヤーが変更されたらエネミーを再生成
 	if (map->ConsumeEnemyLayerDirtyFlag()) {
@@ -7829,7 +8282,7 @@ void GamePlayScene::Update()
 		player->SetControlEnabled(true);
 	}
 
-	
+
 
 	// フォローカメラ
 	if (!startCam_->IsRunning())
@@ -7856,8 +8309,15 @@ void GamePlayScene::Update()
 
 	// 敵の更新
 	for (auto& enemy : enemies) {
+		if (!enemy) continue;
 		enemy->Update();
 	}
+
+	// 敵同士の重なり解消
+	ResolveEnemyVsEnemy();
+
+	// 当たり判定
+	CheckCollision();
 
 	// 当たり判定
 	CheckCollision();
@@ -7869,10 +8329,10 @@ void GamePlayScene::Update()
 	// プレイヤーがゴールに触れていたらシーン遷移
 	bool isGoal = player->GetIsGoal();
 	if (isGoal) {
-		sceneManager->ChangeSceneWithTransition("STAGECLEAR",TransitionType::Normal);
+		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Normal);
 	}
 
-	
+
 
 	// ImGuiの描画
 	DrawImgui();
@@ -7955,6 +8415,12 @@ void GamePlayScene::GenerateEnemy()
 			case EnemyType::FlyingEnemy:
 				enemyId = "FlyingEnemy";
 				break;
+			case EnemyType::SideMoveFlyingEnemy:
+				enemyId = "SideMoveFlyingEnemy";
+				break;
+			case EnemyType::SideMoveEnemy:
+				enemyId = "SideMoveEnemy";
+				break;
 			default:
 				continue;
 			}
@@ -7965,6 +8431,7 @@ void GamePlayScene::GenerateEnemy()
 			if (!enemy) continue;
 			// エネミーの初期化
 			enemy->Initialize();
+			enemy->SetMapQuery(&mapCollisionQuery);
 			// マップ上の位置にセット
 			Vector3 enemyPos = map->GetMapChipPositionByIndex(x, y);
 			// オフセット
@@ -7990,10 +8457,11 @@ void GamePlayScene::CheckCollision()
 	/// エネミー全種
 	for (auto& enemy : enemies) {
 		if (!enemy)continue;
-
+		// 生存していたら当たり判定をとる
 		if (enemy->IsAlive()) {
 			collision_->AddCollider(enemy.get());
 		}
+		
 	}
 	// 衝突判定実行
 	collision_->CheckAllCollisions();
@@ -8002,26 +8470,90 @@ void GamePlayScene::CheckCollision()
 
 void GamePlayScene::UpdateStartCamera(float dt)
 {
-	
+
 }
 
 
 
 void GamePlayScene::SpritesInitialize()
 {
-	
+
 }
 
 void GamePlayScene::SpritesUpdate()
 {
-	
+
 }
 
 void GamePlayScene::SpritesDraw()
 {
 }
 
+bool GamePlayScene::IsAABBOverlap(const AABB& a, const AABB& b)
+{
+	return (a.min.x <= b.max.x && a.max.x >= b.min.x) &&
+		(a.min.y <= b.max.y && a.max.y >= b.min.y) &&
+		(a.min.z <= b.max.z && a.max.z >= b.min.z);
+}
+void GamePlayScene::CorrectEnemyOverlap(EnemyBase* enemyA, EnemyBase* enemyB)
+{
+	// どちらかがnullptrなら処理しない
+	if (!enemyA || !enemyB) {
+		return;
+	}
+	
+	AABB a = enemyA->GetAABB();
+	AABB b = enemyB->GetAABB();
+	// AABB同士が重なっていないなら処理しない
+	if (!IsAABBOverlap(a, b)) {
+		return;
+	}
+	// 重なっている場合、x軸方向に修正する
+	Vector3 posA = enemyA->GetTranslate();
+	Vector3 posB = enemyB->GetTranslate();
 
+	// x軸方向の重なり量
+	float overlapLeft = b.max.x - a.min.x;
+	float overlapRight = a.max.x - b.min.x;
+	float correctionX = (overlapLeft < overlapRight) ? overlapLeft : -overlapRight;
+
+	// 半分ずつ離す
+	float push = correctionX * 0.5f;
+
+	posA.x += push;
+	posB.x -= push;
+
+	enemyA->SetTranslate(posA);
+	enemyB->SetTranslate(posB);
+
+	// 互いに反転
+	Vector3 velA = enemyA->GetVelocity();
+	Vector3 velB = enemyB->GetVelocity();
+
+	velA.x *= -1.0f;
+	velB.x *= -1.0f;
+
+	enemyA->SetVelocity(velA);
+	enemyB->SetVelocity(velB);
+}
+void GamePlayScene::ResolveEnemyVsEnemy()
+{
+	const size_t count = enemies.size();
+
+	for (size_t i = 0; i < count; ++i) {
+		if (!enemies[i] || !enemies[i]->IsAlive()) {
+			continue;
+		}
+
+		for (size_t j = i + 1; j < count; ++j) {
+			if (!enemies[j] || !enemies[j]->IsAlive()) {
+				continue;
+			}
+
+			CorrectEnemyOverlap(enemies[i].get(), enemies[j].get());
+		}
+	}
+}
 
 void GamePlayScene::Finalize()
 {
@@ -8040,7 +8572,7 @@ void GamePlayScene::DrawImgui()
 #ifdef USE_IMGUI
 	ImGui::Begin("Camera Settings / GamePlayScene");
 	// 読み込んでいるマップデータのキー
-	ImGui::Text("SelectedStage:%s",stageKey);
+	ImGui::Text("SelectedStage:%s", stageKey);
 	//==============================
 	// Start Camera Intro Tuning UI
 	//==============================
@@ -8073,7 +8605,7 @@ File Path: Game/Scene/GamePlayScene.h
 #include "Audio.h"    
 #include "engine/InsideScene/BaseScene.h"
 #include "engine/math/MyMath.h"
-#include "Game/Application/Enemy/EnemyFactory.h"
+#include "Game/Application/Enemy/Factory/EnemyFactory.h"
 #include "Game/Application/BackGround.h"
 #include "Game/Camera/CameraController.h"
 #include "Game/Particle/ParticleSystem.h"
@@ -8082,6 +8614,8 @@ File Path: Game/Scene/GamePlayScene.h
 #include "Game/Camera/StartCamPhase.h"
 #include "Game/Application/UI/DamageFeedBack.h"
 #include "engine/base/DirectXCommon.h"
+#include "Game/Collision/MapCollisionQuery.h"
+#include <Game/Collision/Collider.h>
 /// <summary>
 /// ゲームプレイシーン
 /// ゲームプレイ中のシーンを管理する
@@ -8156,7 +8690,18 @@ public:
 	void SpritesUpdate();
 	void SpritesDraw();
 
-
+	/// <summary>
+	/// AABB同士の当たり判定
+	/// </summary>
+	bool IsAABBOverlap(const AABB& a, const AABB& b);
+	/// <summary>
+	/// エネミー同士の重なりを修正
+	/// </summary>
+	void CorrectEnemyOverlap(EnemyBase* leftEnemy, EnemyBase* rightEnemy);
+	/// <summary>
+	/// エネミー同士の重なりを修正する処理
+	/// </summary>
+	void ResolveEnemyVsEnemy();
 	
 
 private:
@@ -8218,12 +8763,7 @@ private:
 	// エネミー配置のオフセット
 	float enemySpawnOffset_ = 0.5f;
 
-	
-	
-
 	std::unique_ptr<ParticleSystem>testParticle_;
-
-	
 
 	bool isPlayerControlLocked_ = false;
 	
@@ -8234,7 +8774,11 @@ private:
 	Vector3 baseCameraPos_ = {};
 
 	std::string stageKey;
+
+	MapCollisionQuery mapCollisionQuery;
+
 };
+
 
 
 
@@ -12490,42 +13034,6 @@ private:
 
 
 ============================================================
-File Path: HazardType.h
-============================================================
-// HazardType.h
-// Add new layer support for hazard types in maps
-
-#ifndef HAZARD_TYPE_H
-#define HAZARD_TYPE_H
-
-enum HazardType {
-    None,
-    Spike
-};
-
-#endif // HAZARD_TYPE_H
-
-
-============================================================
-File Path: Map.cpp
-============================================================
-// Map.cpp
-#include "HazardType.h"
-
-void Map::LoadMapData(std::string mapName) {
-    // Updated to load hazard layer from <map>_Hazard
-}
-
-void Map::Initialize() {
-    // Allocate hazardData here
-} // Other existing functionalities 
-
-void ImGuiBlockEditor() {
-    // Updated UI for Paint Mode and hazard type combo
-} 
-
-
-============================================================
 File Path: MyEngine.vcxproj
 ============================================================
 ﻿<?xml version="1.0" encoding="utf-8"?>
@@ -12638,15 +13146,16 @@ File Path: MyEngine.vcxproj
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.cpp" />
     <ClCompile Include="Game\Scene\Transition\BallWipeTransition.cpp" />
     <ClCompile Include="Game\Application\UI\DamageFeedBack.cpp" />
     <ClCompile Include="Game\Application\UI\GamePlayHUD.cpp" />
     <ClCompile Include="Game\Camera\CameraController.cpp" />
     <ClCompile Include="Game\Application\BackGround.cpp" />
     <ClCompile Include="Game\Collision\CollisionManager.cpp" />
-    <ClCompile Include="Game\Application\Enemy\FlyingEnemy.cpp" />
-    <ClCompile Include="Game\Application\Enemy\EnemyBase.cpp" />
-    <ClCompile Include="Game\Application\Enemy\EnemyFactory.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Flying\FlyingEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\EnemyBase.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Factory\EnemyFactory.cpp" />
     <ClCompile Include="Game\Collision\Collider.cpp" />
     <ClCompile Include="Game\Application\Map\CsvLoader.cpp" />
     <ClCompile Include="Game\Application\Block\Block.cpp" />
@@ -12664,6 +13173,7 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="engine\base\ImGuiManager.cpp" />
     <ClCompile Include="Game\Loader\LevelLoader.cpp" />
     <ClCompile Include="Game\Scene\Transition\ITransitionEffect.cpp" />
+    <ClCompile Include="Game\Application\Map\IMapCollisionQuery.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="engine\math\MakeMatrix.cpp" />
     <ClCompile Include="engine\3d\Model.cpp" />
@@ -12684,7 +13194,7 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="engine\base\SrvManager.cpp" />
     <ClCompile Include="Game\Scene\TitleScene.cpp" />
     <ClCompile Include="Game\Application\StageType.cpp" />
-    <ClCompile Include="Game\Application\Enemy\NormalEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\NormalEnemy.cpp" />
     <ClCompile Include="engine\3d\SkyBox\SkyBox.cpp" />
     <ClCompile Include="engine\2d\RenderTexture.cpp" />
     <ClCompile Include="Game\Application\Player\Player.cpp" />
@@ -12699,18 +13209,22 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="Game\Particle\ParticlePresets.cpp" />
     <ClCompile Include="Game\Particle\ModelParticleManager.cpp" />
     <ClCompile Include="Game\Scene\Transition\TransitionManager.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.cpp" />
+    <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
     <ClInclude Include="Game\Scene\Transition\BallWipeTransition.h" />
     <ClInclude Include="Game\Application\UI\DamageFeedBack.h" />
     <ClInclude Include="Game\Application\UI\GamePlayHUD.h" />
-    <ClInclude Include="Game\Application\Enemy\EnemyType.h" />
+    <ClInclude Include="Game\Application\Enemy\Types\EnemyType.h" />
     <ClInclude Include="Game\Camera\CameraController.h" />
     <ClInclude Include="Game\Application\BackGround.h" />
     <ClInclude Include="Game\Collision\CollisionManager.h" />
-    <ClInclude Include="Game\Application\Enemy\FlyingEnemy.h" />
-    <ClInclude Include="Game\Application\Enemy\EnemyBase.h" />
-    <ClInclude Include="Game\Application\Enemy\EnemyFactory.h" />
+    <ClInclude Include="Game\Application\Enemy\Flying\FlyingEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\EnemyBase.h" />
+    <ClInclude Include="Game\Application\Enemy\Factory\EnemyFactory.h" />
     <ClInclude Include="Game\Collision\Collider.h" />
     <ClInclude Include="Game\Application\Block\BlockType.h" />
     <ClInclude Include="Game\Application\Map\CsvLoader.h" />
@@ -12747,7 +13261,7 @@ File Path: MyEngine.vcxproj
     <ClInclude Include="engine\base\SrvManager.h" />
     <ClInclude Include="Game\Scene\TitleScene.h" />
     <ClInclude Include="Game\Application\StageType.h" />
-    <ClInclude Include="Game\Application\Enemy\NormalEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\NormalEnemy.h" />
     <ClInclude Include="Game\Loader\LevelLoader.h" />
     <ClInclude Include="engine\3d\SkyBox\SkyBox.h" />
     <ClInclude Include="engine\2d\RenderTexture.h" />
@@ -12765,6 +13279,10 @@ File Path: MyEngine.vcxproj
     <ClInclude Include="Game\Scene\Transition\TransitionManager.h" />
     <ClInclude Include="Game\Scene\Transition\ITransitionEffect.h" />
     <ClInclude Include="Game\Application\Block\HazardType.h" />
+    <ClInclude Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.h" />
+    <ClInclude Include="Game\Application\Map\IMapCollisionQuery.h" />
+    <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
@@ -12842,16 +13360,16 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="Game\Particle\ParticleManager.cpp">
       <Filter>Game\Particle</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\Enemy\EnemyBase.cpp">
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\EnemyBase.cpp">
       <Filter>Game\Application\Enemy</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\Enemy\EnemyFactory.cpp">
+    <ClCompile Include="Game\Application\Enemy\Factory\EnemyFactory.cpp">
       <Filter>Game\Application\Enemy</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\Enemy\FlyingEnemy.cpp">
+    <ClCompile Include="Game\Application\Enemy\Flying\FlyingEnemy.cpp">
       <Filter>Game\Application\Enemy</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\Enemy\NormalEnemy.cpp">
+    <ClCompile Include="Game\Application\Enemy\Ground\NormalEnemy.cpp">
       <Filter>Game\Application\Enemy</Filter>
     </ClCompile>
     <ClCompile Include="engine\InsideScene\Framework.cpp">
@@ -12986,6 +13504,11 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="Game\Particle\ParticlePresets.cpp">
       <Filter>Game\Particle</Filter>
     </ClCompile>
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.cpp" />
+    <ClCompile Include="Game\Application\Map\IMapCollisionQuery.cpp" />
+    <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -13028,16 +13551,16 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="Game\Particle\ParticleManager.h">
       <Filter>Game\Particle</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\EnemyBase.h">
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\EnemyBase.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\EnemyFactory.h">
+    <ClInclude Include="Game\Application\Enemy\Factory\EnemyFactory.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\FlyingEnemy.h">
+    <ClInclude Include="Game\Application\Enemy\Flying\FlyingEnemy.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\NormalEnemy.h">
+    <ClInclude Include="Game\Application\Enemy\Ground\NormalEnemy.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
     <ClInclude Include="engine\InsideScene\Framework.h">
@@ -13124,7 +13647,7 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="Game\Camera\CameraController.h">
       <Filter>Game\Camera</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\Enemy\EnemyType.h">
+    <ClInclude Include="Game\Application\Enemy\Types\EnemyType.h">
       <Filter>Game\Application\Enemy</Filter>
     </ClInclude>
     <ClInclude Include="Game\Application\Player\Player.h">
@@ -13179,6 +13702,11 @@ File Path: MyEngine.vcxproj.filters
       <Filter>Game\Particle</Filter>
     </ClInclude>
     <ClInclude Include="Game\Application\Block\HazardType.h" />
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
+    <ClInclude Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.h" />
+    <ClInclude Include="Game\Application\Map\IMapCollisionQuery.h" />
+    <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">
