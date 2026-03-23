@@ -64,9 +64,6 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 
 	isPlayerControlLocked_ = true;
 
-
-
-
 	pauseSystem_ = std::make_unique<PauseSystem>();
 	pauseSystem_->Initialize();
 

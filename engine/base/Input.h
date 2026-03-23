@@ -52,7 +52,7 @@ public:
 	///特定のキーが話された瞬間を判定
 	/// </summary>
 	/// <param name="keyNumber"></param>
-	bool RereseKey(BYTE keyNumber);
+	bool ReriseKey(BYTE keyNumber);
 
 	/// <summary>
 	///キーが押されているか確認
@@ -65,13 +65,28 @@ public:
 	/// <param name="keyNumber"></param>
 	/// <returns></returns>
 	bool TriggerKey(BYTE keyNumber);
+
+	// マウス追加
+	bool PushMouse(int button);
+	bool TriggerMouse(int button);
+	bool ReleaseMouse(int button);
+
+	LONG GetMouseMoveX() const { return mouseState.lX; }
+	LONG GetMouseMoveY() const { return mouseState.lY; }
+	LONG GetMouseWheel() const { return mouseState.lZ; }
+
 	template <class T>using ComPtr = Microsoft::WRL::ComPtr<T>;
 private:
 
 	ComPtr<IDirectInputDevice8> keyboard;
+	ComPtr<IDirectInputDevice8> mouse;
 	ComPtr<IDirectInput8>directInput = nullptr;
 	BYTE key[256] = {};
 	BYTE keyPre[256] = {};
+
+	// マウス追加
+	DIMOUSESTATE mouseState = {};       
+	DIMOUSESTATE mousePreState = {};
 
 	//WindowsAPI
 	WinAPI* winAPI = nullptr;

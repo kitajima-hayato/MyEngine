@@ -11,7 +11,8 @@ StageSelectGraph::~StageSelectGraph()
 
 void StageSelectGraph::Initialize()
 {
-	// ノード情報をJSONファイルから読み込み
+	// ノード情報を
+	// ファイルから読み込み
 	LoadMapNodeFromJson("stage_select_graph");
 	// ノード境界情報の再計算     
 	RecalculateBounds();
