@@ -3,6 +3,7 @@
 #include "Game/Scene/GamePlayScene.h"
 #include "Game/Scene/StageSelectScene.h"
 #include "Game/Scene/StageClearScene.h"
+#include "Game/Scene/DebugScene.h"
 std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneName)
 {
     // 次のシーン生成
@@ -17,6 +18,10 @@ std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneNam
 	}
 	else if (sceneName == "STAGECLEAR") {
 		return std::make_unique<StageClearScene>();
+	}
+
+	else if(sceneName == "DEBUG") {
+		return std::make_unique<DebugScene>();
 	}
 	return nullptr;
 }

@@ -24,7 +24,8 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("Scenes/StageSelect/Models/node");
 	ModelManager::GetInstance().LoadModel("Scenes/StageSelect/Models/route");
 							   
-	/// GamePlayScene // Player // Block  // Enemy
+	/// GamePlayScene 
+	// Player // Block  // Enemy
 	ModelManager::GetInstance().LoadModel("GamePlay/Player");
 
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/soilblock");
@@ -39,4 +40,8 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/damageblock");
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
+
+
+	// DebugScene
+	ModelManager::GetInstance().LoadModel("Scenes/Debug/BlackDome");
 }
