@@ -1,0 +1,60 @@
+name: Sync From Tag
+
+on:
+  # 手動でタグから最新の状態に同期する
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: '同期するタグ名 (例: StatePattern, Polymorphism)'
+        required: true
+        type: string
+
+jobs:
+  sync-from-tag:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Sync Branch from Tag
+        run: |
+          TAG_NAME="${{ inputs.tag_name }}"
+          BRANCH_NAME="tag/$TAG_NAME"
+
+          # タグの存在を確認
+          if ! git tag -l | grep -qx "$TAG_NAME"; then
+            echo "❌ タグ '$TAG_NAME' が見つかりません。"
+            echo "利用可能なタグ:"
+            git tag -l
+            exit 1
+          fi
+
+          TAG_COMMIT=$(git rev-list -n 1 "$TAG_NAME")
+          echo "🔖 タグ '$TAG_NAME' のコミット: $TAG_COMMIT"
+
+          # ブランチが既に存在する場合は更新、存在しない場合は作成
+          if git ls-remote --heads origin "$BRANCH_NAME" | grep -q "$BRANCH_NAME"; then
+            echo "🔄 ブランチ '$BRANCH_NAME' を更新します。"
+            git fetch origin "$BRANCH_NAME":"$BRANCH_NAME"
+            git checkout "$BRANCH_NAME"
+            git reset --hard "$TAG_COMMIT"
+          else
+            echo "🌿 ブランチ '$BRANCH_NAME' を作成します。"
+            git checkout -b "$BRANCH_NAME" "$TAG_COMMIT"
+          fi
+
+          git push origin "$BRANCH_NAME" --force
+
+          echo "✅ ブランチ '$BRANCH_NAME' をタグ '$TAG_NAME' の状態に同期しました。"
+          echo "   コミット: $TAG_COMMIT"

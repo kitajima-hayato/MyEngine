@@ -1,0 +1,71 @@
+name: Create Tag
+
+on:
+  # 手動でタグを作成する
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'タグ名 (例: StatePattern, Polymorphism)'
+        required: true
+        type: string
+      tag_message:
+        description: 'タグのメッセージ'
+        required: false
+        default: ''
+        type: string
+      force_update:
+        description: '既存のタグを強制的に更新する (true/false)'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'false'
+          - 'true'
+
+jobs:
+  create-tag:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout master
+        uses: actions/checkout@v4
+        with:
+          ref: master
+          fetch-depth: 0
+
+      - name: Configure Git
+        run: |
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+
+      - name: Create or Update Tag
+        run: |
+          TAG_NAME="${{ inputs.tag_name }}"
+          TAG_MESSAGE="${{ inputs.tag_message }}"
+          FORCE_UPDATE="${{ inputs.force_update }}"
+
+          # タグメッセージが空の場合はタグ名をメッセージとして使用
+          if [ -z "$TAG_MESSAGE" ]; then
+            TAG_MESSAGE="$TAG_NAME"
+          fi
+
+          # 既存のタグを確認
+          if git tag -l | grep -qx "$TAG_NAME"; then
+            if [ "$FORCE_UPDATE" = "true" ]; then
+              echo "⚠️ タグ '$TAG_NAME' が既に存在します。強制更新します。"
+              git tag -d "$TAG_NAME"
+              git push origin ":refs/tags/$TAG_NAME" || true
+            else
+              echo "❌ タグ '$TAG_NAME' が既に存在します。force_update を true にして再実行してください。"
+              exit 1
+            fi
+          fi
+
+          # 注釈付きタグを作成
+          git tag -a "$TAG_NAME" -m "$TAG_MESSAGE"
+          git push origin "$TAG_NAME"
+
+          echo "✅ タグ '$TAG_NAME' を作成しました (commit: $(git rev-parse HEAD))"
