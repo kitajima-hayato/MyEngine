@@ -47,6 +47,7 @@ void DebugScene::Initialize(DirectXCommon* dxCommon)
 
 void DebugScene::Update()
 {
+	// Inputクラスの取得と省略
 	Input* input = Input::GetInstance();
 
 	// F1でデバッグカメラON/OFF
@@ -63,12 +64,13 @@ void DebugScene::Update()
 	if (isDebugCameraActive_) {
 		UpdateDebugCamera();
 	}
+
 	// カメラの更新
 	camera->Update();
+
 	// ------------オブジェクトの更新------------
 	ball->Update();
 	player->Update();
-
 	backGround->Update();
 	// ---------------------------------------
 
