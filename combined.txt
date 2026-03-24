@@ -1,6 +1,5 @@
 ### 🌳 Codebase File Tree (Excluding ignored directories)
 
-├── CsvLoader.cpp
 ├── Game/
 └── ├── Application/
 └── └── ├── BackGround.cpp
@@ -45,6 +44,8 @@
 └── └── ├── Player/
 └── └── └── ├── Player.cpp
 └── └── └── └── Player.h
+└── └── ├── RespawnSequence.cpp
+└── └── ├── RespawnSequence.h
 └── └── ├── StageType.cpp
 └── └── ├── StageType.h
 └── └── └── UI/
@@ -79,6 +80,11 @@
 └── └── ├── ParticleSystem.cpp
 └── └── └── ParticleSystem.h
 └── └── Scene/
+└──     ├── DebugScene/
+└──     └── ├── DebugScene.cpp
+└──     └── └── DebugScene.h
+└──     ├── GameOverScene.cpp
+└──     ├── GameOverScene.h
 └──     ├── GamePlayScene.cpp
 └──     ├── GamePlayScene.h
 └──     ├── MyGame.cpp
@@ -168,24 +174,6 @@
 └──     └── MyMath.h
 └── main.cpp
 ================================================================================
-
-
-============================================================
-File Path: CsvLoader.cpp
-============================================================
-// CsvLoader.cpp
-// Loading and saving hazard CSV support
-
-#include "CsvLoader.h"
-#include "MapChipData.h"
-
-void LoadMapHazardType(std::string path, MapChipData &data) {
-    // Implementation to load hazard type from CSV
-}
-
-void SaveMapHazardType(std::string path, const MapChipData &data) {
-    // Implementation to save hazard type to CSV
-}
 
 
 ============================================================
@@ -2840,7 +2828,8 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("Scenes/StageSelect/Models/node");
 	ModelManager::GetInstance().LoadModel("Scenes/StageSelect/Models/route");
 							   
-	/// GamePlayScene // Player // Block  // Enemy
+	/// GamePlayScene 
+	// Player // Block  // Enemy
 	ModelManager::GetInstance().LoadModel("GamePlay/Player");
 
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/soilblock");
@@ -2855,6 +2844,10 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/damageblock");
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
+
+
+	// DebugScene
+	ModelManager::GetInstance().LoadModel("Scenes/Debug/BlackDome");
 }
 
 
@@ -3038,6 +3031,9 @@ void Player::TakeDamage()
 	isEnemyHit_ = true;
 	flashingFrameCount_ = 0;
 	isVisible_ = true;
+
+	// 体力を減らす
+	status_.kHealth -= 1;
 }
 
 void Player::StompEnemy(Collider* enemy)
@@ -3144,6 +3140,32 @@ bool Player::IsTouchingHazardSpike() const
 
 	return false;
 }
+
+void Player::Respawn(const Vector3& pos)
+{
+	velocity_ = {};
+	if (playerModel_) {
+		playerModel_->SetTranslate(pos);
+		playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
+	}
+
+	isDead_ = false;
+	isDeathByFalling_ = false;
+
+	onGround_ = true;
+
+	// 無敵点滅などの副作用があるなら必要に応じて初期化
+	// isEnemyHit_ = false;
+	// isVisible_ = true;
+}
+
+bool Player::ConsumeDeathByFalling()
+{
+	if (!isDeathByFalling_) { return false; }
+	isDeathByFalling_ = false;
+	return true;
+}
+
 
 void Player::FlashingUpdate()
 {
@@ -3258,7 +3280,7 @@ void Player::Initialize(Vector3 position)
 	playerModel_->SetTranslate(position);
 	playerModel_->SetModel("GamePlay/Player");
 	// 死ぬ高さの設定
-	SetDeathHeight(-1.0f);
+	SetDeathHeight(-3.0f);
 
 	// ダッシュエフェクトの初期化
 	// 足元の煙エフェクト
@@ -3340,7 +3362,9 @@ void Player::UpdateBehavior()
 	if (playerModel_->GetTranslate().y < deathHeight_ && !onGround_)
 	{
 		// 死亡フラグ
+		status_.kHealth -= 1;
 		isDead_ = true;
+		isDeathByFalling_ = true;
 	}
 
 	// 移動量の反映
@@ -3820,12 +3844,11 @@ bool Player::IsHitBlockDamageTable(BlockType type)
 
 void Player::DebugPlayerReset()
 {
-	// デバッグ用にリセット
-	velocity_ = {};
-	playerModel_->SetTranslate({ 1.5f,1.5f,0.0f });
-	playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
-	isDead_ = false;
-	onGround_ = true;
+	//// デバッグ用にリセット
+	//velocity_ = {};
+	//playerModel_->SetTranslate({ 1.5f,1.5f,0.0f });
+	//playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
+	//isDead_ = false;
 }
 
 
@@ -3864,6 +3887,7 @@ void Player::ImGui()
 			ImGui::SliderFloat("Gravity", &status_.kGravity, 0.01f, 0.2f);
 			ImGui::SliderFloat("Max Fall Speed", &status_.kMaxFallSpeed, 0.1f, 2.0f);
 			ImGui::SliderFloat("Jump Power", &status_.kJumpPower, 0.1f, 1.0f);
+			ImGui::Text("HP: %d", status_.kHealth);
 
 			// Playerのスタッツの変更
 			Vector3 pos = playerModel_->GetTranslate();
@@ -4049,6 +4073,9 @@ struct PlayerStatus {
 	//振り向きパラメーター
 	// 角度の補間タイム
 	float kTurnTime = 0.1f;
+
+	// プレイヤーの体力
+	uint32_t kHealth = 3;
 };
 
 class Player :public Collider
@@ -4092,6 +4119,13 @@ public:
 	/// 終了処理
 	/// </summary>
 	void Finalize();
+
+	/// <summary>
+	/// プレイヤーの位置をリスポーン地点に移動させる
+	/// </summary>
+	/// <param name="pos"></param>
+	void Respawn(const Vector3& pos);
+
 
 private:
 	/// <summary>
@@ -4243,6 +4277,7 @@ private:
 	/// <returns></returns>
 	bool IsTouchingHazardSpike()const;
 
+	
 public:	/// Setter / Getter
 	// 死亡判定の高さを設定
 	void SetDeathHeight(float deathHeight) { deathHeight_ = deathHeight; }
@@ -4263,6 +4298,17 @@ public:	/// Setter / Getter
 	void SetControlEnabled(bool enabled) { controlEnabled_ = enabled; }
 	bool IsControlEnabled() const { return controlEnabled_; }
 
+	// プレイヤーの体力取得
+	uint32_t GetHealth() const { return status_.kHealth; }
+
+	// プレイヤーの生存状態を取得
+	bool IsAlive() const { return status_.kHealth > 0; }
+
+	// プレイヤーが落下して死亡したかの取得
+	bool IsDeathByFalling() const { return isDeathByFalling_; }
+
+	// 落下死フラグを「消費」する（trueなら内部でfalseに戻す）
+	bool ConsumeDeathByFalling();
 
 
 private:	// メンバ変数
@@ -4345,9 +4391,240 @@ private:	// メンバ変数
 	// ダメージブロックに触れてからのフレーム数を追跡
 	uint32_t damageTouchFrames_ = 0;
 	uint32_t damageTickIntervalFrames_ = 30;
+
+	// 落下して死亡したのフラグ
+	bool isDeathByFalling_ = false;
 };
 
 
+
+============================================================
+File Path: Game/Application/RespawnSequence.cpp
+============================================================
+#include "RespawnSequence.h"
+
+void RespawnSequence::Initialize()
+{
+	blackOverlay_ = std::make_unique<Sprite>();
+	blackOverlay_->Initialize("resources/Scenes/Debug/BlackDome/Black.dds");
+
+	// 初期は見えない（透明）
+	blackOverlay_->SetColor({ 0.0f,0.0f,0.0f,0.0f });
+	blackOverlay_->SetPosition({ 0.0f,0.0f });
+	blackOverlay_->SetSize({ 1280.0f,720.0f });
+}
+
+void RespawnSequence::Update(float dt)
+{
+	if (!blackOverlay_) { return; }
+
+	if (phase_ == Phase::Darken || phase_ == Phase::Lighten) {
+		UpdateFade(dt);
+	} else if (phase_ == Phase::Hold) {
+		holdElapsed_ += dt;
+		if (holdElapsed_ >= holdDuration_) {
+			StartLighten();
+		}
+	}
+
+	blackOverlay_->Update();
+}
+
+void RespawnSequence::Draw()
+{
+	if (!blackOverlay_) { return; }
+	blackOverlay_->Draw();
+}
+
+void RespawnSequence::Start()
+{
+	// 状態をリセットして暗転開始
+	isFinished_ = false;
+	isDarkened_ = false;
+	StartDarken();
+}
+
+bool RespawnSequence::ConsumeDarkened()
+{
+	if (!isDarkened_) { return false; }
+	isDarkened_ = false;
+	return true;
+}
+
+void RespawnSequence::StartDarken()
+{
+	phase_ = Phase::Darken;
+	colorChangeDuration_ = darkenDuration_;
+
+	colorChangeElapsed_ = 0.0f;
+
+	// 透明→真っ黒
+	startColor_ = { 0.0f, 0.0f, 0.0f, 0.0f };
+	endColor_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+
+	if (blackOverlay_) {
+		blackOverlay_->SetColor(startColor_);
+	}
+}
+
+void RespawnSequence::StartLighten()
+{
+	phase_ = Phase::Lighten;
+	colorChangeDuration_ = lightenDuration_;
+	colorChangeElapsed_ = 0.0f;
+
+	// 真っ黒→透明
+	startColor_ = { 0.0f, 0.0f, 0.0f, 1.0f };
+	endColor_ = { 0.0f, 0.0f, 0.0f, 0.0f };
+
+	if (blackOverlay_) {
+		blackOverlay_->SetColor(startColor_);
+	}
+}
+
+void RespawnSequence::StartHold()
+{
+	phase_ = Phase::Hold;
+	holdElapsed_ = 0.0f;
+
+	// 真っ暗を維持（alpha=1）
+	if (blackOverlay_) {
+		blackOverlay_->SetColor({ 0.0f,0.0f,0.0f,1.0f });
+	}
+}
+
+void RespawnSequence::UpdateFade(float dt)
+{
+	colorChangeElapsed_ += dt;
+
+	float t = colorChangeElapsed_ / colorChangeDuration_;
+	if (t >= 1.0f) { t = 1.0f; }
+
+	// 線形補間（Lerp）
+	Vector4 c;
+	c.x = startColor_.x + (endColor_.x - startColor_.x) * t;
+	c.y = startColor_.y + (endColor_.y - startColor_.y) * t;
+	c.z = startColor_.z + (endColor_.z - startColor_.z) * t;
+	c.w = startColor_.w + (endColor_.w - startColor_.w) * t;
+
+	blackOverlay_->SetColor(c);
+
+	// 完了判定
+	if (t >= 1.0f) {
+		if (phase_ == Phase::Darken) {
+			// 真っ暗到達（この瞬間にワープさせる）
+			isDarkened_ = true;
+
+			// すぐ明転へ（ワープ後に呼びたいなら、ここで切り替えずGamePlayScene側でStartLighten()を呼ぶ設計もOK）
+			StartLighten();
+		} else if (phase_ == Phase::Lighten) {
+			phase_ = Phase::None;
+			isFinished_ = true;
+		}
+	}
+}
+
+============================================================
+File Path: Game/Application/RespawnSequence.h
+============================================================
+#pragma once
+#include "engine/math/MyMath.h"
+#include <memory>
+#include "engine/2d/Sprite.h"
+
+class RespawnSequence
+{
+public:
+	/// <summary>
+	/// 初期化
+	/// </summary>
+	void Initialize();
+
+	/// <summary>
+	/// 更新
+	/// </summary>
+	void Update(float dt = 1.0f / 60.0f);
+
+	/// <summary>
+	/// 描画
+	/// </summary>
+	void Draw();
+
+public:
+	/// <summary>
+	/// リスポーンシーケンス開始（暗転→真っ暗→明転）
+	/// </summary>
+	void Start();
+
+	/// <summary>
+	/// 実行中か（暗転中 or 明転中）
+	/// </summary>
+	bool IsRunning() const { return phase_ != Phase::None; }
+
+	/// <summary>
+	/// 暗転完了（真っ暗）しているか：この瞬間にワープすると自然
+	/// </summary>
+	bool IsDarkened() const { return isDarkened_; }
+
+	/// <summary>
+	/// 一連の演出が終了したか（明転完了）
+	/// </summary>
+	bool IsFinished() const { return isFinished_; }
+
+	/// <summary>
+	/// 暗転完了フラグを消費する（消費したら false になる）
+	/// </summary>
+	/// <returns></returns>
+	bool ConsumeDarkened();
+
+private:
+	enum class Phase {
+		None,
+		Darken,
+		Hold,
+		Lighten
+	};
+
+private:
+	void StartDarken();
+	void StartLighten();
+	void StartHold();
+
+	/// <summary>
+	/// 色補間を1ステップ進める（t:0→1）
+	/// </summary>
+	void UpdateFade(float dt);
+
+private:
+	// 画面暗転用のスプライト
+	std::unique_ptr<Sprite> blackOverlay_;
+
+	// フェード色（黒固定でalphaだけ変える想定）
+	Vector4 startColor_{ 0.0f, 0.0f, 0.0f, 0.0f };
+	Vector4 endColor_{ 0.0f, 0.0f, 0.0f, 1.0f };
+
+	// 色の変化時間
+	float colorChangeDuration_ = 0.6f; 
+	// 暗転・明転の時間
+	float darkenDuration_ = 0.6f;
+	float lightenDuration_ = 0.3f;
+	// 色の変化の経過時間
+	float colorChangeElapsed_ = 0.0f;
+
+	Phase phase_ = Phase::None;
+
+	// 暗転完了フラグ（真っ暗到達）
+	bool isDarkened_ = false;
+
+	// 全体完了（明転完了）
+	bool isFinished_ = false;
+
+
+	// 真っ暗保持時間（ここを増やすとリスポーンが遅れる）
+	float holdDuration_ = 1.0f;   // 例：0.3秒待つ
+	float holdElapsed_ = 0.0f;
+	
+};
 
 ============================================================
 File Path: Game/Application/StageType.cpp
@@ -8154,6 +8431,440 @@ private:
 
 
 ============================================================
+File Path: Game/Scene/DebugScene/DebugScene.cpp
+============================================================
+#include "DebugScene.h"
+#include "engine/InsideScene/Framework.h"
+
+using Engine::DirectXCommon;
+
+namespace
+{
+	Vector3 Normalize(const Vector3& v)
+	{
+		float len = std::sqrt(v.x * v.x + v.y * v.y + v.z * v.z);
+		if (len <= 0.00001f) {
+			return { 0.0f,0.0f,0.0f };
+		}
+		return { v.x / len, v.y / len, v.z / len };
+	}
+}
+
+DebugScene::DebugScene() {
+
+}
+
+DebugScene::~DebugScene()
+{
+
+}
+
+void DebugScene::Initialize(DirectXCommon* dxCommon)
+{
+	camera = Framework::GetMainCamera();
+	cameraTransform.translate = camera->GetTranslate();
+	cameraTransform.rotate = camera->GetRotate();
+
+	ball = std::make_unique<Object3D>();
+	ball->Initialize();
+	ball->SetModel("Scenes/Debug/BlackDome");
+	ball->SetScale({ 5.0f,5.0f,5.0f });;
+	ball->SetTranslate({ 0.0f,-4.5f,20.0f });
+
+	player = std::make_unique<Object3D>();
+	player->Initialize();
+	player->SetModel("GamePlay/Player");
+	player->SetTranslate({ 0.0f,-7.0f,20.0f });
+
+	backGround = std::make_unique<BackGround>();
+	backGround->Initialize();
+}
+
+void DebugScene::Update()
+{
+	// Inputクラスの取得と省略
+	Input* input = Input::GetInstance();
+
+	// F1でデバッグカメラON/OFF
+	if (input->TriggerKey(DIK_F1)) {
+		isDebugCameraActive_ = !isDebugCameraActive_;
+	}
+
+	// F2で速度切り替え
+	if (input->TriggerKey(DIK_F2)) {
+		isFastMoveMode_ = !isFastMoveMode_;
+	}
+
+	// デバッグカメラが有効な時だけ更新
+	if (isDebugCameraActive_) {
+		UpdateDebugCamera();
+	}
+
+	// カメラの更新
+	camera->Update();
+
+	// ------------オブジェクトの更新------------
+	ball->Update();
+	player->Update();
+	backGround->Update();
+	// ---------------------------------------
+
+
+	// Imguiの描画
+	DrawImgui();
+
+}
+
+void DebugScene::Draw()
+{
+	// ------------オブジェクトの描画------------
+	ball->Draw();
+	player->Draw();
+	backGround->Draw();
+	// ---------------------------------------
+}
+
+void DebugScene::Finalize()
+{
+}
+
+void DebugScene::DrawImgui()
+{
+#ifdef USE_IMGUI
+	// カメラの座標をimguiで編集できるようにする
+	ImGui::Begin("DebugCamera");
+
+	ImGui::Text("Debug Camera : %s", isDebugCameraActive_ ? "ON" : "OFF");
+	ImGui::Text("Speed Mode   : %s", isFastMoveMode_ ? "FAST" : "NORMAL");
+	ImGui::Text("F1 : Toggle Debug Camera");
+	ImGui::Text("F2 : Toggle Speed Mode");
+
+	ImGui::DragFloat3("CameraPos", &cameraTransform.translate.x, 0.1f);
+	ImGui::DragFloat3("CameraRot", &cameraTransform.rotate.x, 0.01f);
+
+	cameraTransform.translate = camera->GetTranslate();
+	cameraTransform.rotate = camera->GetRotate();
+	ImGui::DragFloat3("Translate", &cameraTransform.translate.x, 0.1f);
+	ImGui::DragFloat3("Rotate", &cameraTransform.rotate.x, 0.1f);
+
+	camera->SetTranslate(cameraTransform.translate);
+	camera->SetRotate(cameraTransform.rotate);
+
+	// オブジェクトの座標をimguiで編集できるようにする
+	Transform ballTransform = ball->GetTransform();
+	ImGui::DragFloat3("Ball Translate", &ballTransform.translate.x, 0.1f);
+	ImGui::DragFloat3("Ball Rotate", &ballTransform.rotate.x, 0.1f);
+	ImGui::DragFloat3("Ball Scale", &ballTransform.scale.x, 0.1f);
+
+	ball->SetTransform(ballTransform);
+		
+	Transform playerTransform = player->GetTransform();
+	ImGui::DragFloat3("Player Translate", &playerTransform.translate.x, 0.1f);
+	ImGui::DragFloat3("Player Rotate", &playerTransform.rotate.x, 0.1f);
+	ImGui::DragFloat3("Player Scale", &playerTransform.scale.x, 0.1f);
+
+	player->SetTransform(playerTransform);
+
+
+	ImGui::End();
+#endif
+}
+
+void DebugScene::UpdateDebugCamera()
+{
+	// 入力関数の取得と省略
+	Input* input = Input::GetInstance();
+	// カメラの現在の情報を取得
+	cameraTransform.translate = camera->GetTranslate();
+	cameraTransform.rotate = camera->GetRotate();
+
+	// 右クリック中だけ視点回転
+	if (input->PushMouse(1)) {
+		cameraTransform.rotate.y += input->GetMouseMoveX() * mouseSensitivity_;
+		cameraTransform.rotate.x += input->GetMouseMoveY() * mouseSensitivity_;
+
+		const float limit = 1.55f;
+		if (cameraTransform.rotate.x > limit) {
+			cameraTransform.rotate.x = limit;
+		}
+		if (cameraTransform.rotate.x < -limit) {
+			cameraTransform.rotate.x = -limit;
+		}
+	}
+	// カメラの前方向と右方向を計算
+	float yaw = cameraTransform.rotate.y;
+	float pitch = cameraTransform.rotate.x;
+
+	Vector3 forward = {
+		std::sinf(yaw) * std::cosf(pitch),
+		std::sinf(pitch),
+		std::cosf(yaw) * std::cosf(pitch)
+	};
+
+	float forwardLen = std::sqrt(
+		forward.x * forward.x +
+		forward.y * forward.y +
+		forward.z * forward.z
+	);
+
+	if (forwardLen > 0.00001f) {
+		forward.x /= forwardLen;
+		forward.y /= forwardLen;
+		forward.z /= forwardLen;
+	}
+
+	Vector3 right = {
+		std::cosf(yaw),
+		0.0f,
+		-std::sinf(yaw)
+	};
+
+	float rightLen = std::sqrt(
+		right.x * right.x +
+		right.y * right.y +
+		right.z * right.z
+	);
+
+	if (rightLen > 0.00001f) {
+		right.x /= rightLen;
+		right.y /= rightLen;
+		right.z /= rightLen;
+	}
+
+	Vector3 move = { 0.0f, 0.0f, 0.0f };
+
+	// 入力した方向にカメラを移動させる
+	if (input->PushKey(DIK_W)) {
+		move.x += forward.x;
+		move.y += forward.y;
+		move.z += forward.z;
+	}
+	if (input->PushKey(DIK_S)) {
+		move.x -= forward.x;
+		move.y -= forward.y;
+		move.z -= forward.z;
+	}
+	if (input->PushKey(DIK_D)) {
+		move.x += right.x;
+		move.z += right.z;
+	}
+	if (input->PushKey(DIK_A)) {
+		move.x -= right.x;
+		move.z -= right.z;
+	}
+	if (input->PushKey(DIK_E)) {
+		move.y += 1.0f;
+	}
+	if (input->PushKey(DIK_Q)) {
+		move.y -= 1.0f;
+	}
+
+	float moveLen = std::sqrt(
+		move.x * move.x +
+		move.y * move.y +
+		move.z * move.z
+	);
+
+	if (moveLen > 0.00001f) {
+		move.x /= moveLen;
+		move.y /= moveLen;
+		move.z /= moveLen;
+	}
+
+	// F2で切り替わる速度
+	float speed = isFastMoveMode_ ? cameraShiftSpeed_ : cameraMoveSpeed_;
+
+	// Shift押下中はさらに加速
+	if (input->PushKey(DIK_LSHIFT) || input->PushKey(DIK_RSHIFT)) {
+		speed *= 2.0f;
+	}
+
+	cameraTransform.translate.x += move.x * speed;
+	cameraTransform.translate.y += move.y * speed;
+	cameraTransform.translate.z += move.z * speed;
+	// カメラに反映
+	camera->SetTranslate(cameraTransform.translate);
+	camera->SetRotate(cameraTransform.rotate);
+}
+
+
+============================================================
+File Path: Game/Scene/DebugScene/DebugScene.h
+============================================================
+#pragma once
+#include "engine/InsideScene/BaseScene.h"
+#include "Game/Camera/Camera.h"
+#include "MyMath.h"
+#include "Game/Application/BackGround.h"
+class Object3D;
+class DebugScene :
+    public BaseScene
+{
+public:
+	/// <summary>
+	/// コンストラクタ・デストラクタ
+	/// </summary>
+	DebugScene();
+	~DebugScene();
+
+	/// <summary>
+	 /// 初期化処理
+	 /// </summary>
+	 /// <param name="dxCommon"></param>
+	void Initialize(Engine::DirectXCommon* dxCommon) override;
+	/// <summary>
+	/// 更新処理
+	/// </summary>
+	void Update()override;
+	/// <summary>
+	/// 描画処理
+	/// </summary>
+	void Draw()override;
+	/// <summary>
+	/// 終了処理
+	/// </summary>
+	void Finalize()override;
+
+	/// <summary>
+	/// Imgui一括管理 / 描画関数
+	/// </summary>
+	void DrawImgui();
+private:
+	/// <summary>
+	/// デバッグカメラの更新処理
+	/// </summary>
+	void UpdateDebugCamera();
+private:
+	// カメラ
+	Camera* camera = nullptr;
+	Transform cameraTransform = {};
+
+	// デバッグカメラ設定
+	float cameraMoveSpeed_ = 0.15f;
+	float cameraShiftSpeed_ = 0.45f;
+	float mouseSensitivity_ = 0.01f;
+
+	// デバッグカメラ設定
+	bool isDebugCameraActive_ = true;
+	bool isFastMoveMode_ = false;
+
+	// オブジェクト
+	std::unique_ptr<Object3D> ball = nullptr;
+	std::unique_ptr<Object3D> player = nullptr;
+
+	std::unique_ptr<BackGround> backGround = nullptr;
+};
+
+
+
+============================================================
+File Path: Game/Scene/GameOverScene.cpp
+============================================================
+#include "GameOverScene.h"
+#include "engine/InsideScene/Framework.h"
+
+GameOverScene::GameOverScene()
+{
+}
+
+GameOverScene::~GameOverScene()
+{
+}
+
+void GameOverScene::Initialize(Engine::DirectXCommon* dxCommon)
+{
+	// カメラの取得
+	camera = Framework::GetMainCamera();
+}
+
+void GameOverScene::Update()
+{
+	// カメラの更新
+	camera->Update();
+	// ImGuiの描画
+	DrawImgui();
+}
+
+void GameOverScene::Draw()
+{
+}
+
+void GameOverScene::Finalize()
+{
+	// カメラの終了処理
+	camera->Finalize();
+}
+
+void GameOverScene::DrawImgui()
+{
+#ifdef USE_IMGUI
+	// カメラの調整
+	// カメラの配置情報の変更
+	ImGui::Begin("Camera Transform");
+	cameraTransform = { {0.0f,0.0f,0.0f}, camera->GetRotate(),camera->GetTranslate() };
+	ImGui::DragFloat3("Camera Rotate", &cameraTransform.rotate.x, 0.1f);
+	ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x, 0.1f);
+	
+	// カメラの配置情報の反映
+	camera->SetRotate(cameraTransform.rotate);
+	camera->SetTranslate(cameraTransform.translate);
+	ImGui::End();
+#endif
+}
+
+
+============================================================
+File Path: Game/Scene/GameOverScene.h
+============================================================
+#pragma once
+#include "engine/InsideScene/BaseScene.h"
+#include "Game/Camera/Camera.h"
+#ifdef USE_IMGUI
+#include "ImGuiManager.h"
+#endif
+#include <DirectXCommon.h>
+
+/// <summary>
+/// ゲームオーバーシーン
+/// </summary>
+class GameOverScene : public BaseScene
+{
+	public:
+	GameOverScene();
+	~GameOverScene();
+	/// <summary>
+	/// 初期化処理
+	/// </summary>
+	/// <param name="dxCommon"></param>
+	void Initialize(Engine::DirectXCommon* dxCommon)override;
+	/// <summary>
+	/// 更新処理
+	/// </summary>
+	void Update()override;
+	/// <summary>
+	/// 描画処理
+	/// </summary>
+	void Draw()override;
+	/// <summary>
+	/// 終了処理
+	/// </summary>
+	void Finalize()override;
+
+	/// <summary>
+	/// Imgui一括管理 / 描画関数
+	/// </summary>
+	void DrawImgui();
+private:
+
+	// カメラインスタンス
+	Camera* camera = nullptr;
+	// カメラの配置情報
+	Transform cameraTransform = {};
+};
+
+
+
+============================================================
 File Path: Game/Scene/GamePlayScene.cpp
 ============================================================
 #include "GamePlayScene.h"
@@ -8180,7 +8891,7 @@ GamePlayScene::~GamePlayScene()
 
 void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 {
-	/// オーディオの初期化
+	// オーディオの初期化
 	Audio::GetInstance().Initialize();
 	soundData = Audio::GetInstance().LoadWave("resources/_Common/Audio/debug/mokugyo.wav");
 	xaudio2_ = Audio::GetInstance().GetXAudio2();
@@ -8219,11 +8930,9 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 
 	stageStartEventFlag_ = true;
 	player->SetControlEnabled(false);
+	isPlayerDead_ = player->IsAlive();
 
 	isPlayerControlLocked_ = true;
-
-
-
 
 	pauseSystem_ = std::make_unique<PauseSystem>();
 	pauseSystem_->Initialize();
@@ -8240,13 +8949,23 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	damageFeedBack_->Bind(player.get(), camera, &cameraTransform);
 	damageFeedBack_->Initialize();
 
+	respawnSequence_ = std::make_unique<RespawnSequence>();
+	respawnSequence_->Initialize();
+
 	ModelParticleManager::GetInstance().Initialize();
 }
 
+void GamePlayScene::CheckPlayerAlive()
+{
+	// プレイヤーの生存チェック
+	isPlayerDead_ = player->IsAlive();
+	// プレイヤーの死亡原因が落下かどうか
+	isPlayerDeathByFall_ = player->IsDeathByFalling();
+}
 
 void GamePlayScene::Update()
 {
-
+	// ポーズ中はポーズシステムの更新のみ行う / ポーズ以外入力不可
 	if (pauseSystem_->Update()) {
 		return;
 	}
@@ -8319,11 +9038,48 @@ void GamePlayScene::Update()
 	// 当たり判定
 	CheckCollision();
 
-	// 当たり判定
-	CheckCollision();
 	// スプライトの更新
 	gamePlayHUD_->Update();
+	CheckPlayerAlive();
+	if (isRespawning_) {
+		// 復帰演出中は入力を止める
+		player->SetControlEnabled(false);
 
+		// フェード更新
+		respawnSequence_->Update(dt);
+
+		// 真っ暗になった瞬間にワープ（1回だけ）
+		if (!didWarpOnDark_ && respawnSequence_->ConsumeDarkened()) {
+			didWarpOnDark_ = true;
+			player->Respawn(respawnPos_);
+		}
+
+		// 明転が終わったら復帰完了
+		if (respawnSequence_->IsFinished()) {
+			isRespawning_ = false;
+			didWarpOnDark_ = false;
+			player->SetControlEnabled(true);
+		}
+
+		return;
+	}
+
+	// プレイヤーが死んでいたらゲームオーバーシーンへ
+	if (!isPlayerDead_) {
+		sceneManager->ChangeSceneWithTransition("GAMEOVER");
+	}
+	// 落下フラグを消費して、復帰演出を開始する（HPが残っている場合）
+	if (!isRespawning_ && player->ConsumeDeathByFalling()) {
+		if (player->IsAlive()) {
+			isRespawning_ = true;
+			didWarpOnDark_ = false;
+			respawnSequence_->Start();
+			player->SetControlEnabled(false);
+			return;
+		} else {
+			sceneManager->ChangeSceneWithTransition("GAMEOVER");
+		}
+	}
 
 	ModelParticleManager::GetInstance().Update();
 	// プレイヤーがゴールに触れていたらシーン遷移
@@ -8331,8 +9087,6 @@ void GamePlayScene::Update()
 	if (isGoal) {
 		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Normal);
 	}
-
-
 
 	// ImGuiの描画
 	DrawImgui();
@@ -8350,13 +9104,13 @@ void GamePlayScene::Draw()
 
 
 	//sceneTransition->Draw();
-	/// マップの描画
+	// マップの描画
 	map->Draw();
 
-	/// プレイヤーの描画
+	// プレイヤーの描画
 	player->Draw();
 
-	/// 敵の描画
+	// 敵の描画
 	for (auto& enemy : enemies) {
 		enemy->Draw();
 	}
@@ -8376,6 +9130,9 @@ void GamePlayScene::Draw()
 
 
 	pauseSystem_->Draw();
+	if (respawnSequence_) {
+		respawnSequence_->Draw();
+	}
 
 }
 
@@ -8461,7 +9218,7 @@ void GamePlayScene::CheckCollision()
 		if (enemy->IsAlive()) {
 			collision_->AddCollider(enemy.get());
 		}
-		
+
 	}
 	// 衝突判定実行
 	collision_->CheckAllCollisions();
@@ -8501,7 +9258,7 @@ void GamePlayScene::CorrectEnemyOverlap(EnemyBase* enemyA, EnemyBase* enemyB)
 	if (!enemyA || !enemyB) {
 		return;
 	}
-	
+
 	AABB a = enemyA->GetAABB();
 	AABB b = enemyB->GetAABB();
 	// AABB同士が重なっていないなら処理しない
@@ -8554,6 +9311,8 @@ void GamePlayScene::ResolveEnemyVsEnemy()
 		}
 	}
 }
+
+
 
 void GamePlayScene::Finalize()
 {
@@ -8615,7 +9374,8 @@ File Path: Game/Scene/GamePlayScene.h
 #include "Game/Application/UI/DamageFeedBack.h"
 #include "engine/base/DirectXCommon.h"
 #include "Game/Collision/MapCollisionQuery.h"
-#include <Game/Collision/Collider.h>
+#include "Game/Collision/Collider.h"
+#include "Game/Application/RespawnSequence.h"
 /// <summary>
 /// ゲームプレイシーン
 /// ゲームプレイ中のシーンを管理する
@@ -8702,6 +9462,11 @@ public:
 	/// エネミー同士の重なりを修正する処理
 	/// </summary>
 	void ResolveEnemyVsEnemy();
+
+	/// <summary>
+	/// プレイヤーの生存状況統括
+	/// </summary>
+	void CheckPlayerAlive();
 	
 
 private:
@@ -8762,21 +9527,32 @@ private:
 
 	// エネミー配置のオフセット
 	float enemySpawnOffset_ = 0.5f;
-
+	// エネミー同士の重なり修正用のオフセット
 	std::unique_ptr<ParticleSystem>testParticle_;
-
+	// プレイヤーの操作をロックするフラグ
 	bool isPlayerControlLocked_ = false;
-	
+	// ゲームプレイHUD
 	std::unique_ptr<GamePlayHUD> gamePlayHUD_;
-
+	// スタートカメラ
 	std::unique_ptr<StartCamPhase> startCam_;
-
+	// スタートカメラの開始位置
 	Vector3 baseCameraPos_ = {};
-
+	// ステージキー
 	std::string stageKey;
-
+	// マップ衝突クエリ
 	MapCollisionQuery mapCollisionQuery;
+	// プレイヤーの死亡フラグ
+	bool isPlayerDead_ = false;
+	// プレイヤーの死因が落下
+	bool isPlayerDeathByFall_ = false;
 
+	// リスポーンシーケンス
+	std::unique_ptr <RespawnSequence> respawnSequence_;
+	// リスポーン中フラグ
+	bool isRespawning_ = false;
+	bool didWarpOnDark_ = false;
+	// リスポーン位置
+	const Vector3 respawnPos_ = {  1.5f,1.5f,0.0f  };
 };
 
 
@@ -9572,7 +10348,8 @@ StageSelectGraph::~StageSelectGraph()
 
 void StageSelectGraph::Initialize()
 {
-	// ノード情報をJSONファイルから読み込み
+	// ノード情報を
+	// ファイルから読み込み
 	LoadMapNodeFromJson("stage_select_graph");
 	// ノード境界情報の再計算     
 	RecalculateBounds();
@@ -13146,6 +13923,8 @@ File Path: MyEngine.vcxproj
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Scene\GameOverScene.cpp" />
+    <ClCompile Include="Game\Scene\DebugScene\DebugScene.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.cpp" />
     <ClCompile Include="Game\Scene\Transition\BallWipeTransition.cpp" />
     <ClCompile Include="Game\Application\UI\DamageFeedBack.cpp" />
@@ -13212,8 +13991,11 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.cpp" />
     <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
     <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
+    <ClCompile Include="Game\Application\RespawnSequence.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Scene\GameOverScene.h" />
+    <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
     <ClInclude Include="Game\Scene\Transition\BallWipeTransition.h" />
     <ClInclude Include="Game\Application\UI\DamageFeedBack.h" />
@@ -13283,6 +14065,7 @@ File Path: MyEngine.vcxproj
     <ClInclude Include="Game\Application\Map\IMapCollisionQuery.h" />
     <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
     <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
+    <ClInclude Include="Game\Application\RespawnSequence.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
@@ -13509,6 +14292,9 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="Game\Application\Map\IMapCollisionQuery.cpp" />
     <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
     <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
+    <ClCompile Include="Game\Scene\DebugScene\DebugScene.cpp" />
+    <ClCompile Include="Game\Scene\GameOverScene.cpp" />
+    <ClCompile Include="Game\Application\RespawnSequence.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -13707,6 +14493,9 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="Game\Application\Map\IMapCollisionQuery.h" />
     <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
     <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
+    <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
+    <ClInclude Include="Game\Scene\GameOverScene.h" />
+    <ClInclude Include="Game\Application\RespawnSequence.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">
@@ -17165,6 +17954,8 @@ File Path: engine/InsideScene/SceneFactory.cpp
 #include "Game/Scene/GamePlayScene.h"
 #include "Game/Scene/StageSelectScene.h"
 #include "Game/Scene/StageClearScene.h"
+#include "Game/Scene/GameOverScene.h"
+#include "Game/Scene/DebugScene/DebugScene.h"
 std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneName)
 {
     // 次のシーン生成
@@ -17179,6 +17970,13 @@ std::unique_ptr<BaseScene> SceneFactory::CreateScene(const std::string& sceneNam
 	}
 	else if (sceneName == "STAGECLEAR") {
 		return std::make_unique<StageClearScene>();
+	}
+	else if (sceneName == "GAMEOVER") {
+		return std::make_unique<GameOverScene>();
+	}
+	// デバッグ用シーン / MyGameから直接切り替えを行う
+	else if(sceneName == "DEBUG") {
+		return std::make_unique<DebugScene>();
 	}
 	return nullptr;
 }
@@ -18777,6 +19575,18 @@ void Input::Initialize(WinAPI *winAPI)
 	//排他制御のレベルのセット
 	result = keyboard->SetCooperativeLevel(winAPI->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
 	assert(SUCCEEDED(result));
+
+	// マウスデバイスの作成
+	result = directInput->CreateDevice(GUID_SysMouse, &mouse, NULL);
+	assert(SUCCEEDED(result));
+	// 入力データ形式のセット
+	result = mouse->SetDataFormat(&c_dfDIMouse);
+	assert(SUCCEEDED(result));
+	// 排他制御のレベルのセット
+	result = mouse->SetCooperativeLevel(
+		winAPI->GetHwnd(),
+		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+	assert(SUCCEEDED(result));
 }
 
 void Input::Update()
@@ -18784,15 +19594,21 @@ void Input::Update()
 	HRESULT result;
 	//前回のキー入力を保存
 	memcpy(keyPre, key, sizeof(key));
-	if (TriggerKey(DIK_1)) {
-		OutputDebugStringA("Hit_1\n");
-	}
+	mousePreState = mouseState;
+	
 	////全キーの入力状態を取得する
 	result = keyboard->Acquire();
 	result = keyboard->GetDeviceState(sizeof(key), key);
 
+	// マウス取得
+	result = mouse->Acquire();
+	result = mouse->GetDeviceState(sizeof(DIMOUSESTATE), &mouseState);
+
+	if (TriggerKey(DIK_1)) {
+		OutputDebugStringA("Hit_1\n");
+	}
 }
-bool Input::RereseKey(BYTE keyNumber)
+bool Input::ReriseKey(BYTE keyNumber)
 {
 	// 前フレームで押されていて、今フレームで押されていない場合
 	return (keyPre[keyNumber] != 0) && (key[keyNumber] == 0);
@@ -18810,6 +19626,22 @@ bool Input::TriggerKey(BYTE keyNumber)
 	return (keyPre[keyNumber] == 0) && (key[keyNumber] != 0);
 }
 
+bool Input::PushMouse(int button)
+{
+	return (mouseState.rgbButtons[button] & 0x80) != 0;
+}
+
+bool Input::TriggerMouse(int button)
+{
+	return !(mousePreState.rgbButtons[button] & 0x80) &&
+		(mouseState.rgbButtons[button] & 0x80);
+}
+
+bool Input::ReleaseMouse(int button)
+{
+	return  (mousePreState.rgbButtons[button] & 0x80) &&
+		!(mouseState.rgbButtons[button] & 0x80);
+}
 
 ============================================================
 File Path: engine/base/Input.h
@@ -18868,7 +19700,7 @@ public:
 	///特定のキーが話された瞬間を判定
 	/// </summary>
 	/// <param name="keyNumber"></param>
-	bool RereseKey(BYTE keyNumber);
+	bool ReriseKey(BYTE keyNumber);
 
 	/// <summary>
 	///キーが押されているか確認
@@ -18881,13 +19713,28 @@ public:
 	/// <param name="keyNumber"></param>
 	/// <returns></returns>
 	bool TriggerKey(BYTE keyNumber);
+
+	// マウス追加
+	bool PushMouse(int button);
+	bool TriggerMouse(int button);
+	bool ReleaseMouse(int button);
+
+	LONG GetMouseMoveX() const { return mouseState.lX; }
+	LONG GetMouseMoveY() const { return mouseState.lY; }
+	LONG GetMouseWheel() const { return mouseState.lZ; }
+
 	template <class T>using ComPtr = Microsoft::WRL::ComPtr<T>;
 private:
 
 	ComPtr<IDirectInputDevice8> keyboard;
+	ComPtr<IDirectInputDevice8> mouse;
 	ComPtr<IDirectInput8>directInput = nullptr;
 	BYTE key[256] = {};
 	BYTE keyPre[256] = {};
+
+	// マウス追加
+	DIMOUSESTATE mouseState = {};       
+	DIMOUSESTATE mousePreState = {};
 
 	//WindowsAPI
 	WinAPI* winAPI = nullptr;
