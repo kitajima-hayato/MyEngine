@@ -468,6 +468,11 @@ void Player::UpdateBehavior()
 	// マップがセットされていなかったら処理しない
 	if (!map_)return;
 
+	if (!IsAlive()) {
+		velocity_ = {};
+		return;
+	}
+
 	// 死亡していたらリセット処理
 	if (isDead_) {
 		DebugPlayerReset();
