@@ -240,6 +240,7 @@ void Player::BeginDeathDemo(const Vector3& cameraPos)
 
 	controlEnabled_ = false;
 
+	onGround_ = false;
 	// その場でジャンプ開始
 	deathVel_ = { 0.0f, deathJumpSpeed_, 0.0f };
 
@@ -262,7 +263,8 @@ void Player::UpdateDeathDemo()
 	// 回転は固定でこちら向きにキープ（任意）
 	playerModel_->SetRotate(deathFaceRot_);
 
-	if (deathDemoTimer_ >= deathDemoDuration_) {
+	if ((deathDemoTimer_ >= deathDemoMinDuration_ && p.y < deathHeight_) ||
+		deathDemoTimer_ >= 2.0f) {
 		isDying_ = false;
 		deathDemoFinished_ = true;
 	}

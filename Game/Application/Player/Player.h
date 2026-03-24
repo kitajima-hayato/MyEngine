@@ -434,7 +434,7 @@ private:	// メンバ変数
 	bool isDying_ = false;
 	bool deathDemoFinished_ = false;
 	float deathDemoTimer_ = 0.0f;
-	float deathDemoDuration_ = 0.8f;
+	float deathDemoMinDuration_ = 0.2f;
 
 	Vector3 deathVel_ = { 0,0,0 };
 	float deathJumpSpeed_ = 12.0f;
