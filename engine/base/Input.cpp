@@ -42,6 +42,18 @@ void Input::Initialize(WinAPI *winAPI)
 	//排他制御のレベルのセット
 	result = keyboard->SetCooperativeLevel(winAPI->GetHwnd(), DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY);
 	assert(SUCCEEDED(result));
+
+	// マウスデバイスの作成
+	result = directInput->CreateDevice(GUID_SysMouse, &mouse, NULL);
+	assert(SUCCEEDED(result));
+	// 入力データ形式のセット
+	result = mouse->SetDataFormat(&c_dfDIMouse);
+	assert(SUCCEEDED(result));
+	// 排他制御のレベルのセット
+	result = mouse->SetCooperativeLevel(
+		winAPI->GetHwnd(),
+		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE);
+	assert(SUCCEEDED(result));
 }
 
 void Input::Update()
@@ -49,15 +61,21 @@ void Input::Update()
 	HRESULT result;
 	//前回のキー入力を保存
 	memcpy(keyPre, key, sizeof(key));
-	if (TriggerKey(DIK_1)) {
-		OutputDebugStringA("Hit_1\n");
-	}
+	mousePreState = mouseState;
+	
 	////全キーの入力状態を取得する
 	result = keyboard->Acquire();
 	result = keyboard->GetDeviceState(sizeof(key), key);
 
+	// マウス取得
+	result = mouse->Acquire();
+	result = mouse->GetDeviceState(sizeof(DIMOUSESTATE), &mouseState);
+
+	if (TriggerKey(DIK_1)) {
+		OutputDebugStringA("Hit_1\n");
+	}
 }
-bool Input::RereseKey(BYTE keyNumber)
+bool Input::ReriseKey(BYTE keyNumber)
 {
 	// 前フレームで押されていて、今フレームで押されていない場合
 	return (keyPre[keyNumber] != 0) && (key[keyNumber] == 0);
@@ -73,4 +91,21 @@ bool Input::TriggerKey(BYTE keyNumber)
 {
 	// 前フレームで押されておらず、今フレームで押されている場合
 	return (keyPre[keyNumber] == 0) && (key[keyNumber] != 0);
+}
+
+bool Input::PushMouse(int button)
+{
+	return (mouseState.rgbButtons[button] & 0x80) != 0;
+}
+
+bool Input::TriggerMouse(int button)
+{
+	return !(mousePreState.rgbButtons[button] & 0x80) &&
+		(mouseState.rgbButtons[button] & 0x80);
+}
+
+bool Input::ReleaseMouse(int button)
+{
+	return  (mousePreState.rgbButtons[button] & 0x80) &&
+		!(mouseState.rgbButtons[button] & 0x80);
 }

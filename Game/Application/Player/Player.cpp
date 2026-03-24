@@ -102,6 +102,9 @@ void Player::TakeDamage()
 	isEnemyHit_ = true;
 	flashingFrameCount_ = 0;
 	isVisible_ = true;
+
+	// 体力を減らす
+	status_.kHealth -= 1;
 }
 
 void Player::StompEnemy(Collider* enemy)
@@ -208,6 +211,32 @@ bool Player::IsTouchingHazardSpike() const
 
 	return false;
 }
+
+void Player::Respawn(const Vector3& pos)
+{
+	velocity_ = {};
+	if (playerModel_) {
+		playerModel_->SetTranslate(pos);
+		playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
+	}
+
+	isDead_ = false;
+	isDeathByFalling_ = false;
+
+	onGround_ = true;
+
+	// 無敵点滅などの副作用があるなら必要に応じて初期化
+	// isEnemyHit_ = false;
+	// isVisible_ = true;
+}
+
+bool Player::ConsumeDeathByFalling()
+{
+	if (!isDeathByFalling_) { return false; }
+	isDeathByFalling_ = false;
+	return true;
+}
+
 
 void Player::FlashingUpdate()
 {
@@ -322,7 +351,7 @@ void Player::Initialize(Vector3 position)
 	playerModel_->SetTranslate(position);
 	playerModel_->SetModel("GamePlay/Player");
 	// 死ぬ高さの設定
-	SetDeathHeight(-1.0f);
+	SetDeathHeight(-3.0f);
 
 	// ダッシュエフェクトの初期化
 	// 足元の煙エフェクト
@@ -404,7 +433,9 @@ void Player::UpdateBehavior()
 	if (playerModel_->GetTranslate().y < deathHeight_ && !onGround_)
 	{
 		// 死亡フラグ
+		status_.kHealth -= 1;
 		isDead_ = true;
+		isDeathByFalling_ = true;
 	}
 
 	// 移動量の反映
@@ -884,12 +915,11 @@ bool Player::IsHitBlockDamageTable(BlockType type)
 
 void Player::DebugPlayerReset()
 {
-	// デバッグ用にリセット
-	velocity_ = {};
-	playerModel_->SetTranslate({ 1.5f,1.5f,0.0f });
-	playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
-	isDead_ = false;
-	onGround_ = true;
+	//// デバッグ用にリセット
+	//velocity_ = {};
+	//playerModel_->SetTranslate({ 1.5f,1.5f,0.0f });
+	//playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
+	//isDead_ = false;
 }
 
 
@@ -928,6 +958,7 @@ void Player::ImGui()
 			ImGui::SliderFloat("Gravity", &status_.kGravity, 0.01f, 0.2f);
 			ImGui::SliderFloat("Max Fall Speed", &status_.kMaxFallSpeed, 0.1f, 2.0f);
 			ImGui::SliderFloat("Jump Power", &status_.kJumpPower, 0.1f, 1.0f);
+			ImGui::Text("HP: %d", status_.kHealth);
 
 			// Playerのスタッツの変更
 			Vector3 pos = playerModel_->GetTranslate();

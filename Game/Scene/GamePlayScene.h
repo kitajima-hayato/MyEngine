@@ -12,7 +12,8 @@
 #include "Game/Application/UI/DamageFeedBack.h"
 #include "engine/base/DirectXCommon.h"
 #include "Game/Collision/MapCollisionQuery.h"
-#include <Game/Collision/Collider.h>
+#include "Game/Collision/Collider.h"
+#include "Game/Application/RespawnSequence.h"
 /// <summary>
 /// ゲームプレイシーン
 /// ゲームプレイ中のシーンを管理する
@@ -99,6 +100,11 @@ public:
 	/// エネミー同士の重なりを修正する処理
 	/// </summary>
 	void ResolveEnemyVsEnemy();
+
+	/// <summary>
+	/// プレイヤーの生存状況統括
+	/// </summary>
+	void CheckPlayerAlive();
 	
 
 private:
@@ -159,21 +165,32 @@ private:
 
 	// エネミー配置のオフセット
 	float enemySpawnOffset_ = 0.5f;
-
+	// エネミー同士の重なり修正用のオフセット
 	std::unique_ptr<ParticleSystem>testParticle_;
-
+	// プレイヤーの操作をロックするフラグ
 	bool isPlayerControlLocked_ = false;
-	
+	// ゲームプレイHUD
 	std::unique_ptr<GamePlayHUD> gamePlayHUD_;
-
+	// スタートカメラ
 	std::unique_ptr<StartCamPhase> startCam_;
-
+	// スタートカメラの開始位置
 	Vector3 baseCameraPos_ = {};
-
+	// ステージキー
 	std::string stageKey;
-
+	// マップ衝突クエリ
 	MapCollisionQuery mapCollisionQuery;
+	// プレイヤーの死亡フラグ
+	bool isPlayerDead_ = false;
+	// プレイヤーの死因が落下
+	bool isPlayerDeathByFall_ = false;
 
+	// リスポーンシーケンス
+	std::unique_ptr <RespawnSequence> respawnSequence_;
+	// リスポーン中フラグ
+	bool isRespawning_ = false;
+	bool didWarpOnDark_ = false;
+	// リスポーン位置
+	const Vector3 respawnPos_ = {  1.5f,1.5f,0.0f  };
 };
 
 

@@ -98,6 +98,9 @@ struct PlayerStatus {
 	//振り向きパラメーター
 	// 角度の補間タイム
 	float kTurnTime = 0.1f;
+
+	// プレイヤーの体力
+	uint32_t kHealth = 3;
 };
 
 class Player :public Collider
@@ -141,6 +144,13 @@ public:
 	/// 終了処理
 	/// </summary>
 	void Finalize();
+
+	/// <summary>
+	/// プレイヤーの位置をリスポーン地点に移動させる
+	/// </summary>
+	/// <param name="pos"></param>
+	void Respawn(const Vector3& pos);
+
 
 private:
 	/// <summary>
@@ -292,6 +302,7 @@ private:
 	/// <returns></returns>
 	bool IsTouchingHazardSpike()const;
 
+	
 public:	/// Setter / Getter
 	// 死亡判定の高さを設定
 	void SetDeathHeight(float deathHeight) { deathHeight_ = deathHeight; }
@@ -312,6 +323,17 @@ public:	/// Setter / Getter
 	void SetControlEnabled(bool enabled) { controlEnabled_ = enabled; }
 	bool IsControlEnabled() const { return controlEnabled_; }
 
+	// プレイヤーの体力取得
+	uint32_t GetHealth() const { return status_.kHealth; }
+
+	// プレイヤーの生存状態を取得
+	bool IsAlive() const { return status_.kHealth > 0; }
+
+	// プレイヤーが落下して死亡したかの取得
+	bool IsDeathByFalling() const { return isDeathByFalling_; }
+
+	// 落下死フラグを「消費」する（trueなら内部でfalseに戻す）
+	bool ConsumeDeathByFalling();
 
 
 private:	// メンバ変数
@@ -394,5 +416,8 @@ private:	// メンバ変数
 	// ダメージブロックに触れてからのフレーム数を追跡
 	uint32_t damageTouchFrames_ = 0;
 	uint32_t damageTickIntervalFrames_ = 30;
+
+	// 落下して死亡したのフラグ
+	bool isDeathByFalling_ = false;
 };
 

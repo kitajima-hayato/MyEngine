@@ -108,6 +108,8 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Scene\GameOverScene.cpp" />
+    <ClCompile Include="Game\Scene\DebugScene\DebugScene.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.cpp" />
     <ClCompile Include="Game\Scene\Transition\BallWipeTransition.cpp" />
     <ClCompile Include="Game\Application\UI\DamageFeedBack.cpp" />
@@ -174,8 +176,11 @@
     <ClCompile Include="Game\Application\Enemy\Flying\SideMoveFlyingEnemy.cpp" />
     <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
     <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
+    <ClCompile Include="Game\Application\RespawnSequence.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Scene\GameOverScene.h" />
+    <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
     <ClInclude Include="Game\Scene\Transition\BallWipeTransition.h" />
     <ClInclude Include="Game\Application\UI\DamageFeedBack.h" />
@@ -245,6 +250,7 @@
     <ClInclude Include="Game\Application\Map\IMapCollisionQuery.h" />
     <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
     <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
+    <ClInclude Include="Game\Application\RespawnSequence.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
