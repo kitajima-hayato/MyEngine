@@ -197,7 +197,9 @@
     <ClCompile Include="Game\Application\Map\IMapCollisionQuery.cpp" />
     <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
     <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
-    <ClCompile Include="Game\Scene\DebugScene.cpp" />
+    <ClCompile Include="Game\Scene\DebugScene\DebugScene.cpp" />
+    <ClCompile Include="Game\Scene\GameOverScene.cpp" />
+    <ClCompile Include="Game\Application\RespawnSequence.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -396,7 +398,9 @@
     <ClInclude Include="Game\Application\Map\IMapCollisionQuery.h" />
     <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
     <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
-    <ClInclude Include="Game\Scene\DebugScene.h" />
+    <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
+    <ClInclude Include="Game\Scene\GameOverScene.h" />
+    <ClInclude Include="Game\Application\RespawnSequence.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">

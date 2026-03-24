@@ -95,6 +95,7 @@ void DebugScene::Finalize()
 
 void DebugScene::DrawImgui()
 {
+#ifdef USE_IMGUI
 	// カメラの座標をimguiで編集できるようにする
 	ImGui::Begin("DebugCamera");
 
@@ -131,6 +132,7 @@ void DebugScene::DrawImgui()
 
 
 	ImGui::End();
+#endif
 }
 
 void DebugScene::UpdateDebugCamera()

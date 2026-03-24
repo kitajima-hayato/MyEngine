@@ -22,7 +22,7 @@ GamePlayScene::~GamePlayScene()
 
 void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 {
-	/// オーディオの初期化
+	// オーディオの初期化
 	Audio::GetInstance().Initialize();
 	soundData = Audio::GetInstance().LoadWave("resources/_Common/Audio/debug/mokugyo.wav");
 	xaudio2_ = Audio::GetInstance().GetXAudio2();
@@ -61,6 +61,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 
 	stageStartEventFlag_ = true;
 	player->SetControlEnabled(false);
+	isPlayerDead_ = player->IsAlive();
 
 	isPlayerControlLocked_ = true;
 
@@ -79,13 +80,23 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	damageFeedBack_->Bind(player.get(), camera, &cameraTransform);
 	damageFeedBack_->Initialize();
 
+	respawnSequence_ = std::make_unique<RespawnSequence>();
+	respawnSequence_->Initialize();
+
 	ModelParticleManager::GetInstance().Initialize();
 }
 
+void GamePlayScene::CheckPlayerAlive()
+{
+	// プレイヤーの生存チェック
+	isPlayerDead_ = player->IsAlive();
+	// プレイヤーの死亡原因が落下かどうか
+	isPlayerDeathByFall_ = player->IsDeathByFalling();
+}
 
 void GamePlayScene::Update()
 {
-
+	// ポーズ中はポーズシステムの更新のみ行う / ポーズ以外入力不可
 	if (pauseSystem_->Update()) {
 		return;
 	}
@@ -158,11 +169,48 @@ void GamePlayScene::Update()
 	// 当たり判定
 	CheckCollision();
 
-	// 当たり判定
-	CheckCollision();
 	// スプライトの更新
 	gamePlayHUD_->Update();
+	CheckPlayerAlive();
+	if (isRespawning_) {
+		// 復帰演出中は入力を止める
+		player->SetControlEnabled(false);
 
+		// フェード更新
+		respawnSequence_->Update(dt);
+
+		// 真っ暗になった瞬間にワープ（1回だけ）
+		if (!didWarpOnDark_ && respawnSequence_->ConsumeDarkened()) {
+			didWarpOnDark_ = true;
+			player->Respawn(respawnPos_);
+		}
+
+		// 明転が終わったら復帰完了
+		if (respawnSequence_->IsFinished()) {
+			isRespawning_ = false;
+			didWarpOnDark_ = false;
+			player->SetControlEnabled(true);
+		}
+
+		return;
+	}
+
+	// プレイヤーが死んでいたらゲームオーバーシーンへ
+	if (!isPlayerDead_) {
+		sceneManager->ChangeSceneWithTransition("GAMEOVER");
+	}
+	// 落下フラグを消費して、復帰演出を開始する（HPが残っている場合）
+	if (!isRespawning_ && player->ConsumeDeathByFalling()) {
+		if (player->IsAlive()) {
+			isRespawning_ = true;
+			didWarpOnDark_ = false;
+			respawnSequence_->Start();
+			player->SetControlEnabled(false);
+			return;
+		} else {
+			sceneManager->ChangeSceneWithTransition("GAMEOVER");
+		}
+	}
 
 	ModelParticleManager::GetInstance().Update();
 	// プレイヤーがゴールに触れていたらシーン遷移
@@ -170,8 +218,6 @@ void GamePlayScene::Update()
 	if (isGoal) {
 		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Normal);
 	}
-
-
 
 	// ImGuiの描画
 	DrawImgui();
@@ -189,13 +235,13 @@ void GamePlayScene::Draw()
 
 
 	//sceneTransition->Draw();
-	/// マップの描画
+	// マップの描画
 	map->Draw();
 
-	/// プレイヤーの描画
+	// プレイヤーの描画
 	player->Draw();
 
-	/// 敵の描画
+	// 敵の描画
 	for (auto& enemy : enemies) {
 		enemy->Draw();
 	}
@@ -215,6 +261,9 @@ void GamePlayScene::Draw()
 
 
 	pauseSystem_->Draw();
+	if (respawnSequence_) {
+		respawnSequence_->Draw();
+	}
 
 }
 
@@ -300,7 +349,7 @@ void GamePlayScene::CheckCollision()
 		if (enemy->IsAlive()) {
 			collision_->AddCollider(enemy.get());
 		}
-		
+
 	}
 	// 衝突判定実行
 	collision_->CheckAllCollisions();
@@ -340,7 +389,7 @@ void GamePlayScene::CorrectEnemyOverlap(EnemyBase* enemyA, EnemyBase* enemyB)
 	if (!enemyA || !enemyB) {
 		return;
 	}
-	
+
 	AABB a = enemyA->GetAABB();
 	AABB b = enemyB->GetAABB();
 	// AABB同士が重なっていないなら処理しない
@@ -393,6 +442,8 @@ void GamePlayScene::ResolveEnemyVsEnemy()
 		}
 	}
 }
+
+
 
 void GamePlayScene::Finalize()
 {
