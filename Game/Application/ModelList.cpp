@@ -41,6 +41,8 @@ void ModelList::LoadAllModel()
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
 
+	// GameOverScene
+	ModelManager::GetInstance().LoadModel("Scenes/GameOver/Models/backblack");
 
 	// DebugScene
 	ModelManager::GetInstance().LoadModel("Scenes/Debug/BlackDome");
