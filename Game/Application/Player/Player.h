@@ -151,6 +151,17 @@ public:
 	/// <param name="pos"></param>
 	void Respawn(const Vector3& pos);
 
+	// 死亡演出を開始（その場で少し上に跳ねて、こちらを向いて落ちる）
+	void BeginDeathDemo(const Vector3& cameraPos);
+
+	// 死亡演出中か
+	bool IsInDeathDemo() const;
+
+	// 死亡演出が終わったか
+	bool IsDeathDemoFinished() const;
+
+	// 落下による死亡を消費する（落下死のフラグをリセットして、死亡演出に入る）
+	void UpdateDeathDemo();
 
 private:
 	/// <summary>
@@ -419,5 +430,16 @@ private:	// メンバ変数
 
 	// 落下して死亡したのフラグ
 	bool isDeathByFalling_ = false;
+
+	bool isDying_ = false;
+	bool deathDemoFinished_ = false;
+	float deathDemoTimer_ = 0.0f;
+	float deathDemoDuration_ = 0.8f;
+
+	Vector3 deathVel_ = { 0,0,0 };
+	float deathJumpSpeed_ = 12.0f;
+	float deathGravity_ = 32.0f;
+
+	Vector3 deathFaceRot_ = { 0,0,0 }; 
 };
 

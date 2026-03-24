@@ -20,6 +20,7 @@ public:
 
 	void Reset();
 
+	void StartShake(float timeSec = -1.0f, float amp = -1.0f, bool withFlash = false);
 
 public: // Getter / Setter
 	void SetBaseCameraPos(const Vector3& basePos) { baseCamPos_ = basePos; }
@@ -43,7 +44,7 @@ private:
 	Vector4 flashColorOff_ = { 1.0f,1.0f,1.0f,0.0f };
 
 	// 画像パス
-	std::string texturePath_ = "resources/Effects/Hit/Textures/HitDamage.dds";
+	const std::string texturePath_ = "resources/Effects/Hit/Textures/HitDamage.dds";
 
 private:
 	Player* player_ = nullptr;

@@ -33,6 +33,25 @@ void DamageFeedBack::Reset()
 	}
 }
 
+void DamageFeedBack::StartShake(float timeSec, float amp, bool withFlash)
+{
+	if (timeSec > 0.0f) {
+		shakeTime_ = timeSec;
+	}
+	if (amp > 0.0f) {
+		shakeAmp_ = amp;
+	}
+
+	// シェイク開始
+	shakeActive_ = true;
+	shakeTimer_ = 0.0f;
+
+	// フラッシュも欲しい場合だけ
+	if (withFlash && hitSprite_) {
+		hitSprite_->SetColor(flashColorOn_);
+	}
+}
+
 void DamageFeedBack::BeginHit()
 {
 	shakeActive_ = true;
