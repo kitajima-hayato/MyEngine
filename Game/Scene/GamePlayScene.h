@@ -191,6 +191,17 @@ private:
 	bool didWarpOnDark_ = false;
 	// リスポーン位置
 	const Vector3 respawnPos_ = {  1.5f,1.5f,0.0f  };
+
+	// GameOver前の演出（シェイクしてから遷移）
+	bool isGameOverPending_ = false;
+	float gameOverTimer_ = 0.0f;
+
+	// 失敗感を出すなら 0.5～0.8 くらいが見やすい
+	float gameOverDelay_ = 0.6f;
+
+	// 死亡演出中のカメラ固定
+	bool freezeCameraOnDeath_ = false;
+	Vector3 frozenCameraPos_ = {};
 };
 
 
