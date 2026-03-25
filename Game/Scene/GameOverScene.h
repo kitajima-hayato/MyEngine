@@ -50,6 +50,14 @@ private:
 	/// デバッグカメラの更新処理
 	/// </summary>
 	void UpdateDebugCamera();
+
+
+	void StartPlayerDropIntro(const Transform& finalTr);
+
+	void UpdatePlayerDropIntro(float dt);
+
+	void StartPlayerShrinkSpin();
+	void UpdatePlayerShrinkSpin(float dt);
 private:
 
 	// デバッグカメラ設定
@@ -101,5 +109,48 @@ private:
 	// enter
 	std::unique_ptr<Sprite> keyIcon_Enter;
 	Vector2 keyIcon_Enter_Pos = { 200.0f,650.0f };
+
+
+
+
+	Transform playerFinalTr_;
+	Transform playerAnimTr_;
+
+	bool isDropIntroRunning_ = false;
+	int bounceCount_ = 0;
+
+	float vy_ = 0.0f;
+	float gravity_ = -35.0f;        // 落ちる速さ（調整）
+	float restitution_ = 0.45f;     // 反発（卓球っぽくするなら 0.4～0.6）
+	float spawnHeight_ = 8.0f;      // どれだけ上から落とすか
+
+	float settleEps_ = 0.05f;       // 収束判定
+	float rotBlendT_ = 0.0f;        // 回転補間用
+
+	// バウンドの最大回数（これ以上は跳ねないで止まる）
+	int maxBounces_ = 3;
+
+	float bounceDamping_ = 0.75f; // 0.6～0.85くらいで調整
+
+	enum class PlayerOutroState {
+		DropBounce,   // 落下→バウンド中
+		ShrinkSpin,   // 回転しながら縮小
+		Done          // 完了（非表示）
+	};
+
+	PlayerOutroState playerOutroState_ = PlayerOutroState::DropBounce;
+
+	// 縮小しながら回転するパラメータ
+	float shrinkSpeed_ = 0.5f;    
+	float minScale_ = 0.03f;      
+	float spinSpeedY_ = 8.0f;     
+	float spinSpeedX_ = 2.5f;     
+	bool isPlayerVisible_ = true; 
+
+
+	bool loopPlayerIntro_ = true;
+
+	float loopDelaySec_ = 0.0f;      
+	float loopDelayTimer_ = 0.0f;
 };
 

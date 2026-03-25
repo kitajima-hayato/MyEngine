@@ -441,5 +441,7 @@ private:	// メンバ変数
 	float deathGravity_ = 32.0f;
 
 	Vector3 deathFaceRot_ = { 0,0,0 }; 
+
+	
 };
 

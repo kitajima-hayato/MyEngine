@@ -71,6 +71,13 @@ void GameOverScene::Initialize(Engine::DirectXCommon* dxCommon)
 	keyIcon_Enter->Initialize("resources/_Common/UI/Texture/inputhints/Enter.dds");
 	keyIcon_Enter->SetPosition({ 55.0f, 565.0f });
 	keyIcon_Enter->SetSize({ 50.0f, 50.0f });
+
+
+	playerFinalTr_ = playerModelTransform;     // scale/rotate/translate を含む最終値
+	StartPlayerDropIntro(playerFinalTr_);
+
+	// 初期フレームから上にいる状態を反映
+	PlayerModel->SetTransform(playerAnimTr_);
 }
 
 void GameOverScene::Update()
@@ -162,6 +169,22 @@ void GameOverScene::Update()
 
 	backGround->Update();
 	backBlack->Update();
+
+	const float dt = 1.0f / 60.0f;
+
+	// 状態に応じて更新
+	if (playerOutroState_ == PlayerOutroState::DropBounce) {
+		UpdatePlayerDropIntro(dt);
+	} else if (playerOutroState_ == PlayerOutroState::ShrinkSpin) {
+		UpdatePlayerShrinkSpin(dt);
+	}
+	// Doneは何もしない
+
+	// Transform反映（消えていない時だけ）
+	if (isPlayerVisible_) {
+		PlayerModel->SetTransform(playerAnimTr_);
+	}
+
 	PlayerModel->Update();
 
 	gameOverUI->Update();
@@ -182,9 +205,10 @@ void GameOverScene::Update()
 void GameOverScene::Draw()
 {
 	backGround->Draw();
-	backBlack->Draw();
-	PlayerModel->Draw();
-
+	backBlack->Draw(); 
+	if (isPlayerVisible_) {
+		PlayerModel->Draw();
+	}
 
 	gameOverUI->Draw();
 
@@ -375,4 +399,118 @@ void GameOverScene::UpdateDebugCamera()
 	// カメラに反映
 	camera->SetTranslate(cameraTransform.translate);
 	camera->SetRotate(cameraTransform.rotate);
+}
+
+void GameOverScene::StartPlayerDropIntro(const Transform& finalTr)
+{
+	playerFinalTr_ = finalTr;
+
+	playerAnimTr_ = finalTr;
+	playerAnimTr_.translate.y += spawnHeight_;
+
+	vy_ = 0.0f;
+	bounceCount_ = 0;
+	rotBlendT_ = 0.0f;
+
+	isDropIntroRunning_ = true;
+	playerOutroState_ = PlayerOutroState::DropBounce;
+	isPlayerVisible_ = true;
+	loopDelayTimer_ = 0.0f;
+}
+
+void GameOverScene::UpdatePlayerDropIntro(float dt)
+{
+	if (!isDropIntroRunning_) { return; }
+
+	// 重力
+	vy_ += gravity_ * dt;
+	playerAnimTr_.translate.y += vy_ * dt;
+
+	const float floorY = playerFinalTr_.translate.y;
+
+	if (playerAnimTr_.translate.y <= floorY)
+	{
+		playerAnimTr_.translate.y = floorY;
+
+		// まだバウンドできるなら跳ねる
+		if (bounceCount_ < maxBounces_)
+		{
+			// バウンド回数に応じて反発を弱める（自然に収束）
+			float r = restitution_;
+			for (int i = 0; i < bounceCount_; ++i) {
+				r *= bounceDamping_;
+			}
+
+			if (std::fabs(vy_) < 0.2f) {
+				vy_ = 0.0f;
+				isDropIntroRunning_ = false;
+				playerAnimTr_ = playerFinalTr_;
+
+				// 追加：縮小回転へ
+				StartPlayerShrinkSpin();
+			} else {
+				vy_ = -vy_ * r;
+				bounceCount_++;
+			}
+		} else
+		{
+			// 規定回数跳ねたら固定
+			vy_ = 0.0f;
+			isDropIntroRunning_ = false;
+			playerAnimTr_ = playerFinalTr_;
+			
+			StartPlayerShrinkSpin();
+		}
+	}
+
+	// 回転補間（今のままでもOK）
+	rotBlendT_ += dt * 2.5f;
+	float t = (std::min)(rotBlendT_, 1.0f);
+
+	playerAnimTr_.rotate.x = playerAnimTr_.rotate.x + (playerFinalTr_.rotate.x - playerAnimTr_.rotate.x) * t;
+	playerAnimTr_.rotate.y = playerAnimTr_.rotate.y + (playerFinalTr_.rotate.y - playerAnimTr_.rotate.y) * t;
+	playerAnimTr_.rotate.z = playerAnimTr_.rotate.z + (playerFinalTr_.rotate.z - playerAnimTr_.rotate.z) * t;
+}
+
+void GameOverScene::StartPlayerShrinkSpin()
+{
+	// バウンドが終わった瞬間の姿勢から開始
+	playerOutroState_ = PlayerOutroState::ShrinkSpin;
+
+	// もし「最終姿勢にピタッとしてから」縮小させたいならこれもOK
+	// playerAnimTr_ = playerFinalTr_;
+}
+
+void GameOverScene::UpdatePlayerShrinkSpin(float dt)
+{
+	if (playerOutroState_ != PlayerOutroState::ShrinkSpin) { return; }
+
+	// 回転し続ける
+	playerAnimTr_.rotate.y += spinSpeedY_ * dt;
+	playerAnimTr_.rotate.x += spinSpeedX_ * dt;
+
+	// 縮小（等方縮小）
+	playerAnimTr_.scale.x = (std::max)(0.0f, playerAnimTr_.scale.x - shrinkSpeed_ * dt);
+	playerAnimTr_.scale.y = (std::max)(0.0f, playerAnimTr_.scale.y - shrinkSpeed_ * dt);
+	playerAnimTr_.scale.z = (std::max)(0.0f, playerAnimTr_.scale.z - shrinkSpeed_ * dt);
+
+	// 小さくなったら消す
+	if (playerAnimTr_.scale.x <= minScale_ &&
+		playerAnimTr_.scale.y <= minScale_ &&
+		playerAnimTr_.scale.z <= minScale_)
+	{
+		if (playerAnimTr_.scale.x <= minScale_ &&
+			playerAnimTr_.scale.y <= minScale_ &&
+			playerAnimTr_.scale.z <= minScale_)
+		{
+			if (loopPlayerIntro_) {
+				// すぐ最初からやり直す
+				StartPlayerDropIntro(playerFinalTr_);
+			} else {
+				playerOutroState_ = PlayerOutroState::Done;
+				isPlayerVisible_ = false;
+			}
+			return;
+		}
+	}
 }
