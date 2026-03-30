@@ -6,7 +6,7 @@
 #endif
 #include <DirectXCommon.h>
 #include "engine/3d/Object3D.h"
-#include "Game/Application/BackGround.h"
+#include "Game/Application/BackGround/BackGround.h"
 #include "engine/2d/Sprite.h"
 
 /// <summary>
