@@ -13,7 +13,7 @@ void StageSelectGraph::Initialize()
 {
 	// ノード情報を
 	// ファイルから読み込み
-	LoadMapNodeFromJson("World_2");
+	LoadMapNodeFromJson("stage_select_graph");
 	// ノード境界情報の再計算     
 	RecalculateBounds();
 }
