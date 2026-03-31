@@ -2,8 +2,20 @@
 
 ├── Game/
 └── ├── Application/
-└── └── ├── BackGround.cpp
-└── └── ├── BackGround.h
+└── └── ├── BackGround/
+└── └── └── ├── BackGround.cpp
+└── └── └── ├── BackGround.h
+└── └── └── └── Decoration/
+└── └── └──     ├── DecorationFactory.cpp
+└── └── └──     ├── DecorationFactory.h
+└── └── └──     ├── DecorationField.cpp
+└── └── └──     ├── DecorationField.h
+└── └── └──     ├── DecorationInstanceData.h
+└── └── └──     ├── DecorationObject.cpp
+└── └── └──     ├── DecorationObject.h
+└── └── └──     ├── DecorationPlacer.cpp
+└── └── └──     ├── DecorationPlacer.h
+└── └── └──     └── DecorationSpawnSetting.h
 └── └── ├── Block/
 └── └── └── ├── Block.cpp
 └── └── └── ├── Block.h
@@ -177,9 +189,10 @@
 
 
 ============================================================
-File Path: Game/Application/BackGround.cpp
+File Path: Game/Application/BackGround/BackGround.cpp
 ============================================================
 #include "BackGround.h"
+#include "Game/Application/BackGround/Decoration/DecorationSpawnSetting.h"
 #ifdef USE_IMGUI
 #include "engine/base/ImGuiManager.h"
 #endif
@@ -189,7 +202,8 @@ void BackGround::Initialize()
 	items_.clear();
 	items_.reserve(7);
 
-	// 旧ファイルと同じ初期値
+	// AddItem("Imguiで表示する名前", "設定するモデルのファイルパス", モデルの配置座標);
+
 	AddItem("skyBack", "GamePlay/BackGround/sky", Transform{
 		{ 400.0f,100.0f,1.0f },
 		{ 0.0f,0.0f,0.0f },
@@ -226,13 +240,13 @@ void BackGround::Initialize()
 		});
 	
 	AddItem("soil", "GamePlay/Blocks/grassblock", Transform{
-		{ 40.0f,1.0f,2.0f },
+		{ 300.0f,1.0f,2.0f },
 		{ 0.0f,0.0f,0.0f },
 		{ 0.0f,-8.0f,20.0f }
 		});
 
 	// 花
-	AddItem("flower_white_front_L", "GamePlay/BackGround/fluff", Transform{
+	/*AddItem("flower_white_front_L", "GamePlay/BackGround/fluff", Transform{
 	  { 2.0f, 2.0f, 2.0f }, { 0.0f, 0.15f, 0.0f }, { 4.1f, -7.7f, 21.0f }
 		});
 	AddItem("flower_pink_front_L", "GamePlay/BackGround/flower_pink", Transform{
@@ -251,25 +265,73 @@ void BackGround::Initialize()
 		});
 	AddItem("flower_blue_mid", "GamePlay/BackGround/flower_purple", Transform{
 	  { 2.0f, 2.0f, 2.0f }, { 0.0f,-0.15f, 0.0f }, { 13.4f, -8.0f, 21.8f }
-		});
+		});*/
+
+	DecorationSpawnSetting setting;
+
+	setting.modelPaths = { 
+		"GamePlay/BackGround/fluff",
+		"GamePlay/BackGround/flower_pink",
+		"GamePlay/BackGround/flower_orange", 
+		"GamePlay/BackGround/flower_purple",
+		"GamePlay/BackGround/flower_pink"
+	};
+	setting.areaMin = { 0.0f, -7.5f, 20.0f };
+	setting.areaMax = { 150.0f, -7.5f, 20.0f };
+
+	setting.objectCount = 100;
+	setting.spawnRangeInterval = 0.8f;
+
+	setting.minScale = { 1.0f, 1.0f, 1.0f };
+	setting.maxScale = { 1.0f, 1.0f, 1.0f };
+
+	setting.minRotation = { 0.0f, -0.1f, 0.0f };
+	setting.maxRotation = { 0.0f, 0.1f, 0.0f };
+
+	setting.maxTrialCount = 100;
+
+	// 群れの設定値
+	// 群れの数
+	setting.clusterCountMin = 3;
+	setting.clusterCountMax = 5;
+	// 1群れ当たりの花の数
+	setting.clusterSizeMin = 3;
+	setting.clusterSizeMax = 5;
+	// 群れの広がり半径
+	setting.clusterRadiusMin = 3.0f;
+	setting.clusterRadiusMax = 5.0f;
+	// 単独で生える花の割合
+	setting.singleSpawnRatio = 0.4f;
+
+	setting.fixY = true;
+	setting.fixZ = true;
+
+	flowerField_.Generate(setting);
+	
 }
 
 void BackGround::Update()
 {
-	
+	// 各オブジェクトの更新
 	for (auto& item : items_) {
 		item.object->SetTransform(item.transform);
 		item.object->Update();
 	}
+	// 花の自動配置
+	flowerField_.Update();
 
+	// Imguiの描画
 	DrawImgui();
 }
 
 void BackGround::Draw()
 {
+	// 各オブジェクトの描画	
 	for (auto& item : items_) {
 		item.object->Draw();
 	}
+
+	flowerField_.Draw();
 }
 
 void BackGround::DrawImgui()
@@ -286,7 +348,7 @@ void BackGround::DrawImgui()
 		ImGui::DragFloat3(sRotate.c_str(), &item.transform.rotate.x, 0.1f);
 		ImGui::DragFloat3(sTrans.c_str(), &item.transform.translate.x, 0.1f);
 
-		// 変更を即時反映（次フレーム反映でも良いが、こっちの方が分かりやすい）
+		// 変更を即時反映
 		item.object->SetTransform(item.transform);
 	}
 
@@ -310,12 +372,13 @@ void BackGround::AddItem(const char* debugName, const char* modelName, const Tra
 }
 
 ============================================================
-File Path: Game/Application/BackGround.h
+File Path: Game/Application/BackGround/BackGround.h
 ============================================================
 #pragma once
 #include "engine/3d/Object3D.h"
 #include "engine/math/MyMath.h"
 #include <memory>
+#include "Game/Application/BackGround/Decoration/DecorationField.h"
 /// <summary>
 /// 背景クラス
 /// 各ステージの背景を管理する
@@ -354,17 +417,514 @@ private:
 	// items_ の追加ヘルパ（Initializeを短くする用）
 	void AddItem(const char* debugName, const char* modelName, const Transform& transform);
 
-	// ステージセレクト背景
-	std::unique_ptr<Object3D> skyBack;
-	Transform skyBackTransform;
 
-	// 足場　土
-	std::unique_ptr<Object3D> soil;
-	Transform soilTransform;
+	DecorationField flowerField_;
+};
 
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationFactory.cpp
+============================================================
+#include "DecorationFactory.h"
+#include "DecorationObject.h"
+
+std::unique_ptr<DecorationObject> DecorationFactory::Create(const DecorationInstanceData& data)
+{
+	// DecorationObjectのインスタンスを生成
+	auto object = std::make_unique<DecorationObject>();
+	// 受け取ったデータで初期化
+	object->Initialize(data);
+	// 生成したオブジェクトを返す
+	return object;
+}
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationFactory.h
+============================================================
+#pragma once
+#include "DecorationInstanceData.h"
+#include <memory>
+
+class DecorationObject;
+class DecorationFactory
+{
+
+public:
+	/// <summary>
+	/// DecorationInstanceDataを受け取ってDecorationObjectを生成する
+	/// </summary>
+	static std::unique_ptr<DecorationObject> Create(
+		const DecorationInstanceData& data);
+};
+
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationField.cpp
+============================================================
+#include "DecorationField.h"
+#include "DecorationPlacer.h"
+#include "DecorationFactory.h"
+#include "DecorationObject.h"
+
+void DecorationField::Generate(const DecorationSpawnSetting& setting)
+{
+	// DecorationPlacerを使って配置データのリストを作成
+	objects_.clear();
+
+	// 
+	DecorationPlacer placer;
+
+	// 配置データのリストを作成
+	std::vector<DecorationInstanceData> layout = 
+		placer.CreateLayout(setting);
+
+	for (const auto& data : layout) {
+		auto object = DecorationFactory::Create(data);
+		if (object) {
+			objects_.push_back(std::move(object));
+		}
+	}
+}
+
+void DecorationField::Update()
+{
+	// 生成したオブジェクトを一括更新
+	for (auto& object : objects_) {
+		object->Update();
+	}
+}
+
+void DecorationField::Draw()
+{
+	// 生成したオブジェクトを一括描画
+	for (auto& object : objects_) {
+		object->Draw();
+	}
+}
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationField.h
+============================================================
+#pragma once
+#include "DecorationSpawnSetting.h"
+#include "DecorationObject.h"
+#include <memory>
+#include <vector>
+class DecorationObject;
+class DecorationField
+{
+public:
+	/// <summary>
+	/// DecorationSpawnSettingを受け取ってDecorationObjectを生成する
+	/// </summary>
+	/// <param name="setting"></param>
+	void Generate(const DecorationSpawnSetting& setting);
+
+	/// <summary>
+	/// 更新
+	/// </summary>
+	void Update();
+	/// <summary>
+	/// 描画
+	/// </summary>
+	void Draw();
+
+private:
+	std::vector<std::unique_ptr<DecorationObject>> objects_;
 
 };
 
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationInstanceData.h
+============================================================
+#pragma once
+#include <string>
+#include "MyMath.h"
+
+
+struct DecorationInstanceData {
+	// モデルのファイルパス
+	std::string modelPath;
+	// トランスフォーム / SRT
+	Transform transform;
+
+};
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationObject.cpp
+============================================================
+#include "DecorationObject.h"
+#include "DecorationInstanceData.h"
+
+void DecorationObject::Initialize(const DecorationInstanceData& data)
+{
+	// モデルパスのコピー
+	modelPath_ = data.modelPath;
+	// 数値の受け渡し
+	transform_ = data.transform;
+
+	// モデルの初期化
+	object_ = std::make_unique<Object3D>();
+	object_->Initialize();
+	object_->SetModel(modelPath_);
+	object_->SetTransform(transform_);
+}
+
+
+void DecorationObject::Update()
+{
+	// モデルの更新処理
+	if (object_) {
+		object_->SetTransform(transform_);
+		object_->Update();
+	}
+}
+
+void DecorationObject::Draw()
+{
+	// モデルの描画処理
+	if (object_) {
+		object_->Draw();
+	}
+}
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationObject.h
+============================================================
+#pragma once
+#include <string>
+#include "MyMath.h"
+#include "engine/3d/Object3D.h"
+
+/// <summary>
+/// 
+/// </summary>
+
+// 前方宣言
+struct DecorationInstanceData;
+
+class DecorationObject
+{
+public:
+	/// <summary>
+	/// 初期化処理
+	/// </summary>
+	void Initialize(const DecorationInstanceData& data);
+
+	/// <summary>
+	/// 更新処理
+	/// </summary>
+	void Update();
+
+	/// <summary>
+	/// 描画処理
+	/// </summary>
+	void Draw();
+
+private:
+	// モデルのパス
+	std::string modelPath_;
+	// トランスフォーム
+	Transform transform_;
+	// モデルデーター
+	std::unique_ptr<Object3D> object_;
+};
+
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationPlacer.cpp
+============================================================
+#include "DecorationPlacer.h"
+#include <random>
+#include <cassert>
+#include <algorithm>
+
+std::vector<DecorationInstanceData> DecorationPlacer::CreateLayout(
+	const DecorationSpawnSetting& setting)
+{
+	std::vector<DecorationInstanceData> result;
+	result.reserve(setting.objectCount);
+
+	if (setting.modelPaths.empty() || setting.objectCount == 0) {
+		return result;
+	}
+
+	static std::random_device rd;
+	static std::mt19937 mt(rd());
+
+	// 群れ数を決定
+	std::uniform_int_distribution<uint32_t> clusterCountDist(
+		setting.clusterCountMin, setting.clusterCountMax);
+	uint32_t clusterCount = clusterCountDist(mt);
+
+	// 単独花の数を計算
+	uint32_t singleCount = static_cast<uint32_t>(
+		static_cast<float>(setting.objectCount) * setting.singleSpawnRatio);
+
+	if (singleCount > setting.objectCount) {
+		singleCount = setting.objectCount;
+	}
+
+	uint32_t clusterObjectCount = setting.objectCount - singleCount;
+	uint32_t createdCount = 0;
+
+	// -------------------------
+	// 群れの花を生成
+	// -------------------------
+	for (uint32_t clusterIndex = 0;
+		clusterIndex < clusterCount && createdCount < clusterObjectCount;
+		++clusterIndex) {
+
+		std::uniform_real_distribution<float> centerXDist(
+			(std::min)(setting.areaMin.x, setting.areaMax.x),
+			(std::max)(setting.areaMin.x, setting.areaMax.x));
+
+		float clusterCenterX = centerXDist(mt);
+
+		std::uniform_real_distribution<float> radiusDist(
+			(std::min)(setting.clusterRadiusMin, setting.clusterRadiusMax),
+			(std::max)(setting.clusterRadiusMin, setting.clusterRadiusMax));
+
+		float clusterRadius = radiusDist(mt);
+
+		std::uniform_int_distribution<uint32_t> clusterSizeDist(
+			setting.clusterSizeMin, setting.clusterSizeMax);
+
+		uint32_t clusterSize = clusterSizeDist(mt);
+
+		for (uint32_t i = 0;
+			i < clusterSize && createdCount < clusterObjectCount;
+			++i) {
+
+			bool placed = false;
+
+			for (uint32_t trial = 0; trial < setting.maxTrialCount; ++trial) {
+
+				std::uniform_real_distribution<float> offsetDist(
+					-clusterRadius, clusterRadius);
+
+				float x = clusterCenterX + offsetDist(mt);
+
+				x = (std::max)(
+					(std::min)(setting.areaMin.x, setting.areaMax.x),
+					(std::min)(
+						x,
+						(std::max)(setting.areaMin.x, setting.areaMax.x)));
+
+				Vector3 pos{};
+				pos.x = x;
+				pos.y = setting.fixY ? setting.areaMin.y :
+					RandomVector3(setting.areaMin, setting.areaMax).y;
+				pos.z = setting.fixZ ? setting.areaMin.z :
+					RandomVector3(setting.areaMin, setting.areaMax).z;
+
+				if (!IsFarEnough(pos, result, setting.spawnRangeInterval)) {
+					continue;
+				}
+
+				DecorationInstanceData data;
+				data.modelPath = RandomModelPath(setting.modelPaths);
+				data.transform.translate = pos;
+				data.transform.rotate = RandomVector3(
+					setting.minRotation, setting.maxRotation);
+				data.transform.scale = RandomVector3(
+					setting.minScale, setting.maxScale);
+
+				result.push_back(data);
+				++createdCount;
+				placed = true;
+				break;
+			}
+
+		}
+	}
+
+	// -------------------------
+	// 単独花を生成
+	// -------------------------
+	while (createdCount < setting.objectCount) {
+		bool placed = false;
+
+		for (uint32_t trial = 0; trial < setting.maxTrialCount; ++trial) {
+
+			std::uniform_real_distribution<float> xDist(
+				(std::min)(setting.areaMin.x, setting.areaMax.x),
+				(std::max)(setting.areaMin.x, setting.areaMax.x));
+
+			Vector3 pos{};
+			pos.x = xDist(mt);
+			pos.y = setting.fixY ? setting.areaMin.y :
+				RandomVector3(setting.areaMin, setting.areaMax).y;
+			pos.z = setting.fixZ ? setting.areaMin.z :
+				RandomVector3(setting.areaMin, setting.areaMax).z;
+
+			if (!IsFarEnough(pos, result, setting.spawnRangeInterval)) {
+				continue;
+			}
+
+			DecorationInstanceData data;
+			data.modelPath = RandomModelPath(setting.modelPaths);
+			data.transform.translate = pos;
+			data.transform.rotate = RandomVector3(
+				setting.minRotation, setting.maxRotation);
+			data.transform.scale = RandomVector3(
+				setting.minScale, setting.maxScale);
+
+			result.push_back(data);
+			++createdCount;
+			placed = true;
+			break;
+		}
+
+		if (!placed) {
+			break;
+		}
+	}
+
+	return result;
+}
+
+bool DecorationPlacer::IsFarEnough(const Vector3& candidate, const std::vector<DecorationInstanceData>& placedList, float minDistance) const
+{
+	for (const auto& placed : placedList) {
+		float dx = candidate.x - placed.transform.translate.x;
+
+		if (std::abs(dx) < minDistance) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
+Vector3 DecorationPlacer::RandomPosition(const Vector3& min, const Vector3& max) const
+{
+	return RandomVector3(min, max);
+
+}
+
+Vector3 DecorationPlacer::RandomVector3(const Vector3& min, const Vector3& max) const
+{
+	static std::random_device rd;
+	static std::mt19937 mt(rd());
+
+	std::uniform_real_distribution<float> distX((std::min)(min.x, max.x), (std::max)(min.x, max.x));
+	std::uniform_real_distribution<float> distY((std::min)(min.y, max.y), (std::max)(min.y, max.y));
+	std::uniform_real_distribution<float> distZ((std::min)(min.z, max.z), (std::max)(min.z, max.z));
+
+	Vector3 value;
+	value.x = distX(mt);
+	value.y = distY(mt);
+	value.z = distZ(mt);
+
+	return value;
+}
+
+std::string DecorationPlacer::RandomModelPath(const std::vector<std::string>& modelPaths) const
+{
+	assert(!modelPaths.empty());
+
+	static std::random_device rd;
+	static std::mt19937 mt(rd());
+
+	std::uniform_int_distribution<size_t> dist(0, modelPaths.size() - 1);
+	return modelPaths[dist(mt)];
+}
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationPlacer.h
+============================================================
+#pragma once
+#include <vector>
+#include "DecorationSpawnSetting.h"
+#include "DecorationInstanceData.h"
+#include "MyMath.h"
+#include <string>
+
+
+/// <summary>
+/// DecorationSpawnSettingを受けとる
+/// モデルをランダムに選択しランダムな位置に生成して近すぎないようににする
+/// </summary>
+/// 
+class DecorationPlacer
+{
+public:
+	std::vector<DecorationInstanceData>CreateLayout(
+		const DecorationSpawnSetting& setting);
+
+private:
+	bool IsFarEnough(const Vector3& candidate,
+		const std::vector<DecorationInstanceData>& placedList,
+		float minDistance)const;
+
+	Vector3 RandomPosition(const Vector3& min, const Vector3& max)	const;
+	Vector3 RandomVector3(const Vector3& min, const Vector3& max)	const;
+	std::string RandomModelPath(const std::vector<std::string>& modelPaths)	const;
+};
+
+
+
+============================================================
+File Path: Game/Application/BackGround/Decoration/DecorationSpawnSetting.h
+============================================================
+#pragma once
+#include <vector>
+#include <string>
+#include "MyMath.h"
+/// <summary>
+///	発生の設定項目
+/// </summary>
+struct DecorationSpawnSetting {
+	// 使用するモデルのファイルパス達
+	std::vector<std::string> modelPaths;
+	// 生成するオブジェクトの範囲 / 最小 最大
+	Vector3 areaMin{ 0.0f,0.0f,0.0f };
+	Vector3 areaMax{ 0.0f,0.0f,0.0f };
+	// 生成する数
+	uint32_t objectCount = 0;
+	// 生成する間隔の最低値 / 絶対に空ける距離
+	float spawnRangeInterval = 1.0f;
+	// 大きさのランダム幅 / 最小 最大
+	Vector3 minScale{ 1.0f,1.0f,1.0f };
+	Vector3 maxScale{ 1.0f,1.0f,1.0f };
+	// 回転のランダム幅 / 最小 最大
+	Vector3 minRotation{ 0.0f,0.0f,0.0f };
+	Vector3 maxRotation{ 0.0f,0.0f,0.0f };
+	// 試行回数上限
+	uint32_t maxTrialCount = 100;
+
+	/// 花を群れさせるための設定項目
+
+	// 群れの数
+	uint32_t clusterCountMin = 3;
+	uint32_t clusterCountMax = 5;
+
+	// １群れ当たりの花の数
+	uint32_t clusterSizeMin = 2;
+	uint32_t clusterSizeMax = 5;
+
+	// 群れの人広がり半径
+	float clusterRadiusMin = 4.0f;
+	float clusterRadiusMax = 8.0f;
+
+	// 単独で生える花の割合（0.0f - 1.0f）
+	float singleSpawnRatio = 0.3f;
+
+	// 横スクロール用：YZの固定
+	bool fixY = true;
+	bool fixZ = true;
+};
 
 
 ============================================================
@@ -2845,6 +3405,8 @@ void ModelList::LoadAllModel()
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
 
+	// GameOverScene
+	ModelManager::GetInstance().LoadModel("Scenes/GameOver/Models/backblack");
 
 	// DebugScene
 	ModelManager::GetInstance().LoadModel("Scenes/Debug/BlackDome");
@@ -3159,6 +3721,56 @@ void Player::Respawn(const Vector3& pos)
 	// isVisible_ = true;
 }
 
+void Player::BeginDeathDemo(const Vector3& cameraPos)
+{
+	if (isDying_) return;
+
+	isDying_ = true;
+	deathDemoFinished_ = false;
+	deathDemoTimer_ = 0.0f;
+
+	controlEnabled_ = false;
+
+	onGround_ = false;
+	// その場でジャンプ開始
+	deathVel_ = { 0.0f, deathJumpSpeed_, 0.0f };
+
+	// こちらを向く=
+	deathFaceRot_ = { 0.0f, 1.6f, 0.0f };
+	playerModel_->SetRotate(deathFaceRot_);
+}
+
+void Player::UpdateDeathDemo()
+{
+	deathDemoTimer_ += (1.0f / 60.0f);
+
+	// 重力
+	deathVel_.y -= deathGravity_ * (1.0f / 60.0f);
+
+	Vector3 p = GetTranslate();
+	p.y += deathVel_.y * (1.0f / 60.0f);
+	playerModel_->SetTranslate(p);
+
+	// 回転は固定でこちら向きにキープ（任意）
+	playerModel_->SetRotate(deathFaceRot_);
+
+	if ((deathDemoTimer_ >= deathDemoMinDuration_ && p.y < deathHeight_) ||
+		deathDemoTimer_ >= 2.0f) {
+		isDying_ = false;
+		deathDemoFinished_ = true;
+	}
+}
+
+bool Player::IsInDeathDemo() const
+{
+	return isDying_;
+}
+
+bool Player::IsDeathDemoFinished() const
+{
+	return deathDemoFinished_;
+}
+
 bool Player::ConsumeDeathByFalling()
 {
 	if (!isDeathByFalling_) { return false; }
@@ -3308,6 +3920,11 @@ void Player::Initialize(Vector3 position)
 
 void Player::Update()
 {
+	if (isDying_) {
+		UpdateDeathDemo();
+		playerModel_->Update();
+		return;
+	}
 	// プレイヤーの挙動更新
 	UpdateBehavior();
 	// ダッシュエフェクトの更新
@@ -3343,6 +3960,11 @@ void Player::UpdateBehavior()
 {
 	// マップがセットされていなかったら処理しない
 	if (!map_)return;
+
+	if (!IsAlive()) {
+		velocity_ = {};
+		return;
+	}
 
 	// 死亡していたらリセット処理
 	if (isDead_) {
@@ -4126,6 +4748,17 @@ public:
 	/// <param name="pos"></param>
 	void Respawn(const Vector3& pos);
 
+	// 死亡演出を開始（その場で少し上に跳ねて、こちらを向いて落ちる）
+	void BeginDeathDemo(const Vector3& cameraPos);
+
+	// 死亡演出中か
+	bool IsInDeathDemo() const;
+
+	// 死亡演出が終わったか
+	bool IsDeathDemoFinished() const;
+
+	// 落下による死亡を消費する（落下死のフラグをリセットして、死亡演出に入る）
+	void UpdateDeathDemo();
 
 private:
 	/// <summary>
@@ -4394,6 +5027,19 @@ private:	// メンバ変数
 
 	// 落下して死亡したのフラグ
 	bool isDeathByFalling_ = false;
+
+	bool isDying_ = false;
+	bool deathDemoFinished_ = false;
+	float deathDemoTimer_ = 0.0f;
+	float deathDemoMinDuration_ = 0.2f;
+
+	Vector3 deathVel_ = { 0,0,0 };
+	float deathJumpSpeed_ = 12.0f;
+	float deathGravity_ = 32.0f;
+
+	Vector3 deathFaceRot_ = { 0,0,0 }; 
+
+	
 };
 
 
@@ -4689,6 +5335,25 @@ void DamageFeedBack::Reset()
 	}
 }
 
+void DamageFeedBack::StartShake(float timeSec, float amp, bool withFlash)
+{
+	if (timeSec > 0.0f) {
+		shakeTime_ = timeSec;
+	}
+	if (amp > 0.0f) {
+		shakeAmp_ = amp;
+	}
+
+	// シェイク開始
+	shakeActive_ = true;
+	shakeTimer_ = 0.0f;
+
+	// フラッシュも欲しい場合だけ
+	if (withFlash && hitSprite_) {
+		hitSprite_->SetColor(flashColorOn_);
+	}
+}
+
 void DamageFeedBack::BeginHit()
 {
 	shakeActive_ = true;
@@ -4819,6 +5484,7 @@ public:
 
 	void Reset();
 
+	void StartShake(float timeSec = -1.0f, float amp = -1.0f, bool withFlash = false);
 
 public: // Getter / Setter
 	void SetBaseCameraPos(const Vector3& basePos) { baseCamPos_ = basePos; }
@@ -4842,7 +5508,7 @@ private:
 	Vector4 flashColorOff_ = { 1.0f,1.0f,1.0f,0.0f };
 
 	// 画像パス
-	std::string texturePath_ = "resources/Effects/Hit/Textures/HitDamage.dds";
+	const std::string texturePath_ = "resources/Effects/Hit/Textures/HitDamage.dds";
 
 private:
 	Player* player_ = nullptr;
@@ -8695,7 +9361,7 @@ File Path: Game/Scene/DebugScene/DebugScene.h
 #include "engine/InsideScene/BaseScene.h"
 #include "Game/Camera/Camera.h"
 #include "MyMath.h"
-#include "Game/Application/BackGround.h"
+#include "Game/Application/BackGround/BackGround.h"
 class Object3D;
 class DebugScene :
     public BaseScene
@@ -8775,18 +9441,212 @@ void GameOverScene::Initialize(Engine::DirectXCommon* dxCommon)
 {
 	// カメラの取得
 	camera = Framework::GetMainCamera();
+	cameraTransform = { {0.0f,0.0f,0.0f},{0.0f,0.0f,0.0f},{-0.3f,-6.17f,13.47f} };
+	camera->SetTranslate(cameraTransform.translate);
+
+	backGround = std::make_unique<BackGround>();
+	backGround->Initialize();
+
+	backBlack = std::make_unique<Object3D>();
+	backBlack->Initialize();
+	backBlack->SetModel("Scenes/GameOver/Models/backblack");
+	backBlack->SetTransform(backBlackTransform);
+
+	backBlackTransform = { {1.0f,1.0f,1.0f},{0.0f,-1.6f,0.0f},{0.1f,-6.0f,20.1f} };
+	backBlack->SetTransform(backBlackTransform);
+
+	PlayerModel = std::make_unique<Object3D>();
+	PlayerModel->Initialize();
+	PlayerModel->SetModel("GamePlay/Player");
+	playerModelTransform = { {1.0f,1.0f,1.0f},{2.6f,2.3f,2.0f},{0.0f,-7.0f,20.0f} };
+	PlayerModel->SetTransform(playerModelTransform);
+
+	gameOverUI = std::make_unique<Sprite>();
+	gameOverUI->Initialize("resources/Scenes/GameOver/UI/Texture/GameOverUIText.png");
+	gameOverUI->SetPosition({ 0.0f,0.0f });
+	gameOverUI->SetSize({ 1280.0f,720.0f });
+
+
+	// OneMore / Select / Title UI
+	oneMore_ = std::make_unique<Sprite>();
+	oneMore_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_OneMore.dds");
+	oneMore_->SetPosition({ 250.0f,570.0f });
+	oneMore_->SetSize(oneMoreBaseSize_);
+
+	select_ = std::make_unique<Sprite>();
+	select_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_Select.dds");
+	select_->SetPosition({ 550.0f,570.0f });
+	select_->SetSize(selectBaseSize_);
+
+	title_ = std::make_unique<Sprite>();
+	title_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_Title.dds");
+	title_->SetPosition({ 850.0f,570.0f });
+	title_->SetSize(titleBaseSize_);
+
+	// KeyIconUi　/ 左下に配置
+
+	keyIcon_A = std::make_unique<Sprite>();
+	keyIcon_A->Initialize("resources/_Common/UI/Texture/inputhints/A.dds");
+	keyIcon_A->SetPosition({ 30.0f, 635.0f });
+	keyIcon_A->SetSize({ 50.0f, 50.0f });
+
+	keyIcon_D = std::make_unique<Sprite>();
+	keyIcon_D->Initialize("resources/_Common/UI/Texture/inputhints/D.dds");
+	keyIcon_D->SetPosition({ 80.0f, 635.0f });
+	keyIcon_D->SetSize({ 50.0f, 50.0f });
+
+	keyIcon_Enter = std::make_unique<Sprite>();
+	keyIcon_Enter->Initialize("resources/_Common/UI/Texture/inputhints/Enter.dds");
+	keyIcon_Enter->SetPosition({ 55.0f, 565.0f });
+	keyIcon_Enter->SetSize({ 50.0f, 50.0f });
+
+
+	playerFinalTr_ = playerModelTransform;     // scale/rotate/translate を含む最終値
+	StartPlayerDropIntro(playerFinalTr_);
+
+	// 初期フレームから上にいる状態を反映
+	PlayerModel->SetTransform(playerAnimTr_);
 }
 
 void GameOverScene::Update()
 {
 	// カメラの更新
 	camera->Update();
+	if (Input::GetInstance()->TriggerKey(DIK_A) || Input::GetInstance()->TriggerKey(DIK_LEFT)) {
+		int idx = static_cast<int>(selectedItem_);
+		idx = (idx - 1 + static_cast<int>(ClearMenuItem::Count)) % static_cast<int>(ClearMenuItem::Count);
+		selectedItem_ = static_cast<ClearMenuItem>(idx);
+	}
+	// 右へ（D or →）
+	else if (Input::GetInstance()->TriggerKey(DIK_D) || Input::GetInstance()->TriggerKey(DIK_RIGHT)) {
+		int idx = static_cast<int>(selectedItem_);
+		idx = (idx + 1) % static_cast<int>(ClearMenuItem::Count);
+		selectedItem_ = static_cast<ClearMenuItem>(idx);
+	}
+
+	// ========= 決定（Enter / Space） =========
+	if (Input::GetInstance()->TriggerKey(DIK_RETURN)) {
+		switch (selectedItem_) {
+		case ClearMenuItem::OneMore:
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);     // もう一回 = 今のステージをやり直すなら GAMEPLAY
+			break;
+		case ClearMenuItem::Select:
+			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
+			break;
+		case ClearMenuItem::Title:
+			SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Normal);
+			break;
+		default:
+			break;
+		}
+		return; // シーン遷移したら以降の更新を止めたい場合
+	}
+	oneMore_->SetSize(oneMoreBaseSize_);
+	select_->SetSize(selectBaseSize_);
+	title_->SetSize(titleBaseSize_);
+
+#ifdef USE_IMGUI
+	// Inputクラスの取得と省略
+	Input* input = Input::GetInstance();
+
+	// F1でデバッグカメラON/OFF
+	if (input->TriggerKey(DIK_F1)) {
+		isDebugCameraActive_ = !isDebugCameraActive_;
+	}
+
+	// F2で速度切り替え
+	if (input->TriggerKey(DIK_F2)) {
+		isFastMoveMode_ = !isFastMoveMode_;
+	}
+
+	// デバッグカメラが有効な時だけ更新
+	if (isDebugCameraActive_) {
+		UpdateDebugCamera();
+	}
+#endif
+	// 選択中だけ少し大きく
+	auto Scale = [](const Vector2& v, float s) { return Vector2{ v.x * s, v.y * s }; };
+
+	switch (selectedItem_) {
+	case ClearMenuItem::OneMore:
+		oneMore_->SetSize(Scale(oneMoreBaseSize_, selectScale_));
+		break;
+	case ClearMenuItem::Select:
+		select_->SetSize(Scale(selectBaseSize_, selectScale_));
+		break;
+	case ClearMenuItem::Title:
+		title_->SetSize(Scale(titleBaseSize_, selectScale_));
+		break;
+	default:
+		break;
+	}
+	// タイトルへ戻る (1)
+	if (Input::GetInstance()->TriggerKey(DIK_1)) {
+		SceneManager::GetInstance()->ChangeScene("TITLE");
+	}
+	// ステージセレクトへ戻る (2)
+	else if (Input::GetInstance()->TriggerKey(DIK_2)) {
+		SceneManager::GetInstance()->ChangeScene("STAGESELECT");
+	}
+	// ゲームプレイへ戻る (3)
+	else if (Input::GetInstance()->TriggerKey(DIK_3)) {
+		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
+	}
+	// カメラの更新
+	camera->Update();
+
+	backGround->Update();
+	backBlack->Update();
+
+	const float dt = 1.0f / 60.0f;
+
+	// 状態に応じて更新
+	if (playerOutroState_ == PlayerOutroState::DropBounce) {
+		UpdatePlayerDropIntro(dt);
+	} else if (playerOutroState_ == PlayerOutroState::ShrinkSpin) {
+		UpdatePlayerShrinkSpin(dt);
+	}
+	// Doneは何もしない
+
+	// Transform反映（消えていない時だけ）
+	if (isPlayerVisible_) {
+		PlayerModel->SetTransform(playerAnimTr_);
+	}
+
+	PlayerModel->Update();
+
+	gameOverUI->Update();
+
+	keyIcon_A->Update();
+
+	keyIcon_D->Update();
+	keyIcon_Enter->Update();
+
+
+	oneMore_->Update();
+	select_->Update();
+	title_->Update();
 	// ImGuiの描画
 	DrawImgui();
 }
 
 void GameOverScene::Draw()
 {
+	backGround->Draw();
+	backBlack->Draw(); 
+	if (isPlayerVisible_) {
+		PlayerModel->Draw();
+	}
+
+	gameOverUI->Draw();
+
+	keyIcon_A->Draw();
+
+	keyIcon_D->Draw();
+	keyIcon_Enter->Draw();
+	oneMore_->Draw();
+	select_->Draw();
+	title_->Draw();
 }
 
 void GameOverScene::Finalize()
@@ -8798,20 +9658,290 @@ void GameOverScene::Finalize()
 void GameOverScene::DrawImgui()
 {
 #ifdef USE_IMGUI
+
+	// カメラの座標をimguiで編集できるようにする
+	ImGui::Begin("DebugCamera");
+
+	ImGui::Text("Debug Camera : %s", isDebugCameraActive_ ? "ON" : "OFF");
+	ImGui::Text("Speed Mode   : %s", isFastMoveMode_ ? "FAST" : "NORMAL");
+	ImGui::Text("F1 : Toggle Debug Camera");
+	ImGui::Text("F2 : Toggle Speed Mode");
+
+	ImGui::DragFloat3("CameraPos", &cameraTransform.translate.x, 0.1f);
+	ImGui::DragFloat3("CameraRot", &cameraTransform.rotate.x, 0.01f);
+
+	cameraTransform.translate = camera->GetTranslate();
+	cameraTransform.rotate = camera->GetRotate();
+	ImGui::DragFloat3("Translate", &cameraTransform.translate.x, 0.1f);
+	ImGui::DragFloat3("Rotate", &cameraTransform.rotate.x, 0.1f);
+
+	camera->SetTranslate(cameraTransform.translate);
+	camera->SetRotate(cameraTransform.rotate);
+
+
+
+	ImGui::End();
 	// カメラの調整
 	// カメラの配置情報の変更
 	ImGui::Begin("Camera Transform");
 	cameraTransform = { {0.0f,0.0f,0.0f}, camera->GetRotate(),camera->GetTranslate() };
 	ImGui::DragFloat3("Camera Rotate", &cameraTransform.rotate.x, 0.1f);
 	ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x, 0.1f);
-	
+
 	// カメラの配置情報の反映
 	camera->SetRotate(cameraTransform.rotate);
 	camera->SetTranslate(cameraTransform.translate);
+
+
+	// 背景の調整
+	backBlackTransform = backBlack->GetTransform();
+	ImGui::DragFloat3("BackBlack Scale", &backBlackTransform.scale.x, 0.1f);
+	ImGui::DragFloat3("BackBlack Rotate", &backBlackTransform.rotate.x, 0.1f);
+	ImGui::DragFloat3("BackBlack Translate", &backBlackTransform.translate.x, 0.1f);
+	backBlack->SetTransform(backBlackTransform);
+
+	// プレイヤーモデルの調整
+	playerModelTransform = PlayerModel->GetTransform();
+	ImGui::DragFloat3("PlayerModel Scale", &playerModelTransform.scale.x, 0.1f);
+	ImGui::DragFloat3("PlayerModel Rotate", &playerModelTransform.rotate.x, 0.1f);
+	ImGui::DragFloat3("PlayerModel Translate", &playerModelTransform.translate.x, 0.1f);
+	PlayerModel->SetTransform(playerModelTransform);
+
+
 	ImGui::End();
 #endif
 }
 
+void GameOverScene::UpdateDebugCamera()
+{
+	// 入力関数の取得と省略
+	Input* input = Input::GetInstance();
+	// カメラの現在の情報を取得
+	cameraTransform.translate = camera->GetTranslate();
+	cameraTransform.rotate = camera->GetRotate();
+
+	// 右クリック中だけ視点回転
+	if (input->PushMouse(1)) {
+		cameraTransform.rotate.y += input->GetMouseMoveX() * mouseSensitivity_;
+		cameraTransform.rotate.x += input->GetMouseMoveY() * mouseSensitivity_;
+
+		const float limit = 1.55f;
+		if (cameraTransform.rotate.x > limit) {
+			cameraTransform.rotate.x = limit;
+		}
+		if (cameraTransform.rotate.x < -limit) {
+			cameraTransform.rotate.x = -limit;
+		}
+	}
+	// カメラの前方向と右方向を計算
+	float yaw = cameraTransform.rotate.y;
+	float pitch = cameraTransform.rotate.x;
+
+	Vector3 forward = {
+		std::sinf(yaw) * std::cosf(pitch),
+		std::sinf(pitch),
+		std::cosf(yaw) * std::cosf(pitch)
+	};
+
+	float forwardLen = std::sqrt(
+		forward.x * forward.x +
+		forward.y * forward.y +
+		forward.z * forward.z
+	);
+
+	if (forwardLen > 0.00001f) {
+		forward.x /= forwardLen;
+		forward.y /= forwardLen;
+		forward.z /= forwardLen;
+	}
+
+	Vector3 right = {
+		std::cosf(yaw),
+		0.0f,
+		-std::sinf(yaw)
+	};
+
+	float rightLen = std::sqrt(
+		right.x * right.x +
+		right.y * right.y +
+		right.z * right.z
+	);
+
+	if (rightLen > 0.00001f) {
+		right.x /= rightLen;
+		right.y /= rightLen;
+		right.z /= rightLen;
+	}
+
+	Vector3 move = { 0.0f, 0.0f, 0.0f };
+
+	// 入力した方向にカメラを移動させる
+	if (input->PushKey(DIK_W)) {
+		move.x += forward.x;
+		move.y += forward.y;
+		move.z += forward.z;
+	}
+	if (input->PushKey(DIK_S)) {
+		move.x -= forward.x;
+		move.y -= forward.y;
+		move.z -= forward.z;
+	}
+	if (input->PushKey(DIK_D)) {
+		move.x += right.x;
+		move.z += right.z;
+	}
+	if (input->PushKey(DIK_A)) {
+		move.x -= right.x;
+		move.z -= right.z;
+	}
+	if (input->PushKey(DIK_E)) {
+		move.y += 1.0f;
+	}
+	if (input->PushKey(DIK_Q)) {
+		move.y -= 1.0f;
+	}
+
+	float moveLen = std::sqrt(
+		move.x * move.x +
+		move.y * move.y +
+		move.z * move.z
+	);
+
+	if (moveLen > 0.00001f) {
+		move.x /= moveLen;
+		move.y /= moveLen;
+		move.z /= moveLen;
+	}
+
+	// F2で切り替わる速度
+	float speed = isFastMoveMode_ ? cameraShiftSpeed_ : cameraMoveSpeed_;
+
+	// Shift押下中はさらに加速
+	if (input->PushKey(DIK_LSHIFT) || input->PushKey(DIK_RSHIFT)) {
+		speed *= 2.0f;
+	}
+
+	cameraTransform.translate.x += move.x * speed;
+	cameraTransform.translate.y += move.y * speed;
+	cameraTransform.translate.z += move.z * speed;
+	// カメラに反映
+	camera->SetTranslate(cameraTransform.translate);
+	camera->SetRotate(cameraTransform.rotate);
+}
+
+void GameOverScene::StartPlayerDropIntro(const Transform& finalTr)
+{
+	playerFinalTr_ = finalTr;
+
+	playerAnimTr_ = finalTr;
+	playerAnimTr_.translate.y += spawnHeight_;
+
+	vy_ = 0.0f;
+	bounceCount_ = 0;
+	rotBlendT_ = 0.0f;
+
+	isDropIntroRunning_ = true;
+	playerOutroState_ = PlayerOutroState::DropBounce;
+	isPlayerVisible_ = true;
+	loopDelayTimer_ = 0.0f;
+}
+
+void GameOverScene::UpdatePlayerDropIntro(float dt)
+{
+	if (!isDropIntroRunning_) { return; }
+
+	// 重力
+	vy_ += gravity_ * dt;
+	playerAnimTr_.translate.y += vy_ * dt;
+
+	const float floorY = playerFinalTr_.translate.y;
+
+	if (playerAnimTr_.translate.y <= floorY)
+	{
+		playerAnimTr_.translate.y = floorY;
+
+		// まだバウンドできるなら跳ねる
+		if (bounceCount_ < maxBounces_)
+		{
+			// バウンド回数に応じて反発を弱める（自然に収束）
+			float r = restitution_;
+			for (int i = 0; i < bounceCount_; ++i) {
+				r *= bounceDamping_;
+			}
+
+			if (std::fabs(vy_) < 0.2f) {
+				vy_ = 0.0f;
+				isDropIntroRunning_ = false;
+				playerAnimTr_ = playerFinalTr_;
+
+				// 追加：縮小回転へ
+				StartPlayerShrinkSpin();
+			} else {
+				vy_ = -vy_ * r;
+				bounceCount_++;
+			}
+		} else
+		{
+			// 規定回数跳ねたら固定
+			vy_ = 0.0f;
+			isDropIntroRunning_ = false;
+			playerAnimTr_ = playerFinalTr_;
+			
+			StartPlayerShrinkSpin();
+		}
+	}
+
+	// 回転補間（今のままでもOK）
+	rotBlendT_ += dt * 2.5f;
+	float t = (std::min)(rotBlendT_, 1.0f);
+
+	playerAnimTr_.rotate.x = playerAnimTr_.rotate.x + (playerFinalTr_.rotate.x - playerAnimTr_.rotate.x) * t;
+	playerAnimTr_.rotate.y = playerAnimTr_.rotate.y + (playerFinalTr_.rotate.y - playerAnimTr_.rotate.y) * t;
+	playerAnimTr_.rotate.z = playerAnimTr_.rotate.z + (playerFinalTr_.rotate.z - playerAnimTr_.rotate.z) * t;
+}
+
+void GameOverScene::StartPlayerShrinkSpin()
+{
+	// バウンドが終わった瞬間の姿勢から開始
+	playerOutroState_ = PlayerOutroState::ShrinkSpin;
+
+	// もし「最終姿勢にピタッとしてから」縮小させたいならこれもOK
+	// playerAnimTr_ = playerFinalTr_;
+}
+
+void GameOverScene::UpdatePlayerShrinkSpin(float dt)
+{
+	if (playerOutroState_ != PlayerOutroState::ShrinkSpin) { return; }
+
+	// 回転し続ける
+	playerAnimTr_.rotate.y += spinSpeedY_ * dt;
+	playerAnimTr_.rotate.x += spinSpeedX_ * dt;
+
+	// 縮小（等方縮小）
+	playerAnimTr_.scale.x = (std::max)(0.0f, playerAnimTr_.scale.x - shrinkSpeed_ * dt);
+	playerAnimTr_.scale.y = (std::max)(0.0f, playerAnimTr_.scale.y - shrinkSpeed_ * dt);
+	playerAnimTr_.scale.z = (std::max)(0.0f, playerAnimTr_.scale.z - shrinkSpeed_ * dt);
+
+	// 小さくなったら消す
+	if (playerAnimTr_.scale.x <= minScale_ &&
+		playerAnimTr_.scale.y <= minScale_ &&
+		playerAnimTr_.scale.z <= minScale_)
+	{
+		if (playerAnimTr_.scale.x <= minScale_ &&
+			playerAnimTr_.scale.y <= minScale_ &&
+			playerAnimTr_.scale.z <= minScale_)
+		{
+			if (loopPlayerIntro_) {
+				// すぐ最初からやり直す
+				StartPlayerDropIntro(playerFinalTr_);
+			} else {
+				playerOutroState_ = PlayerOutroState::Done;
+				isPlayerVisible_ = false;
+			}
+			return;
+		}
+	}
+}
 
 ============================================================
 File Path: Game/Scene/GameOverScene.h
@@ -8823,12 +9953,21 @@ File Path: Game/Scene/GameOverScene.h
 #include "ImGuiManager.h"
 #endif
 #include <DirectXCommon.h>
+#include "engine/3d/Object3D.h"
+#include "Game/Application/BackGround/BackGround.h"
+#include "engine/2d/Sprite.h"
 
 /// <summary>
 /// ゲームオーバーシーン
 /// </summary>
 class GameOverScene : public BaseScene
 {
+	enum class ClearMenuItem {
+		OneMore = 0,
+		Select,
+		Title,
+		Count
+	};
 	public:
 	GameOverScene();
 	~GameOverScene();
@@ -8855,11 +9994,112 @@ class GameOverScene : public BaseScene
 	/// </summary>
 	void DrawImgui();
 private:
+	/// <summary>
+	/// デバッグカメラの更新処理
+	/// </summary>
+	void UpdateDebugCamera();
+
+
+	void StartPlayerDropIntro(const Transform& finalTr);
+
+	void UpdatePlayerDropIntro(float dt);
+
+	void StartPlayerShrinkSpin();
+	void UpdatePlayerShrinkSpin(float dt);
+private:
+
+	// デバッグカメラ設定
+	float cameraMoveSpeed_ = 0.15f;
+	float cameraShiftSpeed_ = 0.45f;
+	float mouseSensitivity_ = 0.01f;
+
+	// デバッグカメラ設定
+	bool isDebugCameraActive_ = true;
+	bool isFastMoveMode_ = false;
 
 	// カメラインスタンス
 	Camera* camera = nullptr;
 	// カメラの配置情報
 	Transform cameraTransform = {};
+
+	std::unique_ptr<BackGround> backGround = nullptr;
+	std::unique_ptr<Object3D> backBlack = nullptr;
+	Transform backBlackTransform;
+
+	std::unique_ptr<Object3D> PlayerModel = nullptr;
+	Transform playerModelTransform;
+
+	// ゲームオーバーUI
+	std::unique_ptr<Sprite> gameOverUI = nullptr;
+	Vector2 gameOverUIPosition = { 0.0f,0.0f };
+
+
+	std::unique_ptr<Sprite> oneMore_;
+	Vector2 oneMorePos;
+	std::unique_ptr<Sprite> select_;
+	Vector2 selectPos;
+	std::unique_ptr<Sprite> title_;
+	Vector2 titlePos;
+	// 選択しているアイテム
+	ClearMenuItem selectedItem_ = ClearMenuItem::OneMore;
+	// 選択時の拡縮編集用Vector2
+	Vector2 oneMoreBaseSize_ = { 200.0f, 90.0f };
+	Vector2 selectBaseSize_ = { 200.0f, 90.0f };
+	Vector2 titleBaseSize_ = { 200.0f, 90.0f };
+	// 選択時に８％程大きくする
+	float selectScale_ = 1.08f;
+
+
+	// kyeUI
+	std::unique_ptr<Sprite> keyIcon_A;
+	std::unique_ptr<Sprite> keyIcon_D;
+
+	// enter
+	std::unique_ptr<Sprite> keyIcon_Enter;
+	Vector2 keyIcon_Enter_Pos = { 200.0f,650.0f };
+
+
+
+
+	Transform playerFinalTr_;
+	Transform playerAnimTr_;
+
+	bool isDropIntroRunning_ = false;
+	int bounceCount_ = 0;
+
+	float vy_ = 0.0f;
+	float gravity_ = -35.0f;        // 落ちる速さ（調整）
+	float restitution_ = 0.45f;     // 反発（卓球っぽくするなら 0.4～0.6）
+	float spawnHeight_ = 8.0f;      // どれだけ上から落とすか
+
+	float settleEps_ = 0.05f;       // 収束判定
+	float rotBlendT_ = 0.0f;        // 回転補間用
+
+	// バウンドの最大回数（これ以上は跳ねないで止まる）
+	int maxBounces_ = 3;
+
+	float bounceDamping_ = 0.75f; // 0.6～0.85くらいで調整
+
+	enum class PlayerOutroState {
+		DropBounce,   // 落下→バウンド中
+		ShrinkSpin,   // 回転しながら縮小
+		Done          // 完了（非表示）
+	};
+
+	PlayerOutroState playerOutroState_ = PlayerOutroState::DropBounce;
+
+	// 縮小しながら回転するパラメータ
+	float shrinkSpeed_ = 0.5f;    
+	float minScale_ = 0.03f;      
+	float spinSpeedY_ = 8.0f;     
+	float spinSpeedX_ = 2.5f;     
+	bool isPlayerVisible_ = true; 
+
+
+	bool loopPlayerIntro_ = true;
+
+	float loopDelaySec_ = 0.0f;      
+	float loopDelayTimer_ = 0.0f;
 };
 
 
@@ -8953,6 +10193,10 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	respawnSequence_->Initialize();
 
 	ModelParticleManager::GetInstance().Initialize();
+
+	// ゲームオーバー遷移の保留フラグとタイマーをリセット
+	isGameOverPending_ = false;
+	gameOverTimer_ = 0.0f;
 }
 
 void GamePlayScene::CheckPlayerAlive()
@@ -9066,7 +10310,22 @@ void GamePlayScene::Update()
 
 	// プレイヤーが死んでいたらゲームオーバーシーンへ
 	if (!isPlayerDead_) {
-		sceneManager->ChangeSceneWithTransition("GAMEOVER");
+		if (!isGameOverPending_) {
+			isGameOverPending_ = true;
+
+			// 失敗感のシェイク
+			damageFeedBack_->StartShake(0.7f, 0.75f, false);
+
+			// 死亡演出（こちら向いて少し上にジャンプして落ちる）
+			player->BeginDeathDemo(camera->GetTranslate());
+		}
+
+		// 演出が終わったらゲームオーバーへ
+		if (player->IsDeathDemoFinished()) {
+			sceneManager->ChangeSceneWithTransition("GAMEOVER");
+		}
+
+		return;
 	}
 	// 落下フラグを消費して、復帰演出を開始する（HPが残っている場合）
 	if (!isRespawning_ && player->ConsumeDeathByFalling()) {
@@ -9090,7 +10349,6 @@ void GamePlayScene::Update()
 
 	// ImGuiの描画
 	DrawImgui();
-
 
 }
 
@@ -9206,8 +10464,8 @@ void GamePlayScene::CheckCollision()
 
 	collision_->Clear();
 
-	/// プレイヤー
-	if (player) {
+	/// プレイヤー（死亡演出中は当たり判定から外す）
+	if (player && !player->IsInDeathDemo()) {
 		collision_->AddCollider(player.get());
 	}
 
@@ -9330,8 +10588,13 @@ void GamePlayScene::DrawImgui()
 {
 #ifdef USE_IMGUI
 	ImGui::Begin("Camera Settings / GamePlayScene");
+	if (ImGui::Button("Test Shake")) {
+		damageFeedBack_->StartShake(0.6f, 0.35f, false);
+	}
+
 	// 読み込んでいるマップデータのキー
 	ImGui::Text("SelectedStage:%s", stageKey);
+
 	//==============================
 	// Start Camera Intro Tuning UI
 	//==============================
@@ -9365,7 +10628,7 @@ File Path: Game/Scene/GamePlayScene.h
 #include "engine/InsideScene/BaseScene.h"
 #include "engine/math/MyMath.h"
 #include "Game/Application/Enemy/Factory/EnemyFactory.h"
-#include "Game/Application/BackGround.h"
+#include "Game/Application/BackGround/BackGround.h"
 #include "Game/Camera/CameraController.h"
 #include "Game/Particle/ParticleSystem.h"
 #include "Game/Scene/Pause/PauseSystem.h"
@@ -9553,6 +10816,17 @@ private:
 	bool didWarpOnDark_ = false;
 	// リスポーン位置
 	const Vector3 respawnPos_ = {  1.5f,1.5f,0.0f  };
+
+	// GameOver前の演出（シェイクしてから遷移）
+	bool isGameOverPending_ = false;
+	float gameOverTimer_ = 0.0f;
+
+	// 失敗感を出すなら 0.5～0.8 くらいが見やすい
+	float gameOverDelay_ = 0.6f;
+
+	// 死亡演出中のカメラ固定
+	bool freezeCameraOnDeath_ = false;
+	Vector3 frozenCameraPos_ = {};
 };
 
 
@@ -11106,7 +12380,7 @@ File Path: Game/Scene/StageClearScene.h
 #pragma once
 #include "engine/InsideScene/BaseScene.h"
 #include "MyMath.h"
-#include "Game/Application/BackGround.h"
+#include "Game/Application/BackGround/BackGround.h"
 #include <memory>
 #include "MyMath.h"
 #include "Sprite.h"
@@ -12689,6 +13963,8 @@ File Path: Game/Scene/TitleScene.cpp
 #include "Game/Particle/ParticleSystem.h"
 #include "engine/InsideScene/Framework.h"
 #include "Game/Particle/ParticlePresets.h"
+
+
 using Engine::DirectXCommon;
 TitleScene::TitleScene()
 {
@@ -12713,19 +13989,19 @@ void TitleScene::Initialize(DirectXCommon* dxCommon)
 	};
 	camera->SetTranslate(initCameraTransform.translate);
 	camera->SetRotate(initCameraTransform.rotate);
+
+
 	// パーティクルグループを作成
 	particleEmitter = ParticlePresets::CreateSmoke({ 1.0f,-7.0f,20.0f });
 	particleEmitter->Pause();
 
-	
 	particleEmitter2 = ParticlePresets::CreateSparks({ 1.0f,-7.0f,20.0f });
 	particleEmitter2->Pause();
-
 
 	presetEffect = ParticlePresets::CreateSummonCircle({5.0f,-7.0f,20.0f});
 	//presetEffect->Play();
 
-
+	// プレイヤーオブジェクトの呼び出し / 初期化
 	playerObject = std::make_unique<Object3D>();
 	playerObject->Initialize();
 	playerObject->SetModel("GamePlay/Player");
@@ -12736,13 +14012,9 @@ void TitleScene::Initialize(DirectXCommon* dxCommon)
 	};
 	playerObject->SetTransform(playerTransform);
 
-
-	
-
+	// 背景の呼び出し / 初期化
 	background = std::make_unique<BackGround>();
 	background->Initialize();
-
-	
 
 	// タイトルスプライトの初期化
 	titleSprite = std::make_unique<Sprite>();
@@ -12780,11 +14052,19 @@ void TitleScene::Initialize(DirectXCommon* dxCommon)
 	titleLandSpark_->SetLoop(false);
 	titleLandSpark_->SetEmissionRate(30.0f);
 	titleLandSpark_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+	
 }
 
 void TitleScene::Update()
 {
 	
+	// カメラを右にずらしていく
+	cameraTransform.translate = camera->GetTranslate();
+	cameraTransform.translate.x += 0.05f; 
+	camera->SetTranslate(cameraTransform.translate);
+
+	// カメラの更新
 	camera->Update();
 	background->Update();
 
@@ -12811,20 +14091,23 @@ void TitleScene::Update()
 	}
 
 	// プレイヤーを回転
-	playerTransform.rotate.z -= 0.05f; // 回転速度は調整可能
+	playerTransform.translate.x += 0.05f; // 移動速度は調整可能
+	playerTransform.rotate.z -= 0.1f; // 回転速度は調整可能
 	playerObject->SetTransform(playerTransform);
 	playerObject->Update();
 
-	// ENTERキーが押されたら
+	// ENTERキーが押されたら ゲームプレイシーンへ（デバッグ用）
+#ifdef _DEBUG
 	if (Input::GetInstance()->TriggerKey(DIK_RETURN))
 	{
 		SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY",TransitionType::Start);
 	}
-	else if (Input::GetInstance()->TriggerKey(DIK_SPACE))
+#endif
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE))
 	{
 		SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT",TransitionType::Start);
 	}
-
+	// デバッグ用：0でパーティクル停止、9で再生
 	if (Input::GetInstance()->TriggerKey(DIK_0))
 	{
 		particleEmitter->Stop();
@@ -12832,10 +14115,11 @@ void TitleScene::Update()
 		presetEffect->Stop();
 	} else if (Input::GetInstance()->TriggerKey(DIK_9))
 	{
-		//particleEmitter->Play();
-		//particleEmitter2->Play();
-		//presetEffect->Play();
+		particleEmitter->Play();
+		particleEmitter2->Play();
+		presetEffect->Play();
 	}
+
 	// (1) ジャンプ開始判定（一定間隔）
 	jumpIntervalTimer_++;
 	if (!isJumping_ && jumpIntervalTimer_ >= jumpIntervalFrame_) {
@@ -12895,16 +14179,20 @@ void TitleScene::Update()
 	if (titleLandSpark_) {
 		titleLandSpark_->Update();
 	}
+
+	Vector3 cameraPos = camera->GetTranslate();
+	if (cameraPos.x >= resetDistance_) {
+		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Normal);
+	}
 }
 
 void TitleScene::Draw()
 {
 
 
-#pragma region 3Dオブジェクトの描画
-
+	// 背景の描画
 	background->Draw();
-
+	// プレイヤーの描画
 	playerObject->Draw();
 	
 
@@ -12913,7 +14201,7 @@ void TitleScene::Draw()
 	ModelParticleManager::GetInstance().Draw();
 
 
-#pragma endregion
+
 
 	titleSprite->Draw();
 	pressStartSprite->Draw();
@@ -12966,9 +14254,6 @@ void TitleScene::DrawImgui() {
 
 	ImGui::End();
 
-	
-
-
 #endif // _DEBUG
 
 }
@@ -12986,7 +14271,7 @@ File Path: Game/Scene/TitleScene.h
 #include "Game/Particle/ParticleManager.h"
 #include "Game/Particle/ParticleSystem.h"
 #include "Game/Loader/LevelLoader.h"
-#include "Game/Application/BackGround.h"
+#include "Game/Application/BackGround/BackGround.h"
 
 
 #ifdef USE_IMGUI
@@ -13048,20 +14333,9 @@ private:
 
 private: // ゲーム要素
 	Vector3 speed = { 0.0f,0.0f,0.0f };
-
-
 	bool isStart = false;
-
-
-
-	/// level loader
-	std::unique_ptr<LevelLoader>levelData;
-
 	std::unique_ptr<Object3D> playerObject;
 	Transform playerTransform;
-
-
-	/// タイトルロゴ
 
 	// バックグラウンド
 	 std::unique_ptr<BackGround> background;
@@ -13075,6 +14349,7 @@ private: // ゲーム要素
 
 	 /// カメラ
 	 Camera* camera = nullptr;
+	 Transform cameraTransform;
 	
 
 	 // ===== Title demo player particle & jump (add) =====
@@ -13095,6 +14370,9 @@ private: // ゲーム要素
 
 	 // 足元位置の補正（煙・スパークを足元へ）
 	 float footOffsetY_ = 0.4f;
+
+	 // タイトル画面をロードしなおすまでの距離
+	 float resetDistance_ = 135.0f;
 
 };
 
@@ -13923,6 +15201,10 @@ File Path: MyEngine.vcxproj
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationPlacer.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationObject.cpp" />
     <ClCompile Include="Game\Scene\GameOverScene.cpp" />
     <ClCompile Include="Game\Scene\DebugScene\DebugScene.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.cpp" />
@@ -13930,7 +15212,7 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="Game\Application\UI\DamageFeedBack.cpp" />
     <ClCompile Include="Game\Application\UI\GamePlayHUD.cpp" />
     <ClCompile Include="Game\Camera\CameraController.cpp" />
-    <ClCompile Include="Game\Application\BackGround.cpp" />
+    <ClCompile Include="Game\Application\BackGround\BackGround.cpp" />
     <ClCompile Include="Game\Collision\CollisionManager.cpp" />
     <ClCompile Include="Game\Application\Enemy\Flying\FlyingEnemy.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\EnemyBase.cpp" />
@@ -13994,6 +15276,12 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="Game\Application\RespawnSequence.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationPlacer.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationObject.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationInstanceData.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationSpawnSetting.h" />
     <ClInclude Include="Game\Scene\GameOverScene.h" />
     <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
@@ -14002,7 +15290,7 @@ File Path: MyEngine.vcxproj
     <ClInclude Include="Game\Application\UI\GamePlayHUD.h" />
     <ClInclude Include="Game\Application\Enemy\Types\EnemyType.h" />
     <ClInclude Include="Game\Camera\CameraController.h" />
-    <ClInclude Include="Game\Application\BackGround.h" />
+    <ClInclude Include="Game\Application\BackGround\BackGround.h" />
     <ClInclude Include="Game\Collision\CollisionManager.h" />
     <ClInclude Include="Game\Application\Enemy\Flying\FlyingEnemy.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\EnemyBase.h" />
@@ -14254,7 +15542,7 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="Game\Scene\Pause\PauseUI.cpp">
       <Filter>Game\Application\UI</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\BackGround.cpp">
+    <ClCompile Include="Game\Application\BackGround\BackGround.cpp">
       <Filter>Game\Application\UI</Filter>
     </ClCompile>
     <ClCompile Include="Game\Camera\StartCamPhase.cpp">
@@ -14295,6 +15583,10 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="Game\Scene\DebugScene\DebugScene.cpp" />
     <ClCompile Include="Game\Scene\GameOverScene.cpp" />
     <ClCompile Include="Game\Application\RespawnSequence.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationObject.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationPlacer.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -14454,7 +15746,7 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="Game\Scene\Pause\PauseUI.h">
       <Filter>Game\Application\UI</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\BackGround.h">
+    <ClInclude Include="Game\Application\BackGround\BackGround.h">
       <Filter>Game\Application\UI</Filter>
     </ClInclude>
     <ClInclude Include="Game\Camera\StartCamPhase.h">
@@ -14496,6 +15788,12 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
     <ClInclude Include="Game\Scene\GameOverScene.h" />
     <ClInclude Include="Game\Application\RespawnSequence.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationSpawnSetting.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationInstanceData.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationObject.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationPlacer.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">
