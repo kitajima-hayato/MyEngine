@@ -106,6 +106,8 @@ private: // ゲーム要素
 	 // 足元位置の補正（煙・スパークを足元へ）
 	 float footOffsetY_ = 0.4f;
 
+	 // タイトル画面をロードしなおすまでの距離
+	 float resetDistance_ = 135.0f;
 
 };
 

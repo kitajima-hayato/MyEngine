@@ -224,6 +224,11 @@ void TitleScene::Update()
 	if (titleLandSpark_) {
 		titleLandSpark_->Update();
 	}
+
+	Vector3 cameraPos = camera->GetTranslate();
+	if (cameraPos.x >= resetDistance_) {
+		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Normal);
+	}
 }
 
 void TitleScene::Draw()
