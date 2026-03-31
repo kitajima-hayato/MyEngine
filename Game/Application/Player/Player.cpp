@@ -230,6 +230,56 @@ void Player::Respawn(const Vector3& pos)
 	// isVisible_ = true;
 }
 
+void Player::BeginDeathDemo(const Vector3& cameraPos)
+{
+	if (isDying_) return;
+
+	isDying_ = true;
+	deathDemoFinished_ = false;
+	deathDemoTimer_ = 0.0f;
+
+	controlEnabled_ = false;
+
+	onGround_ = false;
+	// その場でジャンプ開始
+	deathVel_ = { 0.0f, deathJumpSpeed_, 0.0f };
+
+	// こちらを向く=
+	deathFaceRot_ = { 0.0f, 1.6f, 0.0f };
+	playerModel_->SetRotate(deathFaceRot_);
+}
+
+void Player::UpdateDeathDemo()
+{
+	deathDemoTimer_ += (1.0f / 60.0f);
+
+	// 重力
+	deathVel_.y -= deathGravity_ * (1.0f / 60.0f);
+
+	Vector3 p = GetTranslate();
+	p.y += deathVel_.y * (1.0f / 60.0f);
+	playerModel_->SetTranslate(p);
+
+	// 回転は固定でこちら向きにキープ（任意）
+	playerModel_->SetRotate(deathFaceRot_);
+
+	if ((deathDemoTimer_ >= deathDemoMinDuration_ && p.y < deathHeight_) ||
+		deathDemoTimer_ >= 2.0f) {
+		isDying_ = false;
+		deathDemoFinished_ = true;
+	}
+}
+
+bool Player::IsInDeathDemo() const
+{
+	return isDying_;
+}
+
+bool Player::IsDeathDemoFinished() const
+{
+	return deathDemoFinished_;
+}
+
 bool Player::ConsumeDeathByFalling()
 {
 	if (!isDeathByFalling_) { return false; }
@@ -379,6 +429,11 @@ void Player::Initialize(Vector3 position)
 
 void Player::Update()
 {
+	if (isDying_) {
+		UpdateDeathDemo();
+		playerModel_->Update();
+		return;
+	}
 	// プレイヤーの挙動更新
 	UpdateBehavior();
 	// ダッシュエフェクトの更新
@@ -414,6 +469,11 @@ void Player::UpdateBehavior()
 {
 	// マップがセットされていなかったら処理しない
 	if (!map_)return;
+
+	if (!IsAlive()) {
+		velocity_ = {};
+		return;
+	}
 
 	// 死亡していたらリセット処理
 	if (isDead_) {

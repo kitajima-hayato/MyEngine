@@ -6,7 +6,7 @@
 #include "Game/Particle/ParticleManager.h"
 #include "Game/Particle/ParticleSystem.h"
 #include "Game/Loader/LevelLoader.h"
-#include "Game/Application/BackGround.h"
+#include "Game/Application/BackGround/BackGround.h"
 
 
 #ifdef USE_IMGUI
@@ -68,20 +68,9 @@ private:
 
 private: // ゲーム要素
 	Vector3 speed = { 0.0f,0.0f,0.0f };
-
-
 	bool isStart = false;
-
-
-
-	/// level loader
-	std::unique_ptr<LevelLoader>levelData;
-
 	std::unique_ptr<Object3D> playerObject;
 	Transform playerTransform;
-
-
-	/// タイトルロゴ
 
 	// バックグラウンド
 	 std::unique_ptr<BackGround> background;
@@ -95,6 +84,7 @@ private: // ゲーム要素
 
 	 /// カメラ
 	 Camera* camera = nullptr;
+	 Transform cameraTransform;
 	
 
 	 // ===== Title demo player particle & jump (add) =====
@@ -115,6 +105,9 @@ private: // ゲーム要素
 
 	 // 足元位置の補正（煙・スパークを足元へ）
 	 float footOffsetY_ = 0.4f;
+
+	 // タイトル画面をロードしなおすまでの距離
+	 float resetDistance_ = 135.0f;
 
 };
 

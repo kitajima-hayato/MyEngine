@@ -8,6 +8,8 @@
 #include "Game/Particle/ParticleSystem.h"
 #include "engine/InsideScene/Framework.h"
 #include "Game/Particle/ParticlePresets.h"
+
+
 using Engine::DirectXCommon;
 TitleScene::TitleScene()
 {
@@ -32,19 +34,19 @@ void TitleScene::Initialize(DirectXCommon* dxCommon)
 	};
 	camera->SetTranslate(initCameraTransform.translate);
 	camera->SetRotate(initCameraTransform.rotate);
+
+
 	// パーティクルグループを作成
 	particleEmitter = ParticlePresets::CreateSmoke({ 1.0f,-7.0f,20.0f });
 	particleEmitter->Pause();
 
-	
 	particleEmitter2 = ParticlePresets::CreateSparks({ 1.0f,-7.0f,20.0f });
 	particleEmitter2->Pause();
-
 
 	presetEffect = ParticlePresets::CreateSummonCircle({5.0f,-7.0f,20.0f});
 	//presetEffect->Play();
 
-
+	// プレイヤーオブジェクトの呼び出し / 初期化
 	playerObject = std::make_unique<Object3D>();
 	playerObject->Initialize();
 	playerObject->SetModel("GamePlay/Player");
@@ -55,13 +57,9 @@ void TitleScene::Initialize(DirectXCommon* dxCommon)
 	};
 	playerObject->SetTransform(playerTransform);
 
-
-	
-
+	// 背景の呼び出し / 初期化
 	background = std::make_unique<BackGround>();
 	background->Initialize();
-
-	
 
 	// タイトルスプライトの初期化
 	titleSprite = std::make_unique<Sprite>();
@@ -99,11 +97,19 @@ void TitleScene::Initialize(DirectXCommon* dxCommon)
 	titleLandSpark_->SetLoop(false);
 	titleLandSpark_->SetEmissionRate(30.0f);
 	titleLandSpark_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+	
 }
 
 void TitleScene::Update()
 {
 	
+	// カメラを右にずらしていく
+	cameraTransform.translate = camera->GetTranslate();
+	cameraTransform.translate.x += 0.05f; 
+	camera->SetTranslate(cameraTransform.translate);
+
+	// カメラの更新
 	camera->Update();
 	background->Update();
 
@@ -130,20 +136,23 @@ void TitleScene::Update()
 	}
 
 	// プレイヤーを回転
-	playerTransform.rotate.z -= 0.05f; // 回転速度は調整可能
+	playerTransform.translate.x += 0.05f; // 移動速度は調整可能
+	playerTransform.rotate.z -= 0.1f; // 回転速度は調整可能
 	playerObject->SetTransform(playerTransform);
 	playerObject->Update();
 
-	// ENTERキーが押されたら
+	// ENTERキーが押されたら ゲームプレイシーンへ（デバッグ用）
+#ifdef _DEBUG
 	if (Input::GetInstance()->TriggerKey(DIK_RETURN))
 	{
 		SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY",TransitionType::Start);
 	}
-	else if (Input::GetInstance()->TriggerKey(DIK_SPACE))
+#endif
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE))
 	{
 		SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT",TransitionType::Start);
 	}
-
+	// デバッグ用：0でパーティクル停止、9で再生
 	if (Input::GetInstance()->TriggerKey(DIK_0))
 	{
 		particleEmitter->Stop();
@@ -151,10 +160,11 @@ void TitleScene::Update()
 		presetEffect->Stop();
 	} else if (Input::GetInstance()->TriggerKey(DIK_9))
 	{
-		//particleEmitter->Play();
-		//particleEmitter2->Play();
-		//presetEffect->Play();
+		particleEmitter->Play();
+		particleEmitter2->Play();
+		presetEffect->Play();
 	}
+
 	// (1) ジャンプ開始判定（一定間隔）
 	jumpIntervalTimer_++;
 	if (!isJumping_ && jumpIntervalTimer_ >= jumpIntervalFrame_) {
@@ -214,16 +224,20 @@ void TitleScene::Update()
 	if (titleLandSpark_) {
 		titleLandSpark_->Update();
 	}
+
+	Vector3 cameraPos = camera->GetTranslate();
+	if (cameraPos.x >= resetDistance_) {
+		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Normal);
+	}
 }
 
 void TitleScene::Draw()
 {
 
 
-#pragma region 3Dオブジェクトの描画
-
+	// 背景の描画
 	background->Draw();
-
+	// プレイヤーの描画
 	playerObject->Draw();
 	
 
@@ -232,7 +246,7 @@ void TitleScene::Draw()
 	ModelParticleManager::GetInstance().Draw();
 
 
-#pragma endregion
+
 
 	titleSprite->Draw();
 	pressStartSprite->Draw();
@@ -284,9 +298,6 @@ void TitleScene::DrawImgui() {
 	
 
 	ImGui::End();
-
-	
-
 
 #endif // _DEBUG
 

@@ -84,6 +84,10 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	respawnSequence_->Initialize();
 
 	ModelParticleManager::GetInstance().Initialize();
+
+	// ゲームオーバー遷移の保留フラグとタイマーをリセット
+	isGameOverPending_ = false;
+	gameOverTimer_ = 0.0f;
 }
 
 void GamePlayScene::CheckPlayerAlive()
@@ -197,7 +201,22 @@ void GamePlayScene::Update()
 
 	// プレイヤーが死んでいたらゲームオーバーシーンへ
 	if (!isPlayerDead_) {
-		sceneManager->ChangeSceneWithTransition("GAMEOVER");
+		if (!isGameOverPending_) {
+			isGameOverPending_ = true;
+
+			// 失敗感のシェイク
+			damageFeedBack_->StartShake(0.7f, 0.75f, false);
+
+			// 死亡演出（こちら向いて少し上にジャンプして落ちる）
+			player->BeginDeathDemo(camera->GetTranslate());
+		}
+
+		// 演出が終わったらゲームオーバーへ
+		if (player->IsDeathDemoFinished()) {
+			sceneManager->ChangeSceneWithTransition("GAMEOVER");
+		}
+
+		return;
 	}
 	// 落下フラグを消費して、復帰演出を開始する（HPが残っている場合）
 	if (!isRespawning_ && player->ConsumeDeathByFalling()) {
@@ -221,7 +240,6 @@ void GamePlayScene::Update()
 
 	// ImGuiの描画
 	DrawImgui();
-
 
 }
 
@@ -337,8 +355,8 @@ void GamePlayScene::CheckCollision()
 
 	collision_->Clear();
 
-	/// プレイヤー
-	if (player) {
+	/// プレイヤー（死亡演出中は当たり判定から外す）
+	if (player && !player->IsInDeathDemo()) {
 		collision_->AddCollider(player.get());
 	}
 
@@ -461,8 +479,13 @@ void GamePlayScene::DrawImgui()
 {
 #ifdef USE_IMGUI
 	ImGui::Begin("Camera Settings / GamePlayScene");
+	if (ImGui::Button("Test Shake")) {
+		damageFeedBack_->StartShake(0.6f, 0.35f, false);
+	}
+
 	// 読み込んでいるマップデータのキー
 	ImGui::Text("SelectedStage:%s", stageKey);
+
 	//==============================
 	// Start Camera Intro Tuning UI
 	//==============================
