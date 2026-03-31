@@ -108,6 +108,10 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationPlacer.cpp" />
+    <ClCompile Include="Game\Application\BackGround\Decoration\DecorationObject.cpp" />
     <ClCompile Include="Game\Scene\GameOverScene.cpp" />
     <ClCompile Include="Game\Scene\DebugScene\DebugScene.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.cpp" />
@@ -115,7 +119,7 @@
     <ClCompile Include="Game\Application\UI\DamageFeedBack.cpp" />
     <ClCompile Include="Game\Application\UI\GamePlayHUD.cpp" />
     <ClCompile Include="Game\Camera\CameraController.cpp" />
-    <ClCompile Include="Game\Application\BackGround.cpp" />
+    <ClCompile Include="Game\Application\BackGround\BackGround.cpp" />
     <ClCompile Include="Game\Collision\CollisionManager.cpp" />
     <ClCompile Include="Game\Application\Enemy\Flying\FlyingEnemy.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\EnemyBase.cpp" />
@@ -179,6 +183,12 @@
     <ClCompile Include="Game\Application\RespawnSequence.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationPlacer.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationObject.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationInstanceData.h" />
+    <ClInclude Include="Game\Application\BackGround\Decoration\DecorationSpawnSetting.h" />
     <ClInclude Include="Game\Scene\GameOverScene.h" />
     <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
@@ -187,7 +197,7 @@
     <ClInclude Include="Game\Application\UI\GamePlayHUD.h" />
     <ClInclude Include="Game\Application\Enemy\Types\EnemyType.h" />
     <ClInclude Include="Game\Camera\CameraController.h" />
-    <ClInclude Include="Game\Application\BackGround.h" />
+    <ClInclude Include="Game\Application\BackGround\BackGround.h" />
     <ClInclude Include="Game\Collision\CollisionManager.h" />
     <ClInclude Include="Game\Application\Enemy\Flying\FlyingEnemy.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\EnemyBase.h" />

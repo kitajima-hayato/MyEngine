@@ -1,4 +1,5 @@
 #include "BackGround.h"
+#include "Game/Application/BackGround/Decoration/DecorationSpawnSetting.h"
 #ifdef USE_IMGUI
 #include "engine/base/ImGuiManager.h"
 #endif
@@ -8,7 +9,8 @@ void BackGround::Initialize()
 	items_.clear();
 	items_.reserve(7);
 
-	// 旧ファイルと同じ初期値
+	// AddItem("Imguiで表示する名前", "設定するモデルのファイルパス", モデルの配置座標);
+
 	AddItem("skyBack", "GamePlay/BackGround/sky", Transform{
 		{ 400.0f,100.0f,1.0f },
 		{ 0.0f,0.0f,0.0f },
@@ -45,13 +47,13 @@ void BackGround::Initialize()
 		});
 	
 	AddItem("soil", "GamePlay/Blocks/grassblock", Transform{
-		{ 40.0f,1.0f,2.0f },
+		{ 300.0f,1.0f,2.0f },
 		{ 0.0f,0.0f,0.0f },
 		{ 0.0f,-8.0f,20.0f }
 		});
 
 	// 花
-	AddItem("flower_white_front_L", "GamePlay/BackGround/fluff", Transform{
+	/*AddItem("flower_white_front_L", "GamePlay/BackGround/fluff", Transform{
 	  { 2.0f, 2.0f, 2.0f }, { 0.0f, 0.15f, 0.0f }, { 4.1f, -7.7f, 21.0f }
 		});
 	AddItem("flower_pink_front_L", "GamePlay/BackGround/flower_pink", Transform{
@@ -70,25 +72,73 @@ void BackGround::Initialize()
 		});
 	AddItem("flower_blue_mid", "GamePlay/BackGround/flower_purple", Transform{
 	  { 2.0f, 2.0f, 2.0f }, { 0.0f,-0.15f, 0.0f }, { 13.4f, -8.0f, 21.8f }
-		});
+		});*/
+
+	DecorationSpawnSetting setting;
+
+	setting.modelPaths = { 
+		"GamePlay/BackGround/fluff",
+		"GamePlay/BackGround/flower_pink",
+		"GamePlay/BackGround/flower_orange", 
+		"GamePlay/BackGround/flower_purple",
+		"GamePlay/BackGround/flower_pink"
+	};
+	setting.areaMin = { 0.0f, -7.5f, 20.0f };
+	setting.areaMax = { 150.0f, -7.5f, 20.0f };
+
+	setting.objectCount = 100;
+	setting.spawnRangeInterval = 0.8f;
+
+	setting.minScale = { 1.0f, 1.0f, 1.0f };
+	setting.maxScale = { 1.0f, 1.0f, 1.0f };
+
+	setting.minRotation = { 0.0f, -0.1f, 0.0f };
+	setting.maxRotation = { 0.0f, 0.1f, 0.0f };
+
+	setting.maxTrialCount = 100;
+
+	// 群れの設定値
+	// 群れの数
+	setting.clusterCountMin = 3;
+	setting.clusterCountMax = 5;
+	// 1群れ当たりの花の数
+	setting.clusterSizeMin = 3;
+	setting.clusterSizeMax = 5;
+	// 群れの広がり半径
+	setting.clusterRadiusMin = 3.0f;
+	setting.clusterRadiusMax = 5.0f;
+	// 単独で生える花の割合
+	setting.singleSpawnRatio = 0.4f;
+
+	setting.fixY = true;
+	setting.fixZ = true;
+
+	flowerField_.Generate(setting);
+	
 }
 
 void BackGround::Update()
 {
-	
+	// 各オブジェクトの更新
 	for (auto& item : items_) {
 		item.object->SetTransform(item.transform);
 		item.object->Update();
 	}
+	// 花の自動配置
+	flowerField_.Update();
 
+	// Imguiの描画
 	DrawImgui();
 }
 
 void BackGround::Draw()
 {
+	// 各オブジェクトの描画	
 	for (auto& item : items_) {
 		item.object->Draw();
 	}
+
+	flowerField_.Draw();
 }
 
 void BackGround::DrawImgui()
@@ -105,7 +155,7 @@ void BackGround::DrawImgui()
 		ImGui::DragFloat3(sRotate.c_str(), &item.transform.rotate.x, 0.1f);
 		ImGui::DragFloat3(sTrans.c_str(), &item.transform.translate.x, 0.1f);
 
-		// 変更を即時反映（次フレーム反映でも良いが、こっちの方が分かりやすい）
+		// 変更を即時反映
 		item.object->SetTransform(item.transform);
 	}
 

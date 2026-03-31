@@ -2,7 +2,7 @@
 #include "engine/InsideScene/BaseScene.h"
 #include "Game/Camera/Camera.h"
 #include "MyMath.h"
-#include "Game/Application/BackGround.h"
+#include "Game/Application/BackGround/BackGround.h"
 class Object3D;
 class DebugScene :
     public BaseScene

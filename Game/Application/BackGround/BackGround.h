@@ -2,6 +2,7 @@
 #include "engine/3d/Object3D.h"
 #include "engine/math/MyMath.h"
 #include <memory>
+#include "Game/Application/BackGround/Decoration/DecorationField.h"
 /// <summary>
 /// 背景クラス
 /// 各ステージの背景を管理する
@@ -40,14 +41,7 @@ private:
 	// items_ の追加ヘルパ（Initializeを短くする用）
 	void AddItem(const char* debugName, const char* modelName, const Transform& transform);
 
-	// ステージセレクト背景
-	std::unique_ptr<Object3D> skyBack;
-	Transform skyBackTransform;
 
-	// 足場　土
-	std::unique_ptr<Object3D> soil;
-	Transform soilTransform;
-
-
+	DecorationField flowerField_;
 };
 
