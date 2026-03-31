@@ -3,6 +3,10 @@
 #include "engine/InsideScene/Framework.h"
 #include "Input.h"
 #include "ImGuiManager.h"
+#include "Game/Application/PlayContext.h"
+#include <algorithm>
+#include <cctype>
+#include <cstdlib>
 
 using Engine::DirectXCommon;
 StageClearScene::StageClearScene()
@@ -86,28 +90,66 @@ void StageClearScene::Update()
 {
 	// カメラの更新
 	camera->Update();
+	// 左
 	if(Input::GetInstance()->TriggerKey(DIK_A) || Input::GetInstance()->TriggerKey(DIK_LEFT)) {
 		int idx = static_cast<int>(selectedItem_);
 		idx = (idx - 1 + static_cast<int>(ClearMenuItem::Count)) % static_cast<int>(ClearMenuItem::Count);
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
-	// 右へ（D or →）
+	// 右
 	else if (Input::GetInstance()->TriggerKey(DIK_D) || Input::GetInstance()->TriggerKey(DIK_RIGHT)) {
 		int idx = static_cast<int>(selectedItem_);
 		idx = (idx + 1) % static_cast<int>(ClearMenuItem::Count);
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
 
-	// ========= 決定（Enter / Space） =========
+	//  決定（Enter / Space） 
 	if (Input::GetInstance()->TriggerKey(DIK_RETURN) ) {
 		switch (selectedItem_) {
-		case ClearMenuItem::OneMore:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY",TransitionType::Normal);     // もう一回 = 今のステージをやり直すなら GAMEPLAY
+		case ClearMenuItem::NextStage:
+		{
+			const std::string& nextStageName = PlayContext::GetInstance().GetSelectedStageKey();
+			const size_t dash = nextStageName.find('-');
+			if (dash != std::string::npos) {
+				const std::string left = nextStageName.substr(0, dash);
+				const std::string right = nextStageName.substr(dash + 1);
+
+				auto isAllDigits = [](const std::string& s) {
+					return !s.empty() &&
+						std::all_of(s.begin(), s.end(),
+							[](unsigned char c) { return std::isdigit(c) != 0; });
+					};
+
+				if (isAllDigits(left) && isAllDigits(right)) {
+
+					const int world = std::atoi(left.c_str());
+					const int stage = std::atoi(right.c_str());
+
+
+					constexpr int kMaxStage = 8;
+					if (stage >= kMaxStage) {
+						// もう次が無いので、ステージセレクトに戻す
+						SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
+						break;
+					}
+					// "1-1" -> "1-2"
+					const std::string nextStageKey =
+						std::to_string(world) + "-" + std::to_string(stage + 1);
+
+					PlayContext::GetInstance().SetSelectedStage(
+						PlayContext::GetInstance().GetSelectedStageId(),
+						nextStageKey);
+				}
+			}
+
+
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);
 			break;
-		case ClearMenuItem::Select:
+		}
+		case ClearMenuItem::OneMore:
 			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
 			break;
-		case ClearMenuItem::Title:
+		case ClearMenuItem::Select:
 			SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Normal);
 			break;
 		default:
@@ -128,13 +170,13 @@ void StageClearScene::Update()
 	auto Scale = [](const Vector2& v, float s) { return Vector2{ v.x * s, v.y * s }; };
 
 	switch (selectedItem_) {
-	case ClearMenuItem::OneMore:
+	case ClearMenuItem::NextStage:
 		oneMore_->SetSize(Scale(oneMoreBaseSize_, selectScale_));
 		break;
-	case ClearMenuItem::Select:
+	case ClearMenuItem::OneMore:
 		select_->SetSize(Scale(selectBaseSize_, selectScale_));
 		break;
-	case ClearMenuItem::Title:
+	case ClearMenuItem::Select:
 		title_->SetSize(Scale(titleBaseSize_, selectScale_));
 		break;
 	default:
