@@ -42,42 +42,61 @@ void GameOverScene::Initialize(Engine::DirectXCommon* dxCommon)
 	// OneMore / Select / Title UI
 	oneMore_ = std::make_unique<Sprite>();
 	oneMore_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_OneMore.dds");
-	oneMore_->SetPosition({ 250.0f,570.0f });
+	oneMore_->SetPosition({ 350.0f,615.0f });
 	oneMore_->SetSize(oneMoreBaseSize_);
+	oneMore_->SetAnchorPoint({ 0.5f,0.5f });
 
 	select_ = std::make_unique<Sprite>();
 	select_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_Select.dds");
-	select_->SetPosition({ 550.0f,570.0f });
+	select_->SetPosition({ 650.0f,615.0f });
 	select_->SetSize(selectBaseSize_);
+	select_->SetAnchorPoint({ 0.5f,0.5f });
 
 	title_ = std::make_unique<Sprite>();
 	title_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_Title.dds");
-	title_->SetPosition({ 850.0f,570.0f });
+	title_->SetPosition({ 950.0f,615.0f });
 	title_->SetSize(titleBaseSize_);
+	title_->SetAnchorPoint({ 0.5f,0.5f });
 
 	// KeyIconUi　/ 左下に配置
 
-	keyIcon_A = std::make_unique<Sprite>();
-	keyIcon_A->Initialize("resources/_Common/UI/Texture/inputhints/A.dds");
-	keyIcon_A->SetPosition({ 30.0f, 635.0f });
-	keyIcon_A->SetSize({ 50.0f, 50.0f });
-
-	keyIcon_D = std::make_unique<Sprite>();
-	keyIcon_D->Initialize("resources/_Common/UI/Texture/inputhints/D.dds");
-	keyIcon_D->SetPosition({ 80.0f, 635.0f });
-	keyIcon_D->SetSize({ 50.0f, 50.0f });
-
-	keyIcon_Enter = std::make_unique<Sprite>();
-	keyIcon_Enter->Initialize("resources/_Common/UI/Texture/inputhints/Enter.dds");
-	keyIcon_Enter->SetPosition({ 55.0f, 565.0f });
-	keyIcon_Enter->SetSize({ 50.0f, 50.0f });
+	keyIcon_Space = std::make_unique<Sprite>();
+	keyIcon_Space->Initialize("resources/_Common/UI/Texture/inputhints/Space.png");
+	keyIcon_Space->SetPosition({ 10.0f, 300.0f });
+	keyIcon_Space->SetSize({ 125.0f, 75.0f });
 
 
-	playerFinalTr_ = playerModelTransform;     // scale/rotate/translate を含む最終値
+	keyIcon_AD = std::make_unique<Sprite>();
+	keyIcon_AD->Initialize("resources/Scenes/Clear/UI/Texture/AD.png");
+	keyIcon_AD->SetPosition({ 10.0f, 350.0f });
+	keyIcon_AD->SetSize({ 60.0f, 60.0f });
+
+	// scale/rotate/translate を含む最終値
+	playerFinalTr_ = playerModelTransform;
 	StartPlayerDropIntro(playerFinalTr_);
 
 	// 初期フレームから上にいる状態を反映
 	PlayerModel->SetTransform(playerAnimTr_);
+
+	// コロンのスプライト
+	colonSprites_.clear();
+	colonSprites_.reserve(2);
+
+	colonPositions_.clear();
+	colonPositions_.reserve(2);
+
+	colonPositions_.push_back({ 85.0f,305.0f });
+	colonPositions_.push_back({ 85.0f,345.0f });
+
+	for (int i = 0; i < 2; ++i) {
+		auto s = std::make_unique<Sprite>();
+		s->Initialize("resources/_Common/UI/Texture/inputhints/Colon.png");
+		s->SetSize({ 125.0f, 70.0f });
+		s->SetPosition(colonPositions_[i]);
+		colonSprites_.push_back(std::move(s));
+	}
+
+
 }
 
 void GameOverScene::Update()
@@ -96,8 +115,8 @@ void GameOverScene::Update()
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
 
-	// ========= 決定（Enter / Space） =========
-	if (Input::GetInstance()->TriggerKey(DIK_RETURN)) {
+	// 決定（Enter / Space）
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
 		switch (selectedItem_) {
 		case ClearMenuItem::OneMore:
 			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);     // もう一回 = 今のステージをやり直すなら GAMEPLAY
@@ -111,7 +130,7 @@ void GameOverScene::Update()
 		default:
 			break;
 		}
-		return; // シーン遷移したら以降の更新を止めたい場合
+		return; 
 	}
 	oneMore_->SetSize(oneMoreBaseSize_);
 	select_->SetSize(selectBaseSize_);
@@ -178,9 +197,7 @@ void GameOverScene::Update()
 	} else if (playerOutroState_ == PlayerOutroState::ShrinkSpin) {
 		UpdatePlayerShrinkSpin(dt);
 	}
-	// Doneは何もしない
-
-	// Transform反映（消えていない時だけ）
+	// Transform反映
 	if (isPlayerVisible_) {
 		PlayerModel->SetTransform(playerAnimTr_);
 	}
@@ -189,10 +206,12 @@ void GameOverScene::Update()
 
 	gameOverUI->Update();
 
-	keyIcon_A->Update();
+	keyIcon_AD->Update();
 
-	keyIcon_D->Update();
-	keyIcon_Enter->Update();
+	keyIcon_Space->Update();
+
+	// コロンUIの更新
+	for (auto& s : colonSprites_) { s->Update(); }
 
 
 	oneMore_->Update();
@@ -212,13 +231,15 @@ void GameOverScene::Draw()
 
 	gameOverUI->Draw();
 
-	keyIcon_A->Draw();
+	keyIcon_AD->Draw();
 
-	keyIcon_D->Draw();
-	keyIcon_Enter->Draw();
+	keyIcon_Space->Draw();
 	oneMore_->Draw();
 	select_->Draw();
 	title_->Draw();
+
+	// コロンUIの描画
+	for (auto& s : colonSprites_) { s->Draw(); }
 }
 
 void GameOverScene::Finalize()

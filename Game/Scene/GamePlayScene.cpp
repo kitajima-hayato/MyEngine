@@ -111,8 +111,9 @@ void GamePlayScene::Update()
 	backGround->Update();
 	// スタートカメラの更新
 	startCam_->Update(dt);
+	bool isGoal = player->GetIsGoal();
 	stageStartEventFlag_ = startCam_->IsRunning();
-	isPlayerControlLocked_ = stageStartEventFlag_;
+	isPlayerControlLocked_ = stageStartEventFlag_ || isGoal;
 	player->SetControlEnabled(!isPlayerControlLocked_);
 
 	// マップの更新
@@ -233,8 +234,9 @@ void GamePlayScene::Update()
 
 	ModelParticleManager::GetInstance().Update();
 	// プレイヤーがゴールに触れていたらシーン遷移
-	bool isGoal = player->GetIsGoal();
+
 	if (isGoal) {
+		// ゴールしたら操作を受け付けない
 		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Normal);
 	}
 
@@ -249,10 +251,9 @@ void GamePlayScene::Draw()
 	//  モデルの描画   //
 	///////////////////
 
+	// 背景の描画
 	backGround->Draw();
 
-
-	//sceneTransition->Draw();
 	// マップの描画
 	map->Draw();
 

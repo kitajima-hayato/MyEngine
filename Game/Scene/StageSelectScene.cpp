@@ -78,12 +78,12 @@ Vector3 StageSelectScene::CalcNodeWorldPos(uint32_t nodeId) const
 	const Vector2 uv = stageSelectGraph->GetNodeUV(nodeId);
 
 	// マップの表示範囲（ワールド単位）
-	const float mapWidth = 40.0f;  // 横幅
-	const float mapHeight = 20.0f;  // 縦幅
+	const float mapWidth = 40.0f;  
+	const float mapHeight = 20.0f;  
 
 	// マップの基準（中心）位置
 	Vector3 origin = stageSelectBase1Transform.translate;
-	origin.y = 1.0f; // カーソル高さ
+	origin.y = 1.0f; 
 
 	// ノード位置をワールド座標に変換
 	Vector3 t = origin;
@@ -98,10 +98,10 @@ float StageSelectScene::CalcYawToTarget(const Vector3& from, const Vector3& to) 
 {
 	// 2点間の方向ベクトルを計算
 	Vector3 delta = to - from;
-	delta.y = 0.0f; // Y軸は無視（水平方向のみ）
+	delta.y = 0.0f;
 
 	float len = std::sqrtf(delta.x * delta.x + delta.z * delta.z);
-	if (len < 1e-6f) return 0.0f; // ほぼ同じ位置なら0を返す
+	if (len < 1e-6f) return 0.0f; 
 
 	// Yaw 0 が +Z方向の場合
 	float yaw = std::atan2f(delta.x, delta.z);
@@ -119,7 +119,7 @@ float StageSelectScene::CalcYawFaceCamera(const Vector3& pos) const
 
 	// カメラ方向のベクトルを計算
 	Vector3 delta = camPos - pos;
-	delta.y = 0.0f; // Y軸は無視
+	delta.y = 0.0f; 
 
 	float len = std::sqrtf(delta.x * delta.x + delta.z * delta.z);
 	if (len < 1e-6f) return 0.0f;
@@ -133,9 +133,7 @@ float StageSelectScene::CalcYawFaceCamera(const Vector3& pos) const
 	return WrapAngle0To2Pi(yaw);
 }
 
-// ========================================
-// 移動・回転更新
-// ========================================
+
 
 void StageSelectScene::UpdateCursorMove()
 {
@@ -167,14 +165,13 @@ void StageSelectScene::UpdateCursorMove()
 
 	// 回転更新（移動中は進行方向を向く）
 	transform.rotate.y = yaw;
-	transform.rotate.x = 0.0f;  // 移動中は傾けない
+	transform.rotate.x = 0.0f; 
 	transform.rotate.z = 0.0f;
 
 	// プレイヤー位置更新
 	playerModel->SetTransform(transform);
 
 #ifdef USE_IMGUI
-	// ↓現在のYaw角を更新
 	debugCurrentYawDeg_ = yaw * 57.2957795f;
 #endif
 
@@ -237,10 +234,6 @@ void StageSelectScene::UpdateFaceYaw()
 		isFacing_ = false;
 	}
 }
-
-// ========================================
-// 入力処理
-// ========================================
 
 void StageSelectScene::HandleSelectInput()
 {
@@ -322,7 +315,6 @@ void StageSelectScene::BuildRoutes()
 			uint32_t to = n.neighbor[d];
 			if (to == StageSelectGraph::INVALID_NODE_ID) continue;
 
-			// 重複生成防止（i->to と to->i を1本にする）
 			if (to < i) continue;
 
 			// 端点（ワールド座標）
@@ -345,7 +337,7 @@ void StageSelectScene::BuildRoutes()
 			// Object3D作成
 			auto obj = std::make_unique<Object3D>();
 			obj->Initialize();
-			obj->SetModel("Scenes/StageSelect/Models/route"); // ルート用モデル名
+			obj->SetModel("Scenes/StageSelect/Models/route");
 
 			Transform tr{};
 			tr.translate = mid;
@@ -361,9 +353,6 @@ void StageSelectScene::BuildRoutes()
 	}
 }
 
-// ========================================
-// 初期化・更新・描画
-// ========================================
 
 StageSelectScene::StageSelectScene()
 {
@@ -449,7 +438,7 @@ void StageSelectScene::Initialize(DirectXCommon* dxCommon)
 	{
 		auto obj = std::make_unique<Object3D>();
 		obj->Initialize();
-		obj->SetModel("Scenes/StageSelect/Models/node"); // 同じモデル
+		obj->SetModel("Scenes/StageSelect/Models/node"); 
 
 		Transform tr{};
 		tr.scale = { 1.8f, 1.8f, 1.8f };   // 目印なら少し小さく
@@ -457,7 +446,7 @@ void StageSelectScene::Initialize(DirectXCommon* dxCommon)
 		tr.translate = CalcNodeWorldPos(i);
 
 		// ちょい浮かせたいなら
-		tr.translate.y += -1.1f; // 例: 0.3f
+		tr.translate.y += -1.1f; 
 
 		// 「常にカメラ向き」にしたいなら
 		tr.rotate.y = CalcYawFaceCamera(tr.translate);
@@ -475,36 +464,21 @@ void StageSelectScene::Initialize(DirectXCommon* dxCommon)
 	stageSelect_->SetSize({ 1280.0f,720.0f });
 
 	// KeyIconUi / 左下に配置
-	keyIcon_W = std::make_unique<Sprite>();
-	keyIcon_W->Initialize("resources/_Common/UI/Texture/inputhints/W.dds");
-	keyIcon_W->SetPosition({ 55.0f, 615.0f });
-	keyIcon_W->SetSize({ 50.0f, 50.0f });
+	keyIcon_WASD = std::make_unique<Sprite>();
+	keyIcon_WASD->Initialize("resources/_Common/UI/Texture/inputhints/WASD.png");
+	keyIcon_WASD->SetPosition({ 15.0f, 610.0f });
+	keyIcon_WASD->SetSize({ 125.0f, 70.0f });
 
-	keyIcon_A = std::make_unique<Sprite>();
-	keyIcon_A->Initialize("resources/_Common/UI/Texture/inputhints/A.dds");
-	keyIcon_A->SetPosition({ 10.0f, 635.0f });
-	keyIcon_A->SetSize({ 50.0f, 50.0f });
-
-	keyIcon_S = std::make_unique<Sprite>();
-	keyIcon_S->Initialize("resources/_Common/UI/Texture/inputhints/S.dds");
-	keyIcon_S->SetPosition({ 55.0f, 660.0f });
-	keyIcon_S->SetSize({ 50.0f, 50.0f });
-
-	keyIcon_D = std::make_unique<Sprite>();
-	keyIcon_D->Initialize("resources/_Common/UI/Texture/inputhints/D.dds");
-	keyIcon_D->SetPosition({ 100.0f, 635.0f });
-	keyIcon_D->SetSize({ 50.0f, 50.0f });
-
-	// esc / enter UI配置
+	// esc / Space UI配置
 	keyIcon_Esc = std::make_unique<Sprite>();
-	keyIcon_Esc->Initialize("resources/_Common/UI/Texture/inputhints/Esc.dds");
-	keyIcon_Esc->SetPosition({ 55.0f, 560.0f });
-	keyIcon_Esc->SetSize({ 50.0f, 50.0f });
+	keyIcon_Esc->Initialize("resources/_Common/UI/Texture/inputhints/Esc.png");
+	keyIcon_Esc->SetPosition({ 18.0f, 550.0f });
+	keyIcon_Esc->SetSize({ 125.0f, 70.0f });
 
-	keyIcon_Enter = std::make_unique<Sprite>();
-	keyIcon_Enter->Initialize("resources/_Common/UI/Texture/inputhints/Enter.dds");
-	keyIcon_Enter->SetPosition({ 55.0f, 505.0f });
-	keyIcon_Enter->SetSize({ 50.0f, 50.0f });
+	keyIcon_Space = std::make_unique<Sprite>();
+	keyIcon_Space->Initialize("resources/_Common/UI/Texture/inputhints/Space.png");
+	keyIcon_Space->SetPosition({ 15.0f, 490.0f });
+	keyIcon_Space->SetSize({ 125.0f, 70.0f });
 
 	// MoveUI
 	moveUI_ = std::make_unique<Sprite>();
@@ -523,18 +497,47 @@ void StageSelectScene::Initialize(DirectXCommon* dxCommon)
 	backUI_->Initialize("resources/Scenes/StageSelect/UI/Texture/Back.dds");
 	backUI_->SetPosition(backUI_Pos_);
 	backUI_->SetSize({ 125.0f,50.0f });
+
+	// コロンUI初期化（とりあえず3つ出す）
+	colonSprites_.clear();
+	colonSprites_.reserve(3);
+
+	// ImGuiで調整しやすいように初期値もここで設定
+	colonPositions_.clear();
+	colonPositions_.reserve(3);
+
+	// いったん仮置き（今の固定値を踏襲）
+	colonPositions_.push_back({ 88.0f, 610.0f }); // WASD 行
+	colonPositions_.push_back({ 88.0f, 550.0f }); // ESC 行
+	colonPositions_.push_back({ 88.0f, 490.0f }); // SPACE 行
+
+	for (int i = 0; i < 3; ++i) {
+		auto s = std::make_unique<Sprite>();
+		s->Initialize("resources/_Common/UI/Texture/inputhints/Colon.png");
+		s->SetSize({ 125.0f, 70.0f });
+		s->SetPosition(colonPositions_[i]);
+		colonSprites_.push_back(std::move(s));
+	}
 }
 
 void StageSelectScene::Update()
 {
-	// Enterキーでステージ開始
-	if (Input::GetInstance()->TriggerKey(DIK_RETURN)) {
-		const StageNode& node = stageSelectGraph->GetNode(currentNodeId);
-		PlayContext::GetInstance().SetSelectedStage(node.stageId, node.stageKey);
+	
+	// 一定時間経過するまで操作ができないようにする
+	if (inputLockTime_ >= inputLockDuration_) {
+		// Spaceが押されたらステージを開始する
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			const StageNode& node = stageSelectGraph->GetNode(currentNodeId);
+			PlayContext::GetInstance().SetSelectedStage(node.stageId, node.stageKey);
 
-		// ステージシーンへ切り替え
-		SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY",TransitionType::Start);
+			// ステージシーンへ切り替え
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
+		}
+	} else {
+		// 入力ロック時間を進める
+		inputLockTime_ += 1.0f / 60.0f;
 	}
+	
 
 	// Escキーでタイトルへ
 	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
@@ -579,12 +582,16 @@ void StageSelectScene::Update()
 	stageSelect_->Update();
 
 	// KeyUIの更新
-	keyIcon_W->Update();
-	keyIcon_A->Update();
-	keyIcon_S->Update();
-	keyIcon_D->Update();
+	keyIcon_WASD->Update();
 	keyIcon_Esc->Update();
-	keyIcon_Enter->Update();
+	keyIcon_Space->Update();
+
+	// コロンUIの位置反映（ImGui調整を反映）
+	for (size_t i = 0; i < colonSprites_.size() && i < colonPositions_.size(); ++i) {
+		colonSprites_[i]->SetPosition(colonPositions_[i]);
+	}
+	// コロンUIの更新
+	for (auto& s : colonSprites_) { s->Update(); }
 
 	// Move / Check / Back UIの更新
 	moveUI_->Update();
@@ -616,12 +623,12 @@ void StageSelectScene::Draw()
 	stageSelect_->Draw();
 
 	// KeyUIの描画
-	keyIcon_W->Draw();
-	keyIcon_A->Draw();
-	keyIcon_S->Draw();
-	keyIcon_D->Draw();
+	keyIcon_WASD->Draw();
 	keyIcon_Esc->Draw();
-	keyIcon_Enter->Draw();
+	keyIcon_Space->Draw();
+
+	// コロンUIの描画
+	for (auto& s : colonSprites_) { s->Draw(); }
 
 	// Move / Check / Back UIの描画
 	moveUI_->Draw();
@@ -687,26 +694,30 @@ void StageSelectScene::DrawImgui()
 	ImGui::Separator();
 
 	// UIKeyIcon配置変更
-	keyIcon_W_Pos = keyIcon_W->GetPosition();
-	keyIcon_A_Pos = keyIcon_A->GetPosition();
-	keyIcon_S_Pos = keyIcon_S->GetPosition();
-	keyIcon_D_Pos = keyIcon_D->GetPosition();
-	keyIcon_Esc_Pos = keyIcon_Esc->GetPosition();
-	keyIcon_Enter_Pos = keyIcon_Enter->GetPosition();
 
-	ImGui::DragFloat2("KeyIcon_W_Pos", &keyIcon_W_Pos.x, 1.0f);
-	ImGui::DragFloat2("KeyIcon_A_Pos", &keyIcon_A_Pos.x, 1.0f);
-	ImGui::DragFloat2("KeyIcon_S_Pos", &keyIcon_S_Pos.x, 1.0f);
-	ImGui::DragFloat2("KeyIcon_D_Pos", &keyIcon_D_Pos.x, 1.0f);
+	keyIcon_WASD_Pos = keyIcon_WASD->GetPosition();
+	keyIcon_Esc_Pos = keyIcon_Esc->GetPosition();
+	keyIcon_Enter_Pos = keyIcon_Space->GetPosition();
+
+	ImGui::DragFloat2("KeyIcon_WASD_Pos", &keyIcon_WASD_Pos.x, 1.0f);
 	ImGui::DragFloat2("KeyIcon_Esc_Pos", &keyIcon_Esc_Pos.x, 1.0f);
 	ImGui::DragFloat2("KeyIcon_Enter_Pos", &keyIcon_Enter_Pos.x, 1.0f);
 
-	keyIcon_W->SetPosition(keyIcon_W_Pos);
-	keyIcon_A->SetPosition(keyIcon_A_Pos);
-	keyIcon_S->SetPosition(keyIcon_S_Pos);
-	keyIcon_D->SetPosition(keyIcon_D_Pos);
+	keyIcon_WASD->SetPosition(keyIcon_WASD_Pos);
 	keyIcon_Esc->SetPosition(keyIcon_Esc_Pos);
-	keyIcon_Enter->SetPosition(keyIcon_Enter_Pos);
+	keyIcon_Space->SetPosition(keyIcon_Enter_Pos);
+
+	// Colon UI配置変更（3つ個別に調整）
+	if (colonPositions_.size() < 3) {
+		colonPositions_.resize(3, { 140.0f, 490.0f });
+	}
+
+	ImGui::Separator();
+	ImGui::Text("Colon Positions");
+
+	ImGui::DragFloat2("Colon 0 (WASD row)", &colonPositions_[0].x, 1.0f);
+	ImGui::DragFloat2("Colon 1 (ESC row)", &colonPositions_[1].x, 1.0f);
+	ImGui::DragFloat2("Colon 2 (SPACE row)", &colonPositions_[2].x, 1.0f);
 
 	// Move / Check / Back UI配置変更
 	moveUI_Pos_ = moveUI_->GetPosition();
@@ -872,12 +883,12 @@ void StageSelectScene::DrawSelectGraphImGui()
 		};
 
 	auto validateNeighbor = [&](int v)->int {
-		if (v < 0) return 0;                 // none
-		if ((uint32_t)v >= count) return 2;  // invalid
-		return 1;                            // ok
+		if (v < 0) return 0;                 
+		if ((uint32_t)v >= count) return 2;  
+		return 1;                            
 		};
 
-	// ========= UI =========
+	// UI 
 	ImGui::Begin("StageSelect Graph", nullptr, ImGuiWindowFlags_NoCollapse);
 
 	ImGui::Text("Nodes: %u", count);
@@ -885,12 +896,9 @@ void StageSelectScene::DrawSelectGraphImGui()
 	ImGui::TextDisabled("Selected: %u", (count > 0) ? editNodeId_ : 0);
 	ImGui::Separator();
 
-	// ---- Tabs ----
+	// Tabs 
 	if (ImGui::BeginTabBar("GraphTabs"))
 	{
-		// ======================
-		// List tab
-		// ======================
 		if (ImGui::BeginTabItem("List"))
 		{
 			ImGui::Checkbox("Unlocked only", &filterUnlockedOnly_);
@@ -962,9 +970,7 @@ void StageSelectScene::DrawSelectGraphImGui()
 			ImGui::EndTabItem();
 		}
 
-		// ======================
 		// Node tab
-		// ======================
 		if (ImGui::BeginTabItem("Node"))
 		{
 			if (count == 0)
@@ -1004,11 +1010,11 @@ void StageSelectScene::DrawSelectGraphImGui()
 
 				if (!isAutoYaw) {
 					// ラジアンを度に変換して表示
-					float yawDegrees = currentNode.defaultYaw * 57.2957795f; // rad to deg
+					float yawDegrees = currentNode.defaultYaw * 57.2957795f; 
 					ImGui::SetNextItemWidth(200.0f);
 					if (ImGui::SliderFloat("Yaw (degrees)", &yawDegrees, 0.0f, 360.0f, "%.1f")) {
 						// 度をラジアンに変換して設定
-						float yawRad = yawDegrees * 0.0174532925f; // deg to rad
+						float yawRad = yawDegrees * 0.0174532925f; 
 						stageSelectGraph->SetNodeYaw(editNodeId_, yawRad);
 						jsonDirty_ = true;
 					}
@@ -1036,16 +1042,14 @@ void StageSelectScene::DrawSelectGraphImGui()
 				ImGui::SameLine();
 				if (ImGui::Button("Reload From Graph"))
 				{
-					prevEditNodeId_ = UINT32_MAX; // 次フレームで再ロード
+					prevEditNodeId_ = UINT32_MAX; 
 				}
 			}
 
 			ImGui::EndTabItem();
 		}
 
-		// ======================
 		// Neighbors tab
-		// ======================
 		if (ImGui::BeginTabItem("Neighbors"))
 		{
 			if (count == 0)
@@ -1115,9 +1119,9 @@ void StageSelectScene::DrawSelectGraphImGui()
 			ImGui::EndTabItem();
 		}
 
-		// ======================
+		 
 		// JSON tab
-		// ======================
+		 
 		if (ImGui::BeginTabItem("JSON"))
 		{
 			ImGui::TextDisabled("Graph JSON preview (read-only).");
@@ -1154,9 +1158,7 @@ void StageSelectScene::DrawSelectGraphImGui()
 			ImGui::EndTabItem();
 		}
 
-		// ======================
 		// Ops tab
-		// ======================
 		if (ImGui::BeginTabItem("Ops"))
 		{
 			ImGui::Text("Add Node");
@@ -1190,9 +1192,7 @@ void StageSelectScene::DrawSelectGraphImGui()
 			ImGui::EndTabItem();
 		}
 
-		// ======================
 		// Check tab
-		// ======================
 		if (ImGui::BeginTabItem("Check"))
 		{
 			ImGui::Text("CurrentNodeId: %u", currentNodeId);
