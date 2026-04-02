@@ -45,18 +45,26 @@ class GameOverScene : public BaseScene
 	/// Imgui一括管理 / 描画関数
 	/// </summary>
 	void DrawImgui();
-private:
+private:	// クラス内関数
 	/// <summary>
 	/// デバッグカメラの更新処理
 	/// </summary>
 	void UpdateDebugCamera();
-
-
+	/// <summary>
+	/// プレイヤー落下開始処理
+	/// </summary>
 	void StartPlayerDropIntro(const Transform& finalTr);
-
+	/// <summary>
+	/// プレイヤー落下更新処理
+	/// </summary>
 	void UpdatePlayerDropIntro(float dt);
-
+	/// <summary>
+	/// プレイヤー縮小スピン開始処理
+	/// </summary>
 	void StartPlayerShrinkSpin();
+	/// <summary>
+	/// プレイヤー縮小スピン更新処理
+	/// </summary>
 	void UpdatePlayerShrinkSpin(float dt);
 private:
 
@@ -85,7 +93,7 @@ private:
 	std::unique_ptr<Sprite> gameOverUI = nullptr;
 	Vector2 gameOverUIPosition = { 0.0f,0.0f };
 
-
+	// クリア後の選択肢UI
 	std::unique_ptr<Sprite> oneMore_;
 	Vector2 oneMorePos;
 	std::unique_ptr<Sprite> select_;
@@ -103,14 +111,16 @@ private:
 
 
 	// kyeUI
-	std::unique_ptr<Sprite> keyIcon_A;
-	std::unique_ptr<Sprite> keyIcon_D;
+	std::unique_ptr<Sprite> keyIcon_AD;
 
 	// enter
-	std::unique_ptr<Sprite> keyIcon_Enter;
+	std::unique_ptr<Sprite> keyIcon_Space;
 	Vector2 keyIcon_Enter_Pos = { 200.0f,650.0f };
 
-
+	// コロン
+	std::vector<std::unique_ptr<Sprite>>colonSprites_;
+	// コロンの位置
+	std::vector<Vector2>colonPositions_;
 
 
 	Transform playerFinalTr_;

@@ -135,31 +135,30 @@ private:
 	std::unique_ptr<Sprite>stageSelect_;
 
 	// キーアイコンUI
-	std::unique_ptr<Sprite> keyIcon_W;
-	Vector2 keyIcon_W_Pos = { 1100.0f,650.0f };
-	std::unique_ptr<Sprite> keyIcon_A;
-	Vector2 keyIcon_A_Pos = { 1020.0f,680.0f };
-	std::unique_ptr<Sprite> keyIcon_S;
-	Vector2 keyIcon_S_Pos = { 1100.0f,710.0f };
-	std::unique_ptr<Sprite> keyIcon_D;
-	Vector2 keyIcon_D_Pos = { 1180.0f,680.0f };
+	std::unique_ptr<Sprite> keyIcon_WASD;
+	Vector2 keyIcon_WASD_Pos = { 100.0f,600.0f };
 
 	// Escキー
 	std::unique_ptr<Sprite> keyIcon_Esc;
 	Vector2 keyIcon_Esc_Pos = { 100.0f,650.0f };
 	// Enterキー
-	std::unique_ptr<Sprite> keyIcon_Enter;
+	std::unique_ptr<Sprite> keyIcon_Space;
 	Vector2 keyIcon_Enter_Pos = { 200.0f,650.0f };
 
 	// MoveUI
 	std::unique_ptr<Sprite>moveUI_;
-	Vector2 moveUI_Pos_ = { 160.0f,635.0f };
+	Vector2 moveUI_Pos_ = { 160.0f,620.0f };
 	// CheckUI
 	std::unique_ptr<Sprite>checkUI_;
-	Vector2 checkUI_Pos_ = { 160.0f, 505.0f };
+	Vector2 checkUI_Pos_ = { 160.0f, 500.0f };
 	// BackUI
 	std::unique_ptr<Sprite>backUI_;
 	Vector2 backUI_Pos_ = { 160.0f, 560.0f };
+
+	// コロン
+	std::vector<std::unique_ptr<Sprite>>colonSprites_;
+	// コロンの位置
+	std::vector<Vector2>colonPositions_;
 
 private:
 	// ===== 移動アニメーション用 =====
@@ -194,6 +193,10 @@ private:
 
 	// モデルの向き補正値（モデルが右向きの場合 -90度）
 	const float modelYawOffset_ = -1.570796326f;
+
+	// 一定時間たつまでは入力を受け付けない（連打防止）
+	float inputLockTime_ = 0.0f;
+	const float inputLockDuration_ = 2.0f;
 
 #ifdef USE_IMGUI
 	// ===== ImGui編集用変数 =====
@@ -246,4 +249,6 @@ private:
 	int neighborLeft_ = -1;
 	int neighborRight_ = -1;
 #endif
+
+	
 };

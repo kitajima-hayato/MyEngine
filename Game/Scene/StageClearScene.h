@@ -15,9 +15,9 @@ class StageClearScene :
     public BaseScene
 {
 	enum class ClearMenuItem {
-		OneMore = 0,
+		NextStage = 0,
+		OneMore,
 		Select,
-		Title,
 		Count
 	};
 
@@ -71,14 +71,14 @@ private:
 	Vector2 oneMorePos;
 	std::unique_ptr<Sprite> select_;
 	Vector2 selectPos;
-	std::unique_ptr<Sprite> title_;
-	Vector2 titlePos;
+	std::unique_ptr<Sprite> next_;
+	Vector2 nextPos;
 	// 選択しているアイテム
-	ClearMenuItem selectedItem_ = ClearMenuItem::OneMore;
+	ClearMenuItem selectedItem_ = ClearMenuItem::NextStage;
 	// 選択時の拡縮編集用Vector2
-	Vector2 oneMoreBaseSize_ = { 200.0f, 90.0f };
-	Vector2 selectBaseSize_ = { 200.0f, 90.0f };
-	Vector2 titleBaseSize_ = { 200.0f, 90.0f };
+	Vector2 oneMoreBaseSize_ = { 250.0f, 75.0f };
+	Vector2 selectBaseSize_ = { 250.0f, 75.0f };
+	Vector2 nextBaseSize_ = { 250.0f, 75.0f };
 	// 選択時に８％程大きくする
 	float selectScale_ = 1.08f;
 
