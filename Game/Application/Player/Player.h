@@ -69,9 +69,9 @@ struct PlayerStatus {
 
 	//ジャンプパラメータ
 	// 重力加速度
-	float kGravity = 0.05f;
+	float kGravity = 0.04f;
 	// 最大落下速度
-	float kMaxFallSpeed = 1.0f;
+	float kMaxFallSpeed = 0.4f;
 	// ジャンプ初速度
 	float kJumpPower = 0.5f;
 	// 踏みつけ時のジャンプ力

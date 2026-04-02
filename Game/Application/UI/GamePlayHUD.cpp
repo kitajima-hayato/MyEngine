@@ -4,8 +4,8 @@
 void GamePlayHUD::Initialize()
 {
 	// ポーズアイコン
-	pauseSprite_ = MakeSprite("resources/_Common/UI/Texture/inputhints/Esc.dds",
-		{ 30.0f,30.0f }, { 50.0f,50.0f }, { 1.0f,1.0f,1.0f,1.0f });
+	pauseSprite_ = MakeSprite("resources/_Common/UI/Texture/inputhints/Esc.png",
+		{ 20.0f,10.0f }, { 125.0f,70.0f }, { 1.0f,1.0f,1.0f,1.0f });
 	// コントロールUI
 	// Dキー
 	controlUI_D = MakeSprite("resources/_Common/UI/Texture/inputhints/D.dds",
