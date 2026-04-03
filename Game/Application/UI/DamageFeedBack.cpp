@@ -1,36 +1,34 @@
 #include "DamageFeedBack.h"
 
+
 static float Clamp01(float x) {
 	return std::clamp(x, 0.0f, 1.0f);
 }
 
 void DamageFeedBack::Bind(Player* player, Camera* camera, Transform* cameraTransform)
 {
+	// 各種ポインタの受け渡し
 	player_ = player;
 	camera_ = camera;
 	cameraTransform_ = cameraTransform;
-
 }
 
 bool DamageFeedBack::IsActive() const
 {
-	if (!hitSprite_) {
-		return false;
-	}
+	// スプライトのα値を基に処理を動かす
 	const float a = hitSprite_->GetColor().w;
 	return shakeActive_ || (a > 0.0f);
 }
 
 void DamageFeedBack::Reset()
 {
+	// 諸々のフラグの初期化
 	wasHitPrev_ = false;
 	shakeActive_ = false;
 	shakeTimer_ = 0.0f;
 	baseCamPos_ = {};
-
-	if (hitSprite_) {
-		hitSprite_->SetColor(flashColorOff_);
-	}
+	// スプライトが見えないように色をセット
+	hitSprite_->SetColor(flashColorOff_);
 }
 
 void DamageFeedBack::StartShake(float timeSec, float amp, bool withFlash)
@@ -54,22 +52,16 @@ void DamageFeedBack::StartShake(float timeSec, float amp, bool withFlash)
 
 void DamageFeedBack::BeginHit()
 {
+	// カメラのシェイク
 	shakeActive_ = true;
 	shakeTimer_ = 0.0f;
 
 	// ダメージエフェクト
-	if (hitSprite_) {
-		hitSprite_->SetColor(flashColorOn_);
-	}
-
-	
+	hitSprite_->SetColor(flashColorOn_);
 }
 
 void DamageFeedBack::UpdateFlash()
 {
-	if (!hitSprite_) {
-		return;
-	}
 	Vector4 currentColor = hitSprite_->GetColor();
 	if (currentColor.w > 0.0f) {
 		// 減算スピードは 0.01f ～ 0.05f くらいで調整
@@ -111,31 +103,31 @@ void DamageFeedBack::UpdateShake(float dt)
 
 void DamageFeedBack::Initialize()
 {
+	// ダメージ用スプライトの初期化
 	hitSprite_ = std::make_unique<Sprite>();
 	hitSprite_->Initialize(texturePath_);
 	hitSprite_->SetSize({ 1280.0f,720.0f });
 	hitSprite_->SetPosition({ 0.0f,0.0f });
 	hitSprite_->SetColor(flashColorOff_);
-
+	// 初期値にしておく
 	Reset();
 }
 
 void DamageFeedBack::Update(float dt)
 {
+	// 各種情報が取得できていない場合は処理を通さない
 	if (!player_ || !camera_ || !cameraTransform_)return;
-
+	// エネミーに当たっているか
 	const bool hitNow = player_->GetHitEnemy();
-
-	if(hitNow && !wasHitPrev_){
+	// 多重ヒットにならないように
+	if (hitNow && !wasHitPrev_) {
 		BeginHit();
 	}
-
+	// フレームのヒット情報の記録
 	wasHitPrev_ = hitNow;
 
-
-	if (hitSprite_) {
-		hitSprite_->Update();
-	}
+	// ヒットスプライトの更新
+	hitSprite_->Update();
 
 	// フラッシュ減衰
 	UpdateFlash();
@@ -146,10 +138,7 @@ void DamageFeedBack::Update(float dt)
 
 void DamageFeedBack::Draw()
 {
-	if (!hitSprite_){
-		return;
-	}
-	if (IsActive()){
+	if (IsActive()) {
 		hitSprite_->Draw();
 	}
 }

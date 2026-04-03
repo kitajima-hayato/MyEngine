@@ -2,7 +2,10 @@
 #include "MyMath.h"
 #include "Game/Camera/Camera.h"
 #include <algorithm>
+#include <memory>
+
 class Camera;
+class Sprite;
 class StartCamPhase
 {
 public:
@@ -11,27 +14,59 @@ public:
 		None,
 		MoveToLeft,   // 左端へ移動（初期位置から）
 		PanToRight,   // 左→右へパン
-		Hold,         // 少し止める（任意）
+		Hold,         // 少し止める
 		ReturnToStart // プレイヤー開始地点へ戻る
 	};
 
 public:
-	void Bind(Camera* camera, Transform* cameraTransform);
+	/// <summary>
+	/// 初期化
+	/// </summary>
+	void Initialize();
+	/// <summary>
+	/// UIの描画を行う
+	/// </summary>
+	void DrawUI();
 
+	/// <summary>
+	/// カメラとその配置情報のバインド
+	/// </summary>
+	/// <param name="camera">ゲームシーンのカメラを受け取る</param>
+	/// <param name="cameraTransform">ゲームシーンの配置情報を受け取る</param>
+	void Bind(Camera* camera, Transform* cameraTransform);
+	/// <summary>
+	/// スタート演出
+	/// </summary>
 	void Start();
 
+	/// <summary>
+	/// スタートカメラ演出の更新
+	/// </summary>
+	/// <param name="dt"></param>
 	void Update(float dt);
 
+	/// <summary>
+	/// スタートカメラの演出スキップ
+	/// </summary>
 	void Skip();
 
+	/// <summary>
+	/// スタートカメラの演出が進行中か
+	/// </summary>
+	/// <returns>演出が進行中でなければPhase::Noneを返す</returns>
 	bool IsRunning()const;
 
+	
+
+public: // Getter
+	/// <summary>
+	/// 現在の演出フェーズの取得
+	/// </summary>
+	/// <returns></returns>
 	Phase GetCurrentPhase() const { return phase_; }
 
-	void DrawImgui();
 
-
-private:
+private: // イージング関数 / クラス内のみ
 	static inline float EaseOutCubic(float t) {
 		t = std::clamp(t, 0.0f, 1.0f);
 		return 1.0f - std::pow(1.0f - t, 3.0f);
@@ -43,11 +78,22 @@ private:
 	static inline Vector3 Lerp(const Vector3& a, const Vector3& b, float t) {
 		return { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t };
 	}
-private:
-	// 
-	Camera* camera_ = nullptr;
-	Transform* cameraTransform_;
 
+	/// <summary>
+	/// ImGui描画
+	/// </summary>
+	void DrawImgui();
+
+/// <summary>
+/// UIの点滅
+/// </summary>
+	void SkipUIBlink(float dt);
+private: // 演出に必要な変数
+	// カメラの代入先ポインタ
+	Camera* camera_ = nullptr;
+	// カメラの配置情報の代入先ポインタ
+	Transform* cameraTransform_;
+	// 現在のフェーズ
 	Phase phase_ = Phase::None;
 	float timer_ = 0.0f;
 
@@ -73,5 +119,10 @@ private:
 	float introFixedY_ = 3.5f;
 	// 固定Z座標 / 通常距離
 	float introFixedZ_ = -20.0f;
+
+	// skip spaceのUI
+	std::unique_ptr <Sprite> skipUI_ = nullptr;
+	
+	// 
 };
 

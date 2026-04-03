@@ -202,6 +202,9 @@ private:
 	// 死亡演出中のカメラ固定
 	bool freezeCameraOnDeath_ = false;
 	Vector3 frozenCameraPos_ = {};
+
+	// スタートカメラをスキップしたときにプレイヤーが動かないようにするフラグ
+	bool skipJustFinishedThisFrame_ = false;
 };
 
 

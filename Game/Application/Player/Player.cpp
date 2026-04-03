@@ -673,7 +673,7 @@ void Player::Jump()
 	// 地面にいる場合
 	if (onGround_) {
 		// ジャンプキーが押されたら
-		if (Input::GetInstance()->PushKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
 			// ジャンプ処理
 			velocity_.y = status_.kJumpPower;
 		}
