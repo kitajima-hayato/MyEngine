@@ -1,6 +1,7 @@
 #include "Framework.h"
 #include "engine/InsideScene/SceneManager.h"
 #include "Game/Particle/ModelParticleManager.h"
+#include "Game/Application/ModelList.h"
 using namespace Engine;
 
 void Framework::Initialize()
@@ -33,6 +34,10 @@ void Framework::Initialize()
 
 	// 3Dモデルマネージャの初期化
 	ModelManager::GetInstance().Initialize(dxCommon.get());
+
+	ModelList modelList;
+	modelList.LoadAllModel();
+
 	// 3Dオブジェクト共通部の初期化
 	Object3DCommon::GetInstance()->Initialize(dxCommon.get());
 
@@ -52,8 +57,10 @@ void Framework::Initialize()
 
 	// パーティクル
 	ParticleManager::GetInstance()->Initialize(dxCommon.get(), srvManager.get(), camera.get());
+
+	Object3DInstancingCommon::GetInstance()->Initialize(dxCommon.get());
 	
-	
+	ModelParticleManager::GetInstance().Initialize();
 
 }
 
@@ -77,6 +84,8 @@ void Framework::Update()
 	// パーティクルの更新
 	ParticleManager::GetInstance()->Update();
 	
+
+	ModelParticleManager::GetInstance().Update();
 }
 
 
@@ -94,6 +103,10 @@ void Framework::Finalize()
 	SceneManager::DestroyInstance();
 
 	ParticleManager::GetInstance()->DeleteInstance();
+
+	Object3DInstancingCommon::GetInstance()->Finalize();
+
+	ModelParticleManager::GetInstance().Finalize();
 
 	Object3DCommon::GetInstance()->DeleteInstance();
 	SpriteCommon::DeleteInstance();

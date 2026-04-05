@@ -22,6 +22,7 @@
 #include "D3DResourceLeakChecker.h"
 #include "Input.h"
 #include "engine/2d/RenderTexture.h"
+#include "Object3DInstancingCommon.h"
 /// <summary>
 /// フレームワーク基底クラス
 /// </summary>
@@ -100,6 +101,8 @@ private:
 	};
 
 	static inline Camera* mainCamera_ = nullptr;
+
+	
 	
 };
 

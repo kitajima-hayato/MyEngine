@@ -2,11 +2,11 @@
 #include "MyMath.h"
 #include <memory>
 #include <vector>
+#include <random>
 #include "engine/3d/Object3D.h"
 
 
 struct ModelParticle {
-	std::unique_ptr<Object3D> modelObject; // モデルオブジェクト
 	Transform transform;		// 変換情報
 	Vector3 velocity;			// 速度
 	Vector4 color;				// 色
@@ -54,9 +54,16 @@ public:
 	/// </summary>
 	void Draw();
 
+	/// <summary>
+	/// 終了処理
+	/// </summary>
+	void Finalize();
+
+	/// <summary>
+	/// インスタンシング描画のウォームアップ（最初の1回は重いので、先に呼んでおく）
+	/// </summary>
+	void WarmupDrawOnce();
 private:
-	// シングルトンパターン
-	static ModelParticleManager* instance;
 	// コンストラクタ
 	ModelParticleManager() = default;
 	// デストラクタ
@@ -70,6 +77,18 @@ private:
 	std::vector<ModelParticle> particles_;
 
 	// モデルの名前
-	std::string modelName_ = "breakBlock.obj";
+	std::string modelName_ = "GamePlay/Blocks/breakblock";
+
+	Model* model_ = nullptr;
+
+	static constexpr uint32_t kMaxInstances = 2048;
+
+	Microsoft::WRL::ComPtr<ID3D12Resource> instanceResource_;
+	Object3DInstanceData* instanceMapped_ = nullptr;
+	D3D12_VERTEX_BUFFER_VIEW instanceVBV_{};
+
+	uint32_t instanceCount_ = 0;
+
+	std::mt19937 rng_;
 };
 

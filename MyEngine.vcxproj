@@ -181,6 +181,7 @@
     <ClCompile Include="Game\Collision\MapCollisionQuery.cpp" />
     <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
     <ClCompile Include="Game\Application\RespawnSequence.cpp" />
+    <ClCompile Include="engine\3d\Object3DInstancingCommon.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
@@ -261,6 +262,7 @@
     <ClInclude Include="Game\Collision\MapCollisionQuery.h" />
     <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
     <ClInclude Include="Game\Application\RespawnSequence.h" />
+    <ClInclude Include="engine\3d\Object3DInstancingCommon.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />

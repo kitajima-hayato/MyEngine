@@ -184,7 +184,20 @@ struct EffectInstance
     float currentTime;       // 経過時間
     bool isActive = true;    // アクティブ
 };
+struct Object3DInstanceData
+{
+    Vector4 world0;
+    Vector4 world1;
+    Vector4 world2;
+    Vector4 world3;
 
+    Vector4 wvp0;
+    Vector4 wvp1;
+    Vector4 wvp2;
+    Vector4 wvp3;
+
+    Vector4 color; 
+};
 
 enum BlendMode {
     //!< ブレンド無し

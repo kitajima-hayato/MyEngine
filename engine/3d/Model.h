@@ -40,6 +40,11 @@ public: // メンバ関数
 	/// <param name="filename"></param>
 	/// <returns></returns>
 	ModelData LoadObjFile(const std::string& directoryPath, const std::string& filename);
+
+	/// <summary>
+	/// インスタンシング描画
+	/// </summary>
+	void DrawInstanced(uint32_t instanceCount);
 public: // Getter / Setter
 	/// <summary>
 	/// モデルデータの取得
@@ -74,6 +79,8 @@ private: // メンバ関数
 	/// マテリアルリソースの作成
 	/// </summary>
 	void CreateMaterialResource();
+
+	
 
 private:	// メンバ変数
 	// ModelCommon

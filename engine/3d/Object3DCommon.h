@@ -67,7 +67,7 @@ private:	// メンバ変数
 	// パイプラインステートの作成
 	Microsoft::WRL::ComPtr <ID3D12PipelineState> graphicsPipelineState = nullptr;
 	// 入力要素の定義配列を初期化
-	D3D12_INPUT_ELEMENT_DESC inputElementDescs[3] = {};
+	D3D12_INPUT_ELEMENT_DESC inputElementDescs[12] = {};
 
 public:	// シングルトン化
 	/// <summary>

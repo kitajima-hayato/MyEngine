@@ -45,9 +45,6 @@ void MyGame::Initialize()
 	// シーンマネージャーに最初のシーンをセット
 	SceneManager::GetInstance()->ChangeScene("TITLE");
 
-	modelList = make_unique<ModelList>();
-	modelList->LoadAllModel();
-
 	//スカイボックス
 	skyBox = make_unique<SkyBox>();
 	skyBox->Initialize(dxCommon.get(), srvManager.get());
@@ -77,16 +74,29 @@ void MyGame::Draw()
 	if (usePostProcess_) {
 		renderTexture->BeginRender();
 		srvManager->PreDraw();
+		if (!didInstancingWarmup_) {
+			ModelParticleManager::GetInstance().WarmupDrawOnce();
+			didInstancingWarmup_ = true;
+		}
 		SceneManager::GetInstance()->Draw();
 		renderTexture->EndRender();
 
 		dxCommon->PreDraw();
 		srvManager->PreDraw();
 		renderTexture->Draw();
+
+
+		ModelParticleManager::GetInstance().Draw();
+
 	} else {
 		dxCommon->PreDraw();
 		srvManager->PreDraw();
+		if (!didInstancingWarmup_) {
+			ModelParticleManager::GetInstance().WarmupDrawOnce();
+			didInstancingWarmup_ = true;
+		}
 		SceneManager::GetInstance()->Draw();
+		ModelParticleManager::GetInstance().Draw();
 	}
 
 	Framework::Draw();

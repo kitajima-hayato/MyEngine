@@ -1,7 +1,6 @@
 #pragma once
 #include"externals/DirectXTex/d3dx12.h"
 #include "engine/InsideScene/Framework.h"
-#include "Game/Application/ModelList.h"
 #include "engine/3d/SkyBox/SkyBox.h"
 /// <summary>
 /// ゲーム全体 : フレームワーククラス継承
@@ -29,13 +28,12 @@ public:	// メンバ関数
 
 private:	// メンバ変数
 	
-	// 読み込むモデルのリスト
-	std::unique_ptr<ModelList> modelList;
 	// スカイボックス
 	std::unique_ptr<SkyBox> skyBox = nullptr;
 
 	// レンダーテクスチャ
 	bool usePostProcess_ = false;
 
+	bool didInstancingWarmup_ = false;
 };
 
