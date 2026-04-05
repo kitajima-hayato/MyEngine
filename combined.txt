@@ -282,8 +282,8 @@ void BackGround::Initialize()
 	setting.objectCount = 100;
 	setting.spawnRangeInterval = 0.8f;
 
-	setting.minScale = { 1.0f, 1.0f, 1.0f };
-	setting.maxScale = { 1.0f, 1.0f, 1.0f };
+	setting.minScale = { 0.5f, 0.5f, 1.0f };
+	setting.maxScale = { 1.5f, 1.5f, 1.0f };
 
 	setting.minRotation = { 0.0f, -0.1f, 0.0f };
 	setting.maxRotation = { 0.0f, 0.1f, 0.0f };
@@ -3843,7 +3843,7 @@ void Player::UpdateDashEffect()
 
 	// 地面に接地しているか
 	const bool canShowEffect = dashActive && onGround_;
-
+	// プレイヤーの現在地を取得
 	Vector3 playerPos = playerModel_->GetTranslate();
 
 	// ダッシュ開始時の衝撃波エフェクト
@@ -3894,8 +3894,17 @@ void Player::Initialize(Vector3 position)
 	// 死ぬ高さの設定
 	SetDeathHeight(-3.0f);
 
+	// 通常移動のエフェクトの初期化
+	// 足元の煙エフェクト(通常移動)
+	moveEffect_ = ParticlePresets::CreateSmoke(position);
+	// 初期は停止
+	moveEffect_->Pause();
+	moveEffect_->SetEmissionRate(10.0f);
+	moveEffect_->SetLoop(true);
+	moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+
 	// ダッシュエフェクトの初期化
-	// 足元の煙エフェクト
+	// 足元の煙エフェクト(ダッシュ)
 	dashSmokeEffect_ = ParticlePresets::CreateSmoke(position);
 	// 初期は停止
 	dashSmokeEffect_->Pause();
@@ -3941,6 +3950,7 @@ void Player::Update()
 	playerModel_->Update();
 
 	// パーティクルシステムの更新
+	if (moveEffect_)moveEffect_->Update();
 	if (dashSmokeEffect_)dashSmokeEffect_->Update();
 	if (dashStartEffect_)dashStartEffect_->Update();
 	if (stompEffect_)stompEffect_->Update();
@@ -4033,18 +4043,14 @@ void Player::Move()
 
 	auto* input = Input::GetInstance();
 
-	// ------------------------
 	// 入力状態
-	// ------------------------
 	const bool rightHold = input->PushKey(DIK_D);
 	const bool leftHold = input->PushKey(DIK_A);
 
 	const bool rightTrig = input->TriggerKey(DIK_D);
 	const bool leftTrig = input->TriggerKey(DIK_A);
 
-	// ------------------------
 	// ダブルタップ用タイマー更新
-	// ------------------------
 	if (rightTapTimer_ > 0) { --rightTapTimer_; }
 	if (leftTapTimer_ > 0) { --leftTapTimer_; }
 
@@ -4071,9 +4077,7 @@ void Player::Move()
 		rightTapTimer_ = 0;
 	}
 
-	// ------------------------
 	// ダッシュ継続／解除判定
-	// ------------------------
 	const bool movingRight = rightHold && !leftHold;
 	const bool movingLeft = leftHold && !rightHold;
 
@@ -4090,9 +4094,7 @@ void Player::Move()
 		}
 	}
 
-	// ------------------------
 	// 実際の速度更新
-	// ------------------------
 	Vector3 acceleration{};
 
 	// 左右のどちらの方向にダッシュしているか判別
@@ -4164,8 +4166,8 @@ void Player::Jump()
 	// 地面にいる場合
 	if (onGround_) {
 		// ジャンプキーが押されたら
-		if (Input::GetInstance()->PushKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
-			// ジャンプ処理
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+			// ジャンプ処理 / ジャンプ距離を縦のスピードに入れる
 			velocity_.y = status_.kJumpPower;
 		}
 	} else {
@@ -4477,6 +4479,10 @@ void Player::DebugPlayerReset()
 void Player::Finalize()
 {
 	// パーティクルエフェクトの解放
+	if (moveEffect_) {
+		moveEffect_->Stop();
+		moveEffect_.reset();
+	}
 	if (dashSmokeEffect_) {
 		dashSmokeEffect_->Stop();
 		dashSmokeEffect_.reset();
@@ -5004,6 +5010,9 @@ private:	// メンバ変数
 	// 操作の有効/無効
 	bool controlEnabled_ = true;
 
+	// 通常移動のパーティクル
+	std::unique_ptr <ParticleSystem>moveEffect_;
+
 	// ダッシュエフェクト用パーティクル
 	// 足元の煙
 	std::unique_ptr<ParticleSystem>dashSmokeEffect_;
@@ -5302,37 +5311,35 @@ File Path: Game/Application/UI/DamageFeedBack.cpp
 ============================================================
 #include "DamageFeedBack.h"
 
+
 static float Clamp01(float x) {
 	return std::clamp(x, 0.0f, 1.0f);
 }
 
 void DamageFeedBack::Bind(Player* player, Camera* camera, Transform* cameraTransform)
 {
+	// 各種ポインタの受け渡し
 	player_ = player;
 	camera_ = camera;
 	cameraTransform_ = cameraTransform;
-
 }
 
 bool DamageFeedBack::IsActive() const
 {
-	if (!hitSprite_) {
-		return false;
-	}
+	// スプライトのα値を基に処理を動かす
 	const float a = hitSprite_->GetColor().w;
 	return shakeActive_ || (a > 0.0f);
 }
 
 void DamageFeedBack::Reset()
 {
+	// 諸々のフラグの初期化
 	wasHitPrev_ = false;
 	shakeActive_ = false;
 	shakeTimer_ = 0.0f;
 	baseCamPos_ = {};
-
-	if (hitSprite_) {
-		hitSprite_->SetColor(flashColorOff_);
-	}
+	// スプライトが見えないように色をセット
+	hitSprite_->SetColor(flashColorOff_);
 }
 
 void DamageFeedBack::StartShake(float timeSec, float amp, bool withFlash)
@@ -5356,22 +5363,16 @@ void DamageFeedBack::StartShake(float timeSec, float amp, bool withFlash)
 
 void DamageFeedBack::BeginHit()
 {
+	// カメラのシェイク
 	shakeActive_ = true;
 	shakeTimer_ = 0.0f;
 
 	// ダメージエフェクト
-	if (hitSprite_) {
-		hitSprite_->SetColor(flashColorOn_);
-	}
-
-	
+	hitSprite_->SetColor(flashColorOn_);
 }
 
 void DamageFeedBack::UpdateFlash()
 {
-	if (!hitSprite_) {
-		return;
-	}
 	Vector4 currentColor = hitSprite_->GetColor();
 	if (currentColor.w > 0.0f) {
 		// 減算スピードは 0.01f ～ 0.05f くらいで調整
@@ -5413,31 +5414,31 @@ void DamageFeedBack::UpdateShake(float dt)
 
 void DamageFeedBack::Initialize()
 {
+	// ダメージ用スプライトの初期化
 	hitSprite_ = std::make_unique<Sprite>();
 	hitSprite_->Initialize(texturePath_);
 	hitSprite_->SetSize({ 1280.0f,720.0f });
 	hitSprite_->SetPosition({ 0.0f,0.0f });
 	hitSprite_->SetColor(flashColorOff_);
-
+	// 初期値にしておく
 	Reset();
 }
 
 void DamageFeedBack::Update(float dt)
 {
+	// 各種情報が取得できていない場合は処理を通さない
 	if (!player_ || !camera_ || !cameraTransform_)return;
-
+	// エネミーに当たっているか
 	const bool hitNow = player_->GetHitEnemy();
-
-	if(hitNow && !wasHitPrev_){
+	// 多重ヒットにならないように
+	if (hitNow && !wasHitPrev_) {
 		BeginHit();
 	}
-
+	// フレームのヒット情報の記録
 	wasHitPrev_ = hitNow;
 
-
-	if (hitSprite_) {
-		hitSprite_->Update();
-	}
+	// ヒットスプライトの更新
+	hitSprite_->Update();
 
 	// フラッシュ減衰
 	UpdateFlash();
@@ -5448,10 +5449,7 @@ void DamageFeedBack::Update(float dt)
 
 void DamageFeedBack::Draw()
 {
-	if (!hitSprite_){
-		return;
-	}
-	if (IsActive()){
+	if (IsActive()) {
 		hitSprite_->Draw();
 	}
 }
@@ -5463,37 +5461,75 @@ void DamageFeedBack::Draw()
 File Path: Game/Application/UI/DamageFeedBack.h
 ============================================================
 #pragma once
+#include <memory>
 #include "Game/Camera/Camera.h"
 #include "Game/Application/Player/Player.h"
 #include "engine/2d/Sprite.h"
+
+// 前方宣言
 class Player;
 class Camera;
+class Sprite;
+/// <summary>
+/// ダメージを受けたら行う処理
+/// </summary>
 class DamageFeedBack
 {
 
 public:
+	/// <summary>
+	/// 初期化処理
+	/// </summary>
 	void Initialize();
-
+	/// <summary>
+	/// 更新処理
+	/// </summary>
+	/// <param name="dt">進行時間を基に演出</param>
 	void Update(float dt);
-
+	/// <summary>
+	/// 描画処理
+	/// </summary>
 	void Draw();
-
+	/// <summary>
+	/// 必要情報の取得と設定
+	/// </summary>
 	void Bind(Player* player,Camera*camera,Transform*cameraTransform);
-
+	/// <summary>
+	/// ダメージを受けたら色を付ける
+	/// </summary>
 	bool IsActive()const;
 
+	/// <summary>
+	/// 初期状態に戻す
+	/// </summary>
 	void Reset();
-
+	/// <summary>
+	/// ダメージ時のカメラシェイク
+	/// </summary>
+	/// <param name="timeSec">進行度</param>
+	/// <param name="amp"></param>
+	/// <param name="withFlash"></param>
 	void StartShake(float timeSec = -1.0f, float amp = -1.0f, bool withFlash = false);
 
 public: // Getter / Setter
+	/// <summary>
+	/// カメラの基準値を受け取る
+	/// </summary>
+	/// <param name="basePos">カメラの基準値</param>
 	void SetBaseCameraPos(const Vector3& basePos) { baseCamPos_ = basePos; }
 
 private:
+	/// <summary>
+	/// 演出開始前処理
+	/// </summary>
 	void BeginHit();
-
+	/// <summary>
+	/// ダメージスプライトの減衰を管理
+	/// </summary>
 	void UpdateFlash();
-
+	/// <summary>
+	/// シェイクの更新
+	/// </summary>
 	void UpdateShake(float dt);
 
 private:
@@ -5503,14 +5539,17 @@ private:
 	float shakeAmp_ = 0.2f;
 	// α値の減衰速度
 	float fadeSpeed_ = 0.02f;
-
+	// ヒット時にスプライトが見えるように
 	Vector4 flashColorOn_ = { 1.0f,1.0f,1.0f,0.5f };
+	// 見えないように色を指定 / 透明
 	Vector4 flashColorOff_ = { 1.0f,1.0f,1.0f,0.0f };
 
 	// 画像パス
-	const std::string texturePath_ = "resources/Effects/Hit/Textures/HitDamage.dds";
+	const std::string texturePath_ = 
+		"resources/Effects/Hit/Textures/HitDamage.dds";
 
 private:
+	// 入れ物
 	Player* player_ = nullptr;
 	Camera* camera_ = nullptr;
 	Transform* cameraTransform_ = nullptr;
@@ -6024,9 +6063,6 @@ public:
 	/// </summary>
 	void Update(float deltaTime);
 
-
-
-
 public:
 	// 位置のセット
 	void SetTargetPosition(const Vector3& targetPosition) {
@@ -6085,7 +6121,25 @@ private:
 File Path: Game/Camera/StartCamPhase.cpp
 ============================================================
 #include "StartCamPhase.h"
+#include "Input.h"
 #include <cassert>
+#include "Sprite.h"
+
+void StartCamPhase::Initialize()
+{
+	// UIの初期化
+	skipUI_ = std::make_unique<Sprite>();
+	skipUI_->Initialize(textureFilePath_);
+	skipUI_->SetPosition({ 0.0f,0.0f });
+}
+
+void StartCamPhase::DrawUI()
+{
+	// UIの描画 / 演出中のみ描画する
+	if (phase_ != Phase::None) {
+		skipUI_->Draw();
+	}
+}
 
 void StartCamPhase::Bind(Camera* camera, Transform* cameraTransform)
 {
@@ -6104,7 +6158,7 @@ void StartCamPhase::Start()
 	introFixedZ_ = camTargetPos_.z;
 
 	// 開始地点保存
-	startPos_ = { camTargetPos_.x,introFixedY_,introFixedZ_ };
+	startPos_ = { camTargetPos_.x,introFixedY_,camTargetPos_.z };
 
 	// カメラを初期位置へ
 	cameraTransform_->translate = startPos_;
@@ -6113,6 +6167,7 @@ void StartCamPhase::Start()
 	camera_->SetTranslate(cameraTransform_->translate);
 	camera_->SetRotate(cameraTransform_->rotate);
 
+	// 開始の演出状態
 	phase_ = Phase::MoveToLeft;
 	timer_ = 0.0f;
 
@@ -6125,11 +6180,10 @@ void StartCamPhase::Skip()
 	// 即座にターゲットへ
 	introFixedY_ = camTargetPos_.y;
 	introFixedZ_ = camTargetPos_.z;
-
+	// 開始地点保存
 	startPos_ = { camTargetPos_.x,introFixedY_,introFixedZ_ };
 	cameraTransform_->translate = startPos_;
-	camera_->SetTranslate(cameraTransform_->translate);
-
+	// 演出状態を終了
 	phase_ = Phase::None;
 	timer_ = 0.0f;
 }
@@ -6137,14 +6191,20 @@ void StartCamPhase::Skip()
 
 void StartCamPhase::Update(float dt)
 {
+	// カメラの演出状態がNoneの場合は何もしない
 	if (phase_ == Phase::None) {
 		return;
+	}else{ 
+		skipUI_->Update(); 
 	}
+	
+	SkipUIBlink(dt);
 
 	const Vector3 leftPos = { introLeftX_,introFixedY_,introFixedZ_ };
 	const Vector3 rightPos = { introRightX_,introFixedY_,introFixedZ_ };
 	const Vector3 startPos = { camTargetPos_.x,introFixedY_,introFixedZ_ };
 
+#pragma region 各カメラの動き
 	switch (phase_)
 	{
 	case StartCamPhase::Phase::None:
@@ -6159,6 +6219,10 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = leftPos;
 		}
+		// スペースキーでスキップ
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			Skip();
+		}
 	}
 	break;
 	case StartCamPhase::Phase::PanToRight:
@@ -6171,9 +6235,13 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = rightPos;
 		}
+		// スペースキーでスキップ
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			Skip();
+		}
 	}
 	break;
-	case StartCamPhase::Phase::Hold: 
+	case StartCamPhase::Phase::Hold:
 	{
 		timer_ += dt;
 		cameraTransform_->translate = rightPos;
@@ -6182,9 +6250,14 @@ void StartCamPhase::Update(float dt)
 			phase_ = Phase::ReturnToStart;
 			timer_ = 0.0f;
 		}
+		// スペースキーでスキップ
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			Skip();
+		}
 	}
 	break;
-	case StartCamPhase::Phase::ReturnToStart: {
+	case StartCamPhase::Phase::ReturnToStart:
+	{
 
 		timer_ += dt;
 
@@ -6200,23 +6273,41 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = startPos;
 		}
+		// スペースキーでスキップ
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			Skip();
+		}
 	}
-											break;
+
+	break;
 	default:
 
 		break;
 	}
+#pragma endregion
 	camera_->SetTranslate(cameraTransform_->translate);
 }
 
 
 bool StartCamPhase::IsRunning() const
 {
+	// Noneじゃなければtrueを返す
 	return phase_ != Phase::None;
 }
 
 void StartCamPhase::DrawImgui()
 {
+}
+
+void StartCamPhase::SkipUIBlink(float dt)
+{
+	// 進行度の反映
+	blinkTimer_ += dt;
+	// sin波
+	float alpha = (std::sin(blinkTimer_ * blinkSpeed_ + 1.0f) * 1.0f);
+
+	// スプライトに色の反映
+	skipUI_->SetColor({ 1.0f,1.0f,1.0f,alpha });
 }
 
 
@@ -6227,7 +6318,10 @@ File Path: Game/Camera/StartCamPhase.h
 #include "MyMath.h"
 #include "Game/Camera/Camera.h"
 #include <algorithm>
+#include <memory>
+
 class Camera;
+class Sprite;
 class StartCamPhase
 {
 public:
@@ -6236,27 +6330,59 @@ public:
 		None,
 		MoveToLeft,   // 左端へ移動（初期位置から）
 		PanToRight,   // 左→右へパン
-		Hold,         // 少し止める（任意）
+		Hold,         // 少し止める
 		ReturnToStart // プレイヤー開始地点へ戻る
 	};
 
 public:
-	void Bind(Camera* camera, Transform* cameraTransform);
+	/// <summary>
+	/// 初期化
+	/// </summary>
+	void Initialize();
+	/// <summary>
+	/// UIの描画を行う
+	/// </summary>
+	void DrawUI();
 
+	/// <summary>
+	/// カメラとその配置情報のバインド
+	/// </summary>
+	/// <param name="camera">ゲームシーンのカメラを受け取る</param>
+	/// <param name="cameraTransform">ゲームシーンの配置情報を受け取る</param>
+	void Bind(Camera* camera, Transform* cameraTransform);
+	/// <summary>
+	/// スタート演出
+	/// </summary>
 	void Start();
 
+	/// <summary>
+	/// スタートカメラ演出の更新
+	/// </summary>
+	/// <param name="dt"></param>
 	void Update(float dt);
 
+	/// <summary>
+	/// スタートカメラの演出スキップ
+	/// </summary>
 	void Skip();
 
+	/// <summary>
+	/// スタートカメラの演出が進行中か
+	/// </summary>
+	/// <returns>演出が進行中でなければPhase::Noneを返す</returns>
 	bool IsRunning()const;
 
+
+
+public: // Getter
+	/// <summary>
+	/// 現在の演出フェーズの取得
+	/// </summary>
+	/// <returns></returns>
 	Phase GetCurrentPhase() const { return phase_; }
 
-	void DrawImgui();
 
-
-private:
+private: // イージング関数 / クラス内のみ
 	static inline float EaseOutCubic(float t) {
 		t = std::clamp(t, 0.0f, 1.0f);
 		return 1.0f - std::pow(1.0f - t, 3.0f);
@@ -6268,11 +6394,23 @@ private:
 	static inline Vector3 Lerp(const Vector3& a, const Vector3& b, float t) {
 		return { a.x + (b.x - a.x) * t, a.y + (b.y - a.y) * t, a.z + (b.z - a.z) * t };
 	}
-private:
-	// 
-	Camera* camera_ = nullptr;
-	Transform* cameraTransform_;
 
+	/// <summary>
+	/// ImGui描画
+	/// </summary>
+	void DrawImgui();
+
+	/// <summary>
+	/// UIの点滅
+	/// </summary>
+	void SkipUIBlink(float dt);
+
+private: // 演出に必要な変数
+	// カメラの代入先ポインタ
+	Camera* camera_ = nullptr;
+	// カメラの配置情報の代入先ポインタ
+	Transform* cameraTransform_;
+	// 現在のフェーズ
 	Phase phase_ = Phase::None;
 	float timer_ = 0.0f;
 
@@ -6298,6 +6436,25 @@ private:
 	float introFixedY_ = 3.5f;
 	// 固定Z座標 / 通常距離
 	float introFixedZ_ = -20.0f;
+
+	// skip spaceのUI
+	std::unique_ptr <Sprite> skipUI_ = nullptr;
+
+	// α値の減衰速度
+	float fadeSpeed_ = 0.02f;
+	// スキップUIの折り返し値 / 最大
+	Vector4 colorOn_ = { 1.0f,1.0f,1.0f,0.5f };
+	// スキップUI折り返し値 / 最小
+	Vector4 colorOff_ = { 1.0f,1.0f,1.0f,0.0f };
+
+	// 点滅用にタイマー
+	float blinkTimer_ = 0.8f;
+	// 数値が大きければ大きいほど速い
+	float blinkSpeed_ = 7.0f;
+
+	// UIのテクスチャファイルパス
+	const std::string textureFilePath_ = "resources/GamePlay/UI/Texture/skipUI.png";
+
 };
 
 
@@ -6994,8 +7151,56 @@ ParticleManager* ParticleManager::GetInstance()
 
 void ParticleManager::DeleteInstance()
 {
-	delete instance;
-	instance = nullptr;
+	if (instance){
+		instance->Finalize();
+		delete instance;
+		instance = nullptr;
+	}
+	
+}
+
+void ParticleManager::Finalize()
+{
+	// すでに解放済みなら何もしない（何度呼ばれても安全にする）
+	if (!dxCommon) {
+		return;
+	}
+
+	// 1) particleGroups を全解放（Mapした instancingResource を Unmap してから Reset）
+	for (auto& [name, group] : particleGroups) {
+		if (group.instancingResource) {
+			group.instancingResource->Unmap(0, nullptr);
+			group.instancingData = nullptr;
+			group.instancingResource.Reset();
+		}
+	}
+	particleGroups.clear();
+
+	// 2) vertex/material を Unmap（Mapしたままだった）
+	if (vertexResource) {
+		vertexResource->Unmap(0, nullptr);
+		vertexData = nullptr;
+	}
+	if (materialResource) {
+		materialResource->Unmap(0, nullptr);
+		materialData = nullptr;
+	}
+
+	// 3) D3D12オブジェクトを解放（RootSig/PSO/Resource）
+	ringVertexBuffer.Reset();
+	vertexResource.Reset();
+	materialResource.Reset();
+	graphicsPipelineState.Reset();
+	rootSignature.Reset();
+
+	// 4) 外部参照を切る（Framework側の寿命に依存しないように）
+	camera = nullptr;
+	srvManager = nullptr;
+	dxCommon = nullptr;
+}
+
+ParticleManager::~ParticleManager()
+{
 }
 
 void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager, Camera* camera)
@@ -8122,13 +8327,18 @@ public:
 	/// インスタンス削除
 	/// </summary>
 	static void DeleteInstance();
+
+	/// <summary>
+	/// 明示的な終了処理
+	/// </summary>
+	void Finalize();
 private:
 	// シングルトンパターン
 	static ParticleManager* instance;
 	// コンストラクタ・デストラクタ・コピー禁止
 	ParticleManager() = default;
 	// デストラクタ
-	~ParticleManager() = default;
+	~ParticleManager();
 	// コピーコンストラクタ・代入演算子を削除
 	ParticleManager(ParticleManager&) = delete;
 	// 代入演算子
@@ -9558,7 +9768,7 @@ void GameOverScene::Update()
 		default:
 			break;
 		}
-		return; 
+		return;
 	}
 	oneMore_->SetSize(oneMoreBaseSize_);
 	select_->SetSize(selectBaseSize_);
@@ -9569,12 +9779,12 @@ void GameOverScene::Update()
 	Input* input = Input::GetInstance();
 
 	// F1でデバッグカメラON/OFF
-	if (input->TriggerKey(DIK_F1)) {
+	if (input->TriggerKey(DIK_1)) {
 		isDebugCameraActive_ = !isDebugCameraActive_;
 	}
 
 	// F2で速度切り替え
-	if (input->TriggerKey(DIK_F2)) {
+	if (input->TriggerKey(DIK_2)) {
 		isFastMoveMode_ = !isFastMoveMode_;
 	}
 
@@ -9582,6 +9792,8 @@ void GameOverScene::Update()
 	if (isDebugCameraActive_) {
 		UpdateDebugCamera();
 	}
+
+
 #endif
 	// 選択中だけ少し大きく
 	auto Scale = [](const Vector2& v, float s) { return Vector2{ v.x * s, v.y * s }; };
@@ -9599,18 +9811,7 @@ void GameOverScene::Update()
 	default:
 		break;
 	}
-	// タイトルへ戻る (1)
-	if (Input::GetInstance()->TriggerKey(DIK_1)) {
-		SceneManager::GetInstance()->ChangeScene("TITLE");
-	}
-	// ステージセレクトへ戻る (2)
-	else if (Input::GetInstance()->TriggerKey(DIK_2)) {
-		SceneManager::GetInstance()->ChangeScene("STAGESELECT");
-	}
-	// ゲームプレイへ戻る (3)
-	else if (Input::GetInstance()->TriggerKey(DIK_3)) {
-		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
-	}
+
 	// カメラの更新
 	camera->Update();
 
@@ -9651,17 +9852,20 @@ void GameOverScene::Update()
 
 void GameOverScene::Draw()
 {
+	// 背景の一括描画
 	backGround->Draw();
-	backBlack->Draw(); 
+	// 黒背景の描画
+	backBlack->Draw();
+	// プレイヤーの描画
 	if (isPlayerVisible_) {
 		PlayerModel->Draw();
 	}
-
+	// ゲームオーバーUIの描画
 	gameOverUI->Draw();
-
+	// 操作キーUIの描画
 	keyIcon_AD->Draw();
-
 	keyIcon_Space->Draw();
+	// 選択項目UIの描画
 	oneMore_->Draw();
 	select_->Draw();
 	title_->Draw();
@@ -9680,32 +9884,19 @@ void GameOverScene::DrawImgui()
 {
 #ifdef USE_IMGUI
 
-	// カメラの座標をimguiで編集できるようにする
-	ImGui::Begin("DebugCamera");
-
-	ImGui::Text("Debug Camera : %s", isDebugCameraActive_ ? "ON" : "OFF");
-	ImGui::Text("Speed Mode   : %s", isFastMoveMode_ ? "FAST" : "NORMAL");
-	ImGui::Text("F1 : Toggle Debug Camera");
-	ImGui::Text("F2 : Toggle Speed Mode");
-
-	ImGui::DragFloat3("CameraPos", &cameraTransform.translate.x, 0.1f);
-	ImGui::DragFloat3("CameraRot", &cameraTransform.rotate.x, 0.01f);
-
-	cameraTransform.translate = camera->GetTranslate();
-	cameraTransform.rotate = camera->GetRotate();
-	ImGui::DragFloat3("Translate", &cameraTransform.translate.x, 0.1f);
-	ImGui::DragFloat3("Rotate", &cameraTransform.rotate.x, 0.1f);
-
-	camera->SetTranslate(cameraTransform.translate);
-	camera->SetRotate(cameraTransform.rotate);
-
-
-
-	ImGui::End();
 	// カメラの調整
-	// カメラの配置情報の変更
-	ImGui::Begin("Camera Transform");
-	cameraTransform = { {0.0f,0.0f,0.0f}, camera->GetRotate(),camera->GetTranslate() };
+	ImGui::Begin("DebugCamera");
+	// デバックカメラの機能状態
+	ImGui::Text("1 : DebugCamera ON / Off");
+	ImGui::Text("2 : DebugCamera FastMoveMode ON / Off");
+	ImGui::Text("DebugCamera : %s", isDebugCameraActive_ ? "ON" : "OFF");
+	ImGui::Text("DebugCamera FastMode : %s", isFastMoveMode_ ? "ON" : "OFF");
+
+	// カメラのTransformを取得
+	cameraTransform = {
+		{0.0f,0.0f,0.0f},
+		camera->GetRotate(),
+		camera->GetTranslate() };
 	ImGui::DragFloat3("Camera Rotate", &cameraTransform.rotate.x, 0.1f);
 	ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x, 0.1f);
 
@@ -9907,7 +10098,7 @@ void GameOverScene::UpdatePlayerDropIntro(float dt)
 			vy_ = 0.0f;
 			isDropIntroRunning_ = false;
 			playerAnimTr_ = playerFinalTr_;
-			
+
 			StartPlayerShrinkSpin();
 		}
 	}
@@ -9926,8 +10117,6 @@ void GameOverScene::StartPlayerShrinkSpin()
 	// バウンドが終わった瞬間の姿勢から開始
 	playerOutroState_ = PlayerOutroState::ShrinkSpin;
 
-	// もし「最終姿勢にピタッとしてから」縮小させたいならこれもOK
-	// playerAnimTr_ = playerFinalTr_;
 }
 
 void GameOverScene::UpdatePlayerShrinkSpin(float dt)
@@ -10043,15 +10232,16 @@ private:
 	float mouseSensitivity_ = 0.01f;
 
 	// デバッグカメラ設定
-	bool isDebugCameraActive_ = true;
+	bool isDebugCameraActive_ = false;
 	bool isFastMoveMode_ = false;
 
 	// カメラインスタンス
 	Camera* camera = nullptr;
 	// カメラの配置情報
 	Transform cameraTransform = {};
-
+	// 背景
 	std::unique_ptr<BackGround> backGround = nullptr;
+	// 真っ黒背景
 	std::unique_ptr<Object3D> backBlack = nullptr;
 	Transform backBlackTransform;
 
@@ -10099,17 +10289,22 @@ private:
 	int bounceCount_ = 0;
 
 	float vy_ = 0.0f;
-	float gravity_ = -35.0f;        // 落ちる速さ（調整）
-	float restitution_ = 0.45f;     // 反発（卓球っぽくするなら 0.4～0.6）
-	float spawnHeight_ = 8.0f;      // どれだけ上から落とすか
+	// 落ちる速さ（調整）
+	float gravity_ = -35.0f;        
+	// 反発（卓球っぽくするなら 0.4～0.6）
+	float restitution_ = 0.45f;    
+	// どれだけ上から落とすか
+	float spawnHeight_ = 8.0f;     
 
-	float settleEps_ = 0.05f;       // 収束判定
-	float rotBlendT_ = 0.0f;        // 回転補間用
+	// 収束判定
+	float settleEps_ = 0.05f;     
+	// 回転補間用
+	float rotBlendT_ = 0.0f;        
 
 	// バウンドの最大回数（これ以上は跳ねないで止まる）
 	int maxBounces_ = 3;
-
-	float bounceDamping_ = 0.75f; // 0.6～0.85くらいで調整
+	// 落下の減衰率
+	float bounceDamping_ = 0.75f; 
 
 	enum class PlayerOutroState {
 		DropBounce,   // 落下→バウンド中
@@ -10131,6 +10326,7 @@ private:
 
 	float loopDelaySec_ = 0.0f;      
 	float loopDelayTimer_ = 0.0f;
+
 };
 
 
@@ -10197,7 +10393,6 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	cameraController_ = std::make_unique<CameraController>();
 	cameraController_->Initialize();
 
-	SpritesInitialize();
 
 	stageStartEventFlag_ = true;
 	player->SetControlEnabled(false);
@@ -10212,9 +10407,12 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	gamePlayHUD_->Initialize();
 
 	startCam_ = std::make_unique<StartCamPhase>();
+	startCam_->Initialize();
 	startCam_->Bind(camera, &cameraTransform);
 
 	startCam_->Start();
+
+	baseCameraPos_ = cameraTransform.translate;
 
 	damageFeedBack_ = std::make_unique<DamageFeedBack>();
 	damageFeedBack_->Bind(player.get(), camera, &cameraTransform);
@@ -10228,6 +10426,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	// ゲームオーバー遷移の保留フラグとタイマーをリセット
 	isGameOverPending_ = false;
 	gameOverTimer_ = 0.0f;
+
 }
 
 void GamePlayScene::CheckPlayerAlive()
@@ -10249,11 +10448,17 @@ void GamePlayScene::Update()
 	camera->Update();
 	// 背景の更新
 	backGround->Update();
+
+	const bool wasStatCamRunning = startCam_->IsRunning();
 	// スタートカメラの更新
 	startCam_->Update(dt);
+	// このフレームで開始演出が終了したか
+	skipJustFinishedThisFrame_ = wasStatCamRunning && !startCam_->IsRunning();
 	bool isGoal = player->GetIsGoal();
 	stageStartEventFlag_ = startCam_->IsRunning();
-	isPlayerControlLocked_ = stageStartEventFlag_ || isGoal;
+
+	// ステージ開始演出中  ゴールしていたらプレイヤーの操作を受け付けない
+	isPlayerControlLocked_ = stageStartEventFlag_ || isGoal || skipJustFinishedThisFrame_;
 	player->SetControlEnabled(!isPlayerControlLocked_);
 
 	// マップの更新
@@ -10264,17 +10469,10 @@ void GamePlayScene::Update()
 
 
 
-	// エネミーレイヤーが変更されたらエネミーを再生成
+	// エネミーレイヤーが変更されたらエネミーを再生成 
+	// @TODO　エネミーの生成をクラス化
 	if (map->ConsumeEnemyLayerDirtyFlag()) {
 		GenerateEnemy();
-	}
-
-
-	// 開始演出中はプレイヤーへの入力を受け付けない
-	if (isPlayerControlLocked_) {
-		player->SetControlEnabled(false);
-	} else {
-		player->SetControlEnabled(true);
 	}
 
 
@@ -10314,8 +10512,8 @@ void GamePlayScene::Update()
 	// 当たり判定
 	CheckCollision();
 
-	// スプライトの更新
-	gamePlayHUD_->Update();
+
+	// プレイヤーの生存確認
 	CheckPlayerAlive();
 	if (isRespawning_) {
 		// 復帰演出中は入力を止める
@@ -10380,6 +10578,9 @@ void GamePlayScene::Update()
 		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Normal);
 	}
 
+	// スプライトの更新
+	gamePlayHUD_->Update();
+
 	// ImGuiの描画
 	DrawImgui();
 
@@ -10412,17 +10613,16 @@ void GamePlayScene::Draw()
 	// スプライトの描画 //
 	///////////////////
 
-	// スプライト描画処理
-	SpritesDraw();
 
 	damageFeedBack_->Draw();
 	gamePlayHUD_->Draw(pauseSystem_->GetPause(), !isPlayerControlLocked_);
 
+	startCam_->DrawUI();
 
-	pauseSystem_->Draw();
 	if (respawnSequence_) {
 		respawnSequence_->Draw();
 	}
+	pauseSystem_->Draw();
 
 }
 
@@ -10515,26 +10715,7 @@ void GamePlayScene::CheckCollision()
 
 }
 
-void GamePlayScene::UpdateStartCamera(float dt)
-{
 
-}
-
-
-
-void GamePlayScene::SpritesInitialize()
-{
-
-}
-
-void GamePlayScene::SpritesUpdate()
-{
-
-}
-
-void GamePlayScene::SpritesDraw()
-{
-}
 
 bool GamePlayScene::IsAABBOverlap(const AABB& a, const AABB& b)
 {
@@ -10613,6 +10794,7 @@ void GamePlayScene::Finalize()
 	// カメラの終了処理
 	camera->Finalize();
 
+
 }
 
 
@@ -10626,10 +10808,6 @@ void GamePlayScene::DrawImgui()
 
 	// 読み込んでいるマップデータのキー
 	ImGui::Text("SelectedStage:%s", stageKey);
-
-	//==============================
-	// Start Camera Intro Tuning UI
-	//==============================
 
 	// カメラの配置 / 回転修正
 	cameraTransform.translate = camera->GetTranslate();
@@ -10737,13 +10915,6 @@ public:
 	/// スタートカメラの更新
 	/// </summary>
 	void UpdateStartCamera(float dt);
-
-	/// <summary>
-	/// UI/ダメージ/スプライト類の初期化 / 更新 / 描画
-	/// </summary>
-	void SpritesInitialize();
-	void SpritesUpdate();
-	void SpritesDraw();
 
 	/// <summary>
 	/// AABB同士の当たり判定
@@ -10859,6 +11030,9 @@ private:
 	// 死亡演出中のカメラ固定
 	bool freezeCameraOnDeath_ = false;
 	Vector3 frozenCameraPos_ = {};
+
+	// スタートカメラをスキップしたときにプレイヤーが動かないようにするフラグ
+	bool skipJustFinishedThisFrame_ = false;
 };
 
 
@@ -10912,7 +11086,7 @@ void MyGame::Initialize()
 	sceneFactory_ = make_unique<SceneFactory>();
 	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
 	// シーンマネージャーに最初のシーンをセット
-	SceneManager::GetInstance()->ChangeScene("GAMEOVER");
+	SceneManager::GetInstance()->ChangeScene("TITLE");
 
 	modelList = make_unique<ModelList>();
 	modelList->LoadAllModel();
@@ -16527,27 +16701,27 @@ void Sprite::Draw()
 {
 
 	//Spriteの描画準備。Spriteの描画に共通のグラフィックスコマンドを積む
-	SpriteCommon::GetInstance().DrawSettingCommon();
+	SpriteCommon::GetInstance()->DrawSettingCommon();
 
 	// Vertex bufferViewを設定
-	SpriteCommon::GetInstance().GetDxCommon()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+	SpriteCommon::GetInstance()->GetDxCommon()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
 	// IndexBufferViewを設定
-	SpriteCommon::GetInstance().GetDxCommon()->GetCommandList()->IASetIndexBuffer(&indexBufferView);
+	SpriteCommon::GetInstance()->GetDxCommon()->GetCommandList()->IASetIndexBuffer(&indexBufferView);
 	// マテリアルCBufferの場所を設定
-	SpriteCommon::GetInstance().GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	SpriteCommon::GetInstance()->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 	// 座標変換行列CBufferの場所を設定
-	SpriteCommon::GetInstance().GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
+	SpriteCommon::GetInstance()->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(1, transformationMatrixResource->GetGPUVirtualAddress());
 	// SRVのDescriptorHeapの場所を設定
-	SpriteCommon::GetInstance().GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(textureFilePath_));
+	SpriteCommon::GetInstance()->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(2, TextureManager::GetInstance()->GetSrvHandleGPU(textureFilePath_));
 	// 描画
-	SpriteCommon::GetInstance().GetDxCommon()->GetCommandList()->DrawInstanced(6, 1, 0, 0);
+	SpriteCommon::GetInstance()->GetDxCommon()->GetCommandList()->DrawInstanced(6, 1, 0, 0);
 }
 
 void Sprite::CreateVertexResourceData()
 {
 
 	// VertexResourceを作る
-	vertexResource = SpriteCommon::GetInstance().CreateSpriteVertexResource();
+	vertexResource = SpriteCommon::GetInstance()->CreateSpriteVertexResource();
 	// VertexBufferViewを作成する(値を設定するだけ)
 	vertexBufferView.BufferLocation = vertexResource->GetGPUVirtualAddress();
 	// 6個分のデータを書き込むので6倍
@@ -16556,7 +16730,7 @@ void Sprite::CreateVertexResourceData()
 	vertexBufferView.StrideInBytes = sizeof(VertexData);
 
 	// IndexResourceを作る
-	indexResource = SpriteCommon::GetInstance().CreateSpriteIndexResource();
+	indexResource = SpriteCommon::GetInstance()->CreateSpriteIndexResource();
 
 	// IndexBufferViewを作成する
 	indexBufferView.BufferLocation = indexResource->GetGPUVirtualAddress();
@@ -16582,7 +16756,7 @@ void Sprite::CreateVertexResourceData()
 
 void Sprite::CreateMaterialResource() {
 	// マテリアルデータを作成する
-	materialResource = SpriteCommon::GetInstance().GetDxCommon()->CreateBufferResource(sizeof(Material));
+	materialResource = SpriteCommon::GetInstance()->GetDxCommon()->CreateBufferResource(sizeof(Material));
 	// マテリアルリソースにデータを書き込むためのアドレスを取得してmaterialに割り当てる
 	materialResource->Map(0, nullptr, reinterpret_cast<void**>(&materialData));	// マップする
 
@@ -16595,7 +16769,7 @@ void Sprite::CreateMaterialResource() {
 void Sprite::CreateTransformationMatrixData()
 {
 	// 変換行列データを作成する
-	transformationMatrixResource = SpriteCommon::GetInstance().GetDxCommon()->CreateBufferResource(sizeof(TransformationMatrix));
+	transformationMatrixResource = SpriteCommon::GetInstance()->GetDxCommon()->CreateBufferResource(sizeof(TransformationMatrix));
 
 	// 変換行列リソースにデータを書き込むためのアドレスを取得してtransformationMatrixに割り当てる
 	transformationMatrix = nullptr; // nullptrを代入しておく
@@ -16777,15 +16951,16 @@ File Path: engine/2d/SpriteCommon.cpp
 using namespace Engine;
 
 SpriteCommon* SpriteCommon::instance = nullptr;
-SpriteCommon& SpriteCommon::GetInstance()
+SpriteCommon* SpriteCommon::GetInstance()
 {
-	static SpriteCommon instance;
+	if (!instance) { instance = new SpriteCommon(); }
 	return instance;
 }
 
 void SpriteCommon::DeleteInstance()
 {
-	if (instance != nullptr) {
+	if (instance) {
+		instance->Finalize();
 		delete instance;
 		instance = nullptr;
 	}
@@ -16887,6 +17062,21 @@ void SpriteCommon::DrawSettingCommon()
 	// 形状を設定。PSOに設定しているものとはまた別。同じものを設定すると考えておけば良い
 	dxCommon_->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+}
+
+void SpriteCommon::Finalize()
+{
+	if (!dxCommon_) { return; }
+
+	// Sprite用のD3D12オブジェクトを解放
+	indexResource.Reset();
+	vertexResource.Reset();
+	graphicsPipelineState.Reset();
+	rootSignature.Reset();
+	vertexShaderBlob.Reset();
+	pixelShaderBlob.Reset();
+
+	dxCommon_ = nullptr;
 }
 
 
@@ -17018,7 +17208,7 @@ public:
 	/// <summary>
 	/// インスタンスの取得
 	/// </summary>
-	static SpriteCommon& GetInstance();
+	static SpriteCommon* GetInstance();
 	/// <summary>
 	/// インスタンスの削除
 	/// </summary>
@@ -17036,6 +17226,11 @@ public:		// メンバ関数
 	/// 共通描画設定
 	/// </summary>
 	void DrawSettingCommon();
+
+	/// <summary>
+	/// 終了処理
+	/// </summary>
+	void Finalize();
 public:		//	Getter,Setter
 	/// <summary>
 	/// DirectXCommon取得関数
@@ -17759,6 +17954,13 @@ void Object3D::Create(Model* model)
 	};
 }
 
+Object3D::~Object3D()
+{
+	if (wvpResource) { wvpResource->Unmap(0, nullptr); wvpData = nullptr; }
+	if (directionalLightResource) { directionalLightResource->Unmap(0, nullptr); directionalLightData = nullptr; }
+	if (cameraResource) { cameraResource->Unmap(0, nullptr); cameraForGpuData = nullptr; }
+}
+
 
 
 void Object3D::SetModel(const std::string& filePath)
@@ -17856,6 +18058,10 @@ public:	// メンバ関数
 	///  レベルローダーモデル生成
 	/// </summary>
 	void Create(Model* model);
+	/// <summary>
+	/// デストラクタ
+	/// </summary>
+	~Object3D();
 
 public:	// Getter/Setter
 	/// <summary>
@@ -17974,6 +18180,20 @@ void Object3DCommon::DrawSettingCommon()
 	dxCommon_->GetCommandList()->SetPipelineState(graphicsPipelineState.Get());
 	// プリミティブトポロジーのセット
 	dxCommon_->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+}
+
+void Object3DCommon::Finalize()
+{
+	// 既に解放済みなら何もしない
+	if (!dxCommon_) { return; }
+
+	graphicsPipelineState.Reset();
+	rootSignature.Reset();
+	vertexShaderBlob.Reset();
+	pixelShaderBlob.Reset();
+
+	defaultCamera = nullptr;
+	dxCommon_ = nullptr;
 }
 
 
@@ -18152,9 +18372,13 @@ Object3DCommon* Object3DCommon::GetInstance() {
 	return instance;
 }
 
-void Object3DCommon::DeleteInstance() {
-	delete instance;
-	instance = nullptr;
+void Object3DCommon::DeleteInstance() 
+{
+	if (instance) {
+		instance->Finalize();
+		delete instance;
+		instance = nullptr;
+	}
 }
 
 ============================================================
@@ -18177,6 +18401,11 @@ public:	// メンバ関数
 	/// 共通描画設定
 	/// </summary>
 	void DrawSettingCommon();
+
+	/// <summary>
+	/// 明示的な終了処理
+	/// </summary>
+	void Finalize();
 public:	// Getter/Setter
 	/// <summary>
 	/// DirectXCommonの取得
@@ -19113,7 +19342,7 @@ void Framework::Initialize()
 	srvManager = make_unique<SrvManager>();
 	srvManager->Initialize(dxCommon.get());
 	// スプライトコモンの初期化
-	SpriteCommon::GetInstance().Initialize(dxCommon.get());
+	SpriteCommon::GetInstance()->Initialize(dxCommon.get());
 	// テクスチャマネージャーの初期化
 	TextureManager::GetInstance()->Initialize(dxCommon.get(), srvManager.get());
 
@@ -19185,15 +19414,22 @@ void Framework::Finalize()
 
 	SceneManager::GetInstance()->Finalize();
 	SceneManager::DestroyInstance();
-	Audio::GetInstance().DeleteInstance();
-	Object3DCommon::GetInstance()->DeleteInstance();
-	TextureManager::GetInstance()->DeleteInstance();
-	SpriteCommon::GetInstance().DeleteInstance();
-	ModelManager::GetInstance().Finalize();
-	Input::GetInstance()->DeleteInstance();
-	winAPI->Finalize();
-	mainCamera_ = nullptr;
+
 	ParticleManager::GetInstance()->DeleteInstance();
+
+	Object3DCommon::GetInstance()->DeleteInstance();
+	SpriteCommon::DeleteInstance();
+
+	TextureManager::GetInstance()->DeleteInstance();
+	ModelManager::GetInstance().Finalize();
+
+	Audio::GetInstance().DeleteInstance();
+	Input::GetInstance()->DeleteInstance();
+	
+	
+	
+	mainCamera_ = nullptr;
+	winAPI->Finalize();
 
 }
 
@@ -19687,8 +19923,8 @@ D3DResourceLeakChecker::~D3DResourceLeakChecker() {
 	//リソースリークチェック
 	Microsoft::WRL::ComPtr<IDXGIDebug1> debug;
 	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
-		debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
-		debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+		//debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+		//debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
 		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 	}
 }
