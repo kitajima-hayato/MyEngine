@@ -7,16 +7,15 @@ void StartCamPhase::Initialize()
 {
 	// UIの初期化
 	skipUI_ = std::make_unique<Sprite>();
-	skipUI_->Initialize("resources/GamePlay/UI/Texture/skipUI.png");
+	skipUI_->Initialize(textureFilePath_);
 	skipUI_->SetPosition({ 0.0f,0.0f });
 }
 
 void StartCamPhase::DrawUI()
 {
-	// UIの描画
+	// UIの描画 / 演出中のみ描画する
 	if (phase_ != Phase::None) {
 		skipUI_->Draw();
-
 	}
 }
 
@@ -77,7 +76,7 @@ void StartCamPhase::Update(float dt)
 		skipUI_->Update(); 
 	}
 	
-	
+	SkipUIBlink(dt);
 
 	const Vector3 leftPos = { introLeftX_,introFixedY_,introFixedZ_ };
 	const Vector3 rightPos = { introRightX_,introFixedY_,introFixedZ_ };
@@ -180,5 +179,11 @@ void StartCamPhase::DrawImgui()
 
 void StartCamPhase::SkipUIBlink(float dt)
 {
+	// 進行度の反映
+	blinkTimer_ += dt;
+	// sin波
+	float alpha = (std::sin(blinkTimer_ * blinkSpeed_ + 1.0f) * 1.0f);
 
+	// スプライトに色の反映
+	skipUI_->SetColor({ 1.0f,1.0f,1.0f,alpha });
 }

@@ -96,11 +96,12 @@ void Framework::Finalize()
 	Object3DCommon::GetInstance()->DeleteInstance();
 	TextureManager::GetInstance()->DeleteInstance();
 	SpriteCommon::GetInstance().DeleteInstance();
+	
+	ParticleManager::GetInstance()->DeleteInstance();
 	ModelManager::GetInstance().Finalize();
 	Input::GetInstance()->DeleteInstance();
-	winAPI->Finalize();
 	mainCamera_ = nullptr;
-	ParticleManager::GetInstance()->DeleteInstance();
+	winAPI->Finalize();
 
 }
 

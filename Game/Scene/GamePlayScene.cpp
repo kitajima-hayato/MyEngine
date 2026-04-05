@@ -57,7 +57,6 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	cameraController_ = std::make_unique<CameraController>();
 	cameraController_->Initialize();
 
-	SpritesInitialize();
 
 	stageStartEventFlag_ = true;
 	player->SetControlEnabled(false);
@@ -278,18 +277,16 @@ void GamePlayScene::Draw()
 	// スプライトの描画 //
 	///////////////////
 
-	// スプライト描画処理
-	SpritesDraw();
 
 	damageFeedBack_->Draw();
 	gamePlayHUD_->Draw(pauseSystem_->GetPause(), !isPlayerControlLocked_);
 
 	startCam_->DrawUI();
 
-	pauseSystem_->Draw();
 	if (respawnSequence_) {
 		respawnSequence_->Draw();
 	}
+	pauseSystem_->Draw();
 
 }
 
@@ -382,26 +379,7 @@ void GamePlayScene::CheckCollision()
 
 }
 
-void GamePlayScene::UpdateStartCamera(float dt)
-{
 
-}
-
-
-
-void GamePlayScene::SpritesInitialize()
-{
-
-}
-
-void GamePlayScene::SpritesUpdate()
-{
-
-}
-
-void GamePlayScene::SpritesDraw()
-{
-}
 
 bool GamePlayScene::IsAABBOverlap(const AABB& a, const AABB& b)
 {
@@ -479,6 +457,7 @@ void GamePlayScene::Finalize()
 	Audio::GetInstance().SoundUnload(&soundData);
 	// カメラの終了処理
 	camera->Finalize();
+
 
 }
 

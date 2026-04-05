@@ -82,13 +82,6 @@ public:
 	void UpdateStartCamera(float dt);
 
 	/// <summary>
-	/// UI/ダメージ/スプライト類の初期化 / 更新 / 描画
-	/// </summary>
-	void SpritesInitialize();
-	void SpritesUpdate();
-	void SpritesDraw();
-
-	/// <summary>
 	/// AABB同士の当たり判定
 	/// </summary>
 	bool IsAABBOverlap(const AABB& a, const AABB& b);

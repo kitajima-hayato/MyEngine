@@ -56,7 +56,7 @@ public:
 	/// <returns>演出が進行中でなければPhase::Noneを返す</returns>
 	bool IsRunning()const;
 
-	
+
 
 public: // Getter
 	/// <summary>
@@ -84,10 +84,11 @@ private: // イージング関数 / クラス内のみ
 	/// </summary>
 	void DrawImgui();
 
-/// <summary>
-/// UIの点滅
-/// </summary>
+	/// <summary>
+	/// UIの点滅
+	/// </summary>
 	void SkipUIBlink(float dt);
+
 private: // 演出に必要な変数
 	// カメラの代入先ポインタ
 	Camera* camera_ = nullptr;
@@ -122,7 +123,21 @@ private: // 演出に必要な変数
 
 	// skip spaceのUI
 	std::unique_ptr <Sprite> skipUI_ = nullptr;
-	
-	// 
+
+	// α値の減衰速度
+	float fadeSpeed_ = 0.02f;
+	// スキップUIの折り返し値 / 最大
+	Vector4 colorOn_ = { 1.0f,1.0f,1.0f,0.5f };
+	// スキップUI折り返し値 / 最小
+	Vector4 colorOff_ = { 1.0f,1.0f,1.0f,0.0f };
+
+	// 点滅用にタイマー
+	float blinkTimer_ = 0.8f;
+	// 数値が大きければ大きいほど速い
+	float blinkSpeed_ = 7.0f;
+
+	// UIのテクスチャファイルパス
+	const std::string textureFilePath_ = "resources/GamePlay/UI/Texture/skipUI.png";
+
 };
 

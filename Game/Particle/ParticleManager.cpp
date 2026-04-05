@@ -20,8 +20,56 @@ ParticleManager* ParticleManager::GetInstance()
 
 void ParticleManager::DeleteInstance()
 {
-	delete instance;
-	instance = nullptr;
+	if (instance){
+		instance->Finalize();
+		delete instance;
+		instance = nullptr;
+	}
+	
+}
+
+void ParticleManager::Finalize()
+{
+	// すでに解放済みなら何もしない（何度呼ばれても安全にする）
+	if (!dxCommon) {
+		return;
+	}
+
+	// 1) particleGroups を全解放（Mapした instancingResource を Unmap してから Reset）
+	for (auto& [name, group] : particleGroups) {
+		if (group.instancingResource) {
+			group.instancingResource->Unmap(0, nullptr);
+			group.instancingData = nullptr;
+			group.instancingResource.Reset();
+		}
+	}
+	particleGroups.clear();
+
+	// 2) vertex/material を Unmap（Mapしたままだった）
+	if (vertexResource) {
+		vertexResource->Unmap(0, nullptr);
+		vertexData = nullptr;
+	}
+	if (materialResource) {
+		materialResource->Unmap(0, nullptr);
+		materialData = nullptr;
+	}
+
+	// 3) D3D12オブジェクトを解放（RootSig/PSO/Resource）
+	ringVertexBuffer.Reset();
+	vertexResource.Reset();
+	materialResource.Reset();
+	graphicsPipelineState.Reset();
+	rootSignature.Reset();
+
+	// 4) 外部参照を切る（Framework側の寿命に依存しないように）
+	camera = nullptr;
+	srvManager = nullptr;
+	dxCommon = nullptr;
+}
+
+ParticleManager::~ParticleManager()
+{
 }
 
 void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager, Camera* camera)
