@@ -126,24 +126,52 @@ void Object3DCommon::CreateGraphicsPipeLine()
 {
 	CreateRootSignature();
 
-	// 頂点の位置データを表すセマンティクスを設定
-	inputElementDescs[0].SemanticName = "POSITION";
-	inputElementDescs[0].SemanticIndex = 0;
-	inputElementDescs[0].Format = DXGI_FORMAT_R32G32B32A32_FLOAT;
-	inputElementDescs[0].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-	// テクスチャ座標データを表すセマンティクスの座標
-	inputElementDescs[1].SemanticName = "TEXCOORD";
-	inputElementDescs[1].SemanticIndex = 0;
-	inputElementDescs[1].Format = DXGI_FORMAT_R32G32_FLOAT;
-	inputElementDescs[1].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
-	// 法線データを表すセマンティクスを設定
-	inputElementDescs[2].SemanticName = "NORMAL";
-	inputElementDescs[2].SemanticIndex = 0;
-	inputElementDescs[2].Format = DXGI_FORMAT_R32G32B32_FLOAT;
-	inputElementDescs[2].AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT;
+	inputElementDescs[0] = {
+		.SemanticName = "POSITION",
+		.SemanticIndex = 0,
+		.Format = DXGI_FORMAT_R32G32B32A32_FLOAT,
+		.InputSlot = 0,
+		.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+		.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+		.InstanceDataStepRate = 0
+	};
+	inputElementDescs[1] = {
+		.SemanticName = "TEXCOORD",
+		.SemanticIndex = 0,
+		.Format = DXGI_FORMAT_R32G32_FLOAT,
+		.InputSlot = 0,
+		.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+		.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+		.InstanceDataStepRate = 0
+	};
+	inputElementDescs[2] = {
+		.SemanticName = "NORMAL",
+		.SemanticIndex = 0,
+		.Format = DXGI_FORMAT_R32G32B32_FLOAT,
+		.InputSlot = 0,
+		.AlignedByteOffset = D3D12_APPEND_ALIGNED_ELEMENT,
+		.InputSlotClass = D3D12_INPUT_CLASSIFICATION_PER_VERTEX_DATA,
+		.InstanceDataStepRate = 0
+	};
+
+	// World (TEXCOORD1-4)
+	inputElementDescs[3] = { "TEXCOORD", 1, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
+	inputElementDescs[4] = { "TEXCOORD", 2, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
+	inputElementDescs[5] = { "TEXCOORD", 3, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
+	inputElementDescs[6] = { "TEXCOORD", 4, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
+
+	// WVP (TEXCOORD5-8)
+	inputElementDescs[7] = { "TEXCOORD", 5, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
+	inputElementDescs[8] = { "TEXCOORD", 6, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
+	inputElementDescs[9] = { "TEXCOORD", 7, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
+	inputElementDescs[10] = { "TEXCOORD", 8, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
+
+	// Color (COLOR0)
+	inputElementDescs[11] = { "COLOR", 0, DXGI_FORMAT_R32G32B32A32_FLOAT, 1, D3D12_APPEND_ALIGNED_ELEMENT, D3D12_INPUT_CLASSIFICATION_PER_INSTANCE_DATA, 1 };
 
 	inputLayoutDescs.pInputElementDescs = inputElementDescs;
 	inputLayoutDescs.NumElements = _countof(inputElementDescs);
+
 
 	// レンダーターゲットの書き込みマスクを設定。全ての色チャンネルに書き込みを許可
 	blendDesc.RenderTarget[0].RenderTargetWriteMask =

@@ -85,7 +85,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	respawnSequence_ = std::make_unique<RespawnSequence>();
 	respawnSequence_->Initialize();
 
-	ModelParticleManager::GetInstance().Initialize();
+	
 
 	// ゲームオーバー遷移の保留フラグとタイマーをリセット
 	isGameOverPending_ = false;
@@ -234,7 +234,7 @@ void GamePlayScene::Update()
 		}
 	}
 
-	ModelParticleManager::GetInstance().Update();
+	
 	// プレイヤーがゴールに触れていたらシーン遷移
 
 	if (isGoal) {
@@ -244,6 +244,7 @@ void GamePlayScene::Update()
 
 	// スプライトの更新
 	gamePlayHUD_->Update();
+
 
 	// ImGuiの描画
 	DrawImgui();
@@ -271,7 +272,7 @@ void GamePlayScene::Draw()
 	}
 
 	ParticleManager::GetInstance()->Draw();
-	ModelParticleManager::GetInstance().Draw();
+	
 
 	///////////////////
 	// スプライトの描画 //

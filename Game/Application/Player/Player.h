@@ -296,6 +296,11 @@ private:
 	void UpdateDashEffect();
 
 	/// <summary>
+	/// 通常移動のエフェクトの更新
+	/// </summary>
+	void UpdateMoveEffect();
+
+	/// <summary>
 	///	エネミーを踏みつけたときの処理
 	/// </summary>
 	/// <param name="enemy"></param>
@@ -445,6 +450,7 @@ private:	// メンバ変数
 
 	Vector3 deathFaceRot_ = { 0,0,0 }; 
 
-	
+	// 通常移動のパーティクルが再生中か
+	bool wasMoving_ = false;
 };
 

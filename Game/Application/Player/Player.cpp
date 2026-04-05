@@ -126,7 +126,7 @@ void Player::StompEnemy(Collider* enemy)
 	onGround_ = false;
 }
 
-bool Player::IsTouchingDamageBlock() 
+bool Player::IsTouchingDamageBlock()
 {
 	if (!map_ || !playerModel_) { return false; }
 
@@ -391,6 +391,47 @@ void Player::UpdateDashEffect()
 	wasDashing_ = canShowEffect;
 }
 
+void Player::UpdateMoveEffect()
+{
+	if (!moveEffect_ || !playerModel_) { return; }
+
+	// 入力状態（Move()と同じ判定に合わせる）
+	auto* input = Input::GetInstance();
+	const bool rightHold = input->PushKey(DIK_D);
+	const bool leftHold = input->PushKey(DIK_A);
+
+	// 左右どちらかだけ押している＝移動中
+	const bool movingRight = rightHold && !leftHold;
+	const bool movingLeft = leftHold && !rightHold;
+	const bool moving = movingRight || movingLeft;
+
+	// 通常移動として扱いたい条件
+	const bool canShowEffect = controlEnabled_ && onGround_ && moving && !isDash_;
+
+	Vector3 playerPos = playerModel_->GetTranslate();
+
+	if (canShowEffect) {
+		// 足元に出す
+		Vector3 smokePos = playerPos;
+		smokePos.y -= particleSpawnPosOffset_;
+
+		// 進行方向とは逆に少しずらす（ダッシュ煙と同じ見た目の思想）
+		if (movingRight) {
+			smokePos.x -= particleSpawnPosOffset_;
+		} else if (movingLeft) {
+			smokePos.x += particleSpawnPosOffset_;
+		}
+
+		moveEffect_->SetTranslate(smokePos);
+		if (!wasMoving_) {
+			moveEffect_->Play();
+		}
+	} else {
+		moveEffect_->Pause();
+	}
+	wasMoving_ = canShowEffect;
+}
+
 
 
 void Player::Initialize(Vector3 position)
@@ -408,7 +449,7 @@ void Player::Initialize(Vector3 position)
 	moveEffect_ = ParticlePresets::CreateSmoke(position);
 	// 初期は停止
 	moveEffect_->Pause();
-	moveEffect_->SetEmissionRate(10.0f);
+	moveEffect_->SetEmissionRate(5.0f);
 	moveEffect_->SetLoop(true);
 	moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
 
@@ -428,6 +469,7 @@ void Player::Initialize(Vector3 position)
 	// 一度の発生のためループはしない
 	dashStartEffect_->SetLoop(false);
 
+	// 踏みつけエフェクトの初期化
 	stompEffect_ = ParticlePresets::CreateSparks(position);
 	stompEffect_->Pause();
 	stompEffect_->SetEmissionRate(30.0f);
@@ -445,6 +487,8 @@ void Player::Update()
 	}
 	// プレイヤーの挙動更新
 	UpdateBehavior();
+	// 通常移動エフェクトの更新
+	UpdateMoveEffect();
 	// ダッシュエフェクトの更新
 	UpdateDashEffect();
 	// プレイヤーの回転
@@ -945,6 +989,7 @@ bool Player::IsHitBlockTable(BlockType type)
 
 bool Player::IsHitGoalBlockTable(BlockType type)
 {
+	// ゴールブロックかどうか
 	switch (type) {
 	case BlockType::kGoalUp:
 	case BlockType::kGoalDown:
@@ -956,6 +1001,7 @@ bool Player::IsHitGoalBlockTable(BlockType type)
 
 bool Player::IsHitBlockBreakableTable(BlockType type)
 {
+	// 破壊可能ブロックかどうか
 	switch (type) {
 	case BlockType::breakBlock:
 		return true;
@@ -998,7 +1044,7 @@ void Player::Finalize()
 	}
 	if (dashStartEffect_) {
 		dashStartEffect_->Stop();
-		dashSmokeEffect_.reset();
+		dashStartEffect_.reset();
 	}
 	if (stompEffect_) {
 		stompEffect_->Stop();
