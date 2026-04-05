@@ -178,3 +178,25 @@ void Model::CreateMaterialResource()
 	materialData->uvTransform = MakeIdentity4x4();
 
 }
+
+void Model::DrawInstanced(uint32_t instanceCount)
+{
+	// 頂点バッファービューをセット（slot0）
+	modelCommon->GetDxCommon()->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+
+	// material (root0 b0 PS)
+	modelCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootConstantBufferView(
+		0, materialResource->GetGPUVirtualAddress());
+
+	// texture (root2 t0)
+	modelCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(
+		2, TextureManager::GetInstance()->GetSrvHandleGPU(modelData.material.textureFilePath));
+
+	// cubemap (root4 t1)
+	modelCommon->GetDxCommon()->GetCommandList()->SetGraphicsRootDescriptorTable(
+		4, TextureManager::GetInstance()->GetSrvHandleGPU(cubeMapPath));
+
+	// ★ instanceCount を使う
+	modelCommon->GetDxCommon()->GetCommandList()->DrawInstanced(
+		UINT(modelData.vertices.size()), instanceCount, 0, 0);
+}

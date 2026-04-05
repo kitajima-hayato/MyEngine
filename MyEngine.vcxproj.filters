@@ -204,6 +204,7 @@
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationPlacer.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
+    <ClCompile Include="engine\3d\Object3DInstancingCommon.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -411,6 +412,7 @@
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationPlacer.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
+    <ClInclude Include="engine\3d\Object3DInstancingCommon.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">
