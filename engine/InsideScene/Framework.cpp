@@ -20,7 +20,7 @@ void Framework::Initialize()
 	srvManager = make_unique<SrvManager>();
 	srvManager->Initialize(dxCommon.get());
 	// スプライトコモンの初期化
-	SpriteCommon::GetInstance().Initialize(dxCommon.get());
+	SpriteCommon::GetInstance()->Initialize(dxCommon.get());
 	// テクスチャマネージャーの初期化
 	TextureManager::GetInstance()->Initialize(dxCommon.get(), srvManager.get());
 
@@ -92,15 +92,22 @@ void Framework::Finalize()
 
 	SceneManager::GetInstance()->Finalize();
 	SceneManager::DestroyInstance();
-	Audio::GetInstance().DeleteInstance();
-	Object3DCommon::GetInstance()->DeleteInstance();
-	TextureManager::GetInstance()->DeleteInstance();
-	SpriteCommon::GetInstance().DeleteInstance();
-	ModelManager::GetInstance().Finalize();
-	Input::GetInstance()->DeleteInstance();
-	winAPI->Finalize();
-	mainCamera_ = nullptr;
+
 	ParticleManager::GetInstance()->DeleteInstance();
+
+	Object3DCommon::GetInstance()->DeleteInstance();
+	SpriteCommon::DeleteInstance();
+
+	TextureManager::GetInstance()->DeleteInstance();
+	ModelManager::GetInstance().Finalize();
+
+	Audio::GetInstance().DeleteInstance();
+	Input::GetInstance()->DeleteInstance();
+	
+	
+	
+	mainCamera_ = nullptr;
+	winAPI->Finalize();
 
 }
 

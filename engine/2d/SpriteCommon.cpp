@@ -5,15 +5,16 @@
 using namespace Engine;
 
 SpriteCommon* SpriteCommon::instance = nullptr;
-SpriteCommon& SpriteCommon::GetInstance()
+SpriteCommon* SpriteCommon::GetInstance()
 {
-	static SpriteCommon instance;
+	if (!instance) { instance = new SpriteCommon(); }
 	return instance;
 }
 
 void SpriteCommon::DeleteInstance()
 {
-	if (instance != nullptr) {
+	if (instance) {
+		instance->Finalize();
 		delete instance;
 		instance = nullptr;
 	}
@@ -115,6 +116,21 @@ void SpriteCommon::DrawSettingCommon()
 	// 形状を設定。PSOに設定しているものとはまた別。同じものを設定すると考えておけば良い
 	dxCommon_->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 
+}
+
+void SpriteCommon::Finalize()
+{
+	if (!dxCommon_) { return; }
+
+	// Sprite用のD3D12オブジェクトを解放
+	indexResource.Reset();
+	vertexResource.Reset();
+	graphicsPipelineState.Reset();
+	rootSignature.Reset();
+	vertexShaderBlob.Reset();
+	pixelShaderBlob.Reset();
+
+	dxCommon_ = nullptr;
 }
 
 

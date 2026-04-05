@@ -74,15 +74,16 @@ private:
 	float mouseSensitivity_ = 0.01f;
 
 	// デバッグカメラ設定
-	bool isDebugCameraActive_ = true;
+	bool isDebugCameraActive_ = false;
 	bool isFastMoveMode_ = false;
 
 	// カメラインスタンス
 	Camera* camera = nullptr;
 	// カメラの配置情報
 	Transform cameraTransform = {};
-
+	// 背景
 	std::unique_ptr<BackGround> backGround = nullptr;
+	// 真っ黒背景
 	std::unique_ptr<Object3D> backBlack = nullptr;
 	Transform backBlackTransform;
 
@@ -130,17 +131,22 @@ private:
 	int bounceCount_ = 0;
 
 	float vy_ = 0.0f;
-	float gravity_ = -35.0f;        // 落ちる速さ（調整）
-	float restitution_ = 0.45f;     // 反発（卓球っぽくするなら 0.4～0.6）
-	float spawnHeight_ = 8.0f;      // どれだけ上から落とすか
+	// 落ちる速さ（調整）
+	float gravity_ = -35.0f;        
+	// 反発（卓球っぽくするなら 0.4～0.6）
+	float restitution_ = 0.45f;    
+	// どれだけ上から落とすか
+	float spawnHeight_ = 8.0f;     
 
-	float settleEps_ = 0.05f;       // 収束判定
-	float rotBlendT_ = 0.0f;        // 回転補間用
+	// 収束判定
+	float settleEps_ = 0.05f;     
+	// 回転補間用
+	float rotBlendT_ = 0.0f;        
 
 	// バウンドの最大回数（これ以上は跳ねないで止まる）
 	int maxBounces_ = 3;
-
-	float bounceDamping_ = 0.75f; // 0.6～0.85くらいで調整
+	// 落下の減衰率
+	float bounceDamping_ = 0.75f; 
 
 	enum class PlayerOutroState {
 		DropBounce,   // 落下→バウンド中
@@ -162,5 +168,6 @@ private:
 
 	float loopDelaySec_ = 0.0f;      
 	float loopDelayTimer_ = 0.0f;
+
 };
 

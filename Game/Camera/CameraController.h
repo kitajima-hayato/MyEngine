@@ -14,9 +14,6 @@ public:
 	/// </summary>
 	void Update(float deltaTime);
 
-
-
-
 public:
 	// 位置のセット
 	void SetTargetPosition(const Vector3& targetPosition) {

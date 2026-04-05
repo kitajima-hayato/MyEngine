@@ -43,13 +43,18 @@ public:
 	/// インスタンス削除
 	/// </summary>
 	static void DeleteInstance();
+
+	/// <summary>
+	/// 明示的な終了処理
+	/// </summary>
+	void Finalize();
 private:
 	// シングルトンパターン
 	static ParticleManager* instance;
 	// コンストラクタ・デストラクタ・コピー禁止
 	ParticleManager() = default;
 	// デストラクタ
-	~ParticleManager() = default;
+	~ParticleManager();
 	// コピーコンストラクタ・代入演算子を削除
 	ParticleManager(ParticleManager&) = delete;
 	// 代入演算子

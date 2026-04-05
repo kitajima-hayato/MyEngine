@@ -36,6 +36,10 @@ public:	// メンバ関数
 	///  レベルローダーモデル生成
 	/// </summary>
 	void Create(Model* model);
+	/// <summary>
+	/// デストラクタ
+	/// </summary>
+	~Object3D();
 
 public:	// Getter/Setter
 	/// <summary>

@@ -1,5 +1,23 @@
 #include "StartCamPhase.h"
+#include "Input.h"
 #include <cassert>
+#include "Sprite.h"
+
+void StartCamPhase::Initialize()
+{
+	// UIの初期化
+	skipUI_ = std::make_unique<Sprite>();
+	skipUI_->Initialize(textureFilePath_);
+	skipUI_->SetPosition({ 0.0f,0.0f });
+}
+
+void StartCamPhase::DrawUI()
+{
+	// UIの描画 / 演出中のみ描画する
+	if (phase_ != Phase::None) {
+		skipUI_->Draw();
+	}
+}
 
 void StartCamPhase::Bind(Camera* camera, Transform* cameraTransform)
 {
@@ -18,7 +36,7 @@ void StartCamPhase::Start()
 	introFixedZ_ = camTargetPos_.z;
 
 	// 開始地点保存
-	startPos_ = { camTargetPos_.x,introFixedY_,introFixedZ_ };
+	startPos_ = { camTargetPos_.x,introFixedY_,camTargetPos_.z };
 
 	// カメラを初期位置へ
 	cameraTransform_->translate = startPos_;
@@ -27,6 +45,7 @@ void StartCamPhase::Start()
 	camera_->SetTranslate(cameraTransform_->translate);
 	camera_->SetRotate(cameraTransform_->rotate);
 
+	// 開始の演出状態
 	phase_ = Phase::MoveToLeft;
 	timer_ = 0.0f;
 
@@ -39,11 +58,10 @@ void StartCamPhase::Skip()
 	// 即座にターゲットへ
 	introFixedY_ = camTargetPos_.y;
 	introFixedZ_ = camTargetPos_.z;
-
+	// 開始地点保存
 	startPos_ = { camTargetPos_.x,introFixedY_,introFixedZ_ };
 	cameraTransform_->translate = startPos_;
-	camera_->SetTranslate(cameraTransform_->translate);
-
+	// 演出状態を終了
 	phase_ = Phase::None;
 	timer_ = 0.0f;
 }
@@ -51,14 +69,20 @@ void StartCamPhase::Skip()
 
 void StartCamPhase::Update(float dt)
 {
+	// カメラの演出状態がNoneの場合は何もしない
 	if (phase_ == Phase::None) {
 		return;
+	}else{ 
+		skipUI_->Update(); 
 	}
+	
+	SkipUIBlink(dt);
 
 	const Vector3 leftPos = { introLeftX_,introFixedY_,introFixedZ_ };
 	const Vector3 rightPos = { introRightX_,introFixedY_,introFixedZ_ };
 	const Vector3 startPos = { camTargetPos_.x,introFixedY_,introFixedZ_ };
 
+#pragma region 各カメラの動き
 	switch (phase_)
 	{
 	case StartCamPhase::Phase::None:
@@ -73,6 +97,10 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = leftPos;
 		}
+		// スペースキーでスキップ
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			Skip();
+		}
 	}
 	break;
 	case StartCamPhase::Phase::PanToRight:
@@ -85,9 +113,13 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = rightPos;
 		}
+		// スペースキーでスキップ
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			Skip();
+		}
 	}
 	break;
-	case StartCamPhase::Phase::Hold: 
+	case StartCamPhase::Phase::Hold:
 	{
 		timer_ += dt;
 		cameraTransform_->translate = rightPos;
@@ -96,9 +128,14 @@ void StartCamPhase::Update(float dt)
 			phase_ = Phase::ReturnToStart;
 			timer_ = 0.0f;
 		}
+		// スペースキーでスキップ
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			Skip();
+		}
 	}
 	break;
-	case StartCamPhase::Phase::ReturnToStart: {
+	case StartCamPhase::Phase::ReturnToStart:
+	{
 
 		timer_ += dt;
 
@@ -114,21 +151,39 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = startPos;
 		}
+		// スペースキーでスキップ
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+			Skip();
+		}
 	}
-											break;
+
+	break;
 	default:
 
 		break;
 	}
+#pragma endregion
 	camera_->SetTranslate(cameraTransform_->translate);
 }
 
 
 bool StartCamPhase::IsRunning() const
 {
+	// Noneじゃなければtrueを返す
 	return phase_ != Phase::None;
 }
 
 void StartCamPhase::DrawImgui()
 {
+}
+
+void StartCamPhase::SkipUIBlink(float dt)
+{
+	// 進行度の反映
+	blinkTimer_ += dt;
+	// sin波
+	float alpha = (std::sin(blinkTimer_ * blinkSpeed_ + 1.0f) * 1.0f);
+
+	// スプライトに色の反映
+	skipUI_->SetColor({ 1.0f,1.0f,1.0f,alpha });
 }

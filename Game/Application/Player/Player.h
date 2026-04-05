@@ -407,6 +407,9 @@ private:	// メンバ変数
 	// 操作の有効/無効
 	bool controlEnabled_ = true;
 
+	// 通常移動のパーティクル
+	std::unique_ptr <ParticleSystem>moveEffect_;
+
 	// ダッシュエフェクト用パーティクル
 	// 足元の煙
 	std::unique_ptr<ParticleSystem>dashSmokeEffect_;

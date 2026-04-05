@@ -43,7 +43,7 @@ void MyGame::Initialize()
 	sceneFactory_ = make_unique<SceneFactory>();
 	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
 	// シーンマネージャーに最初のシーンをセット
-	SceneManager::GetInstance()->ChangeScene("GAMEOVER");
+	SceneManager::GetInstance()->ChangeScene("TITLE");
 
 	modelList = make_unique<ModelList>();
 	modelList->LoadAllModel();

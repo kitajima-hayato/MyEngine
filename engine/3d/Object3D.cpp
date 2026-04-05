@@ -80,6 +80,13 @@ void Object3D::Create(Model* model)
 	};
 }
 
+Object3D::~Object3D()
+{
+	if (wvpResource) { wvpResource->Unmap(0, nullptr); wvpData = nullptr; }
+	if (directionalLightResource) { directionalLightResource->Unmap(0, nullptr); directionalLightData = nullptr; }
+	if (cameraResource) { cameraResource->Unmap(0, nullptr); cameraForGpuData = nullptr; }
+}
+
 
 
 void Object3D::SetModel(const std::string& filePath)

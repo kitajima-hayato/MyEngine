@@ -57,7 +57,6 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	cameraController_ = std::make_unique<CameraController>();
 	cameraController_->Initialize();
 
-	SpritesInitialize();
 
 	stageStartEventFlag_ = true;
 	player->SetControlEnabled(false);
@@ -72,9 +71,12 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	gamePlayHUD_->Initialize();
 
 	startCam_ = std::make_unique<StartCamPhase>();
+	startCam_->Initialize();
 	startCam_->Bind(camera, &cameraTransform);
 
 	startCam_->Start();
+
+	baseCameraPos_ = cameraTransform.translate;
 
 	damageFeedBack_ = std::make_unique<DamageFeedBack>();
 	damageFeedBack_->Bind(player.get(), camera, &cameraTransform);
@@ -88,6 +90,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	// ゲームオーバー遷移の保留フラグとタイマーをリセット
 	isGameOverPending_ = false;
 	gameOverTimer_ = 0.0f;
+
 }
 
 void GamePlayScene::CheckPlayerAlive()
@@ -109,11 +112,17 @@ void GamePlayScene::Update()
 	camera->Update();
 	// 背景の更新
 	backGround->Update();
+
+	const bool wasStatCamRunning = startCam_->IsRunning();
 	// スタートカメラの更新
 	startCam_->Update(dt);
+	// このフレームで開始演出が終了したか
+	skipJustFinishedThisFrame_ = wasStatCamRunning && !startCam_->IsRunning();
 	bool isGoal = player->GetIsGoal();
 	stageStartEventFlag_ = startCam_->IsRunning();
-	isPlayerControlLocked_ = stageStartEventFlag_ || isGoal;
+
+	// ステージ開始演出中  ゴールしていたらプレイヤーの操作を受け付けない
+	isPlayerControlLocked_ = stageStartEventFlag_ || isGoal || skipJustFinishedThisFrame_;
 	player->SetControlEnabled(!isPlayerControlLocked_);
 
 	// マップの更新
@@ -124,17 +133,10 @@ void GamePlayScene::Update()
 
 
 
-	// エネミーレイヤーが変更されたらエネミーを再生成
+	// エネミーレイヤーが変更されたらエネミーを再生成 
+	// @TODO　エネミーの生成をクラス化
 	if (map->ConsumeEnemyLayerDirtyFlag()) {
 		GenerateEnemy();
-	}
-
-
-	// 開始演出中はプレイヤーへの入力を受け付けない
-	if (isPlayerControlLocked_) {
-		player->SetControlEnabled(false);
-	} else {
-		player->SetControlEnabled(true);
 	}
 
 
@@ -174,8 +176,8 @@ void GamePlayScene::Update()
 	// 当たり判定
 	CheckCollision();
 
-	// スプライトの更新
-	gamePlayHUD_->Update();
+
+	// プレイヤーの生存確認
 	CheckPlayerAlive();
 	if (isRespawning_) {
 		// 復帰演出中は入力を止める
@@ -240,6 +242,9 @@ void GamePlayScene::Update()
 		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Normal);
 	}
 
+	// スプライトの更新
+	gamePlayHUD_->Update();
+
 	// ImGuiの描画
 	DrawImgui();
 
@@ -272,17 +277,16 @@ void GamePlayScene::Draw()
 	// スプライトの描画 //
 	///////////////////
 
-	// スプライト描画処理
-	SpritesDraw();
 
 	damageFeedBack_->Draw();
 	gamePlayHUD_->Draw(pauseSystem_->GetPause(), !isPlayerControlLocked_);
 
+	startCam_->DrawUI();
 
-	pauseSystem_->Draw();
 	if (respawnSequence_) {
 		respawnSequence_->Draw();
 	}
+	pauseSystem_->Draw();
 
 }
 
@@ -375,26 +379,7 @@ void GamePlayScene::CheckCollision()
 
 }
 
-void GamePlayScene::UpdateStartCamera(float dt)
-{
 
-}
-
-
-
-void GamePlayScene::SpritesInitialize()
-{
-
-}
-
-void GamePlayScene::SpritesUpdate()
-{
-
-}
-
-void GamePlayScene::SpritesDraw()
-{
-}
 
 bool GamePlayScene::IsAABBOverlap(const AABB& a, const AABB& b)
 {
@@ -473,6 +458,7 @@ void GamePlayScene::Finalize()
 	// カメラの終了処理
 	camera->Finalize();
 
+
 }
 
 
@@ -486,10 +472,6 @@ void GamePlayScene::DrawImgui()
 
 	// 読み込んでいるマップデータのキー
 	ImGui::Text("SelectedStage:%s", stageKey);
-
-	//==============================
-	// Start Camera Intro Tuning UI
-	//==============================
 
 	// カメラの配置 / 回転修正
 	cameraTransform.translate = camera->GetTranslate();

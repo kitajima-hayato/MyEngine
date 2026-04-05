@@ -352,7 +352,7 @@ void Player::UpdateDashEffect()
 
 	// 地面に接地しているか
 	const bool canShowEffect = dashActive && onGround_;
-
+	// プレイヤーの現在地を取得
 	Vector3 playerPos = playerModel_->GetTranslate();
 
 	// ダッシュ開始時の衝撃波エフェクト
@@ -403,8 +403,17 @@ void Player::Initialize(Vector3 position)
 	// 死ぬ高さの設定
 	SetDeathHeight(-3.0f);
 
+	// 通常移動のエフェクトの初期化
+	// 足元の煙エフェクト(通常移動)
+	moveEffect_ = ParticlePresets::CreateSmoke(position);
+	// 初期は停止
+	moveEffect_->Pause();
+	moveEffect_->SetEmissionRate(10.0f);
+	moveEffect_->SetLoop(true);
+	moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+
 	// ダッシュエフェクトの初期化
-	// 足元の煙エフェクト
+	// 足元の煙エフェクト(ダッシュ)
 	dashSmokeEffect_ = ParticlePresets::CreateSmoke(position);
 	// 初期は停止
 	dashSmokeEffect_->Pause();
@@ -450,6 +459,7 @@ void Player::Update()
 	playerModel_->Update();
 
 	// パーティクルシステムの更新
+	if (moveEffect_)moveEffect_->Update();
 	if (dashSmokeEffect_)dashSmokeEffect_->Update();
 	if (dashStartEffect_)dashStartEffect_->Update();
 	if (stompEffect_)stompEffect_->Update();
@@ -542,18 +552,14 @@ void Player::Move()
 
 	auto* input = Input::GetInstance();
 
-	// ------------------------
 	// 入力状態
-	// ------------------------
 	const bool rightHold = input->PushKey(DIK_D);
 	const bool leftHold = input->PushKey(DIK_A);
 
 	const bool rightTrig = input->TriggerKey(DIK_D);
 	const bool leftTrig = input->TriggerKey(DIK_A);
 
-	// ------------------------
 	// ダブルタップ用タイマー更新
-	// ------------------------
 	if (rightTapTimer_ > 0) { --rightTapTimer_; }
 	if (leftTapTimer_ > 0) { --leftTapTimer_; }
 
@@ -580,9 +586,7 @@ void Player::Move()
 		rightTapTimer_ = 0;
 	}
 
-	// ------------------------
 	// ダッシュ継続／解除判定
-	// ------------------------
 	const bool movingRight = rightHold && !leftHold;
 	const bool movingLeft = leftHold && !rightHold;
 
@@ -599,9 +603,7 @@ void Player::Move()
 		}
 	}
 
-	// ------------------------
 	// 実際の速度更新
-	// ------------------------
 	Vector3 acceleration{};
 
 	// 左右のどちらの方向にダッシュしているか判別
@@ -673,8 +675,8 @@ void Player::Jump()
 	// 地面にいる場合
 	if (onGround_) {
 		// ジャンプキーが押されたら
-		if (Input::GetInstance()->PushKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
-			// ジャンプ処理
+		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+			// ジャンプ処理 / ジャンプ距離を縦のスピードに入れる
 			velocity_.y = status_.kJumpPower;
 		}
 	} else {
@@ -986,6 +988,10 @@ void Player::DebugPlayerReset()
 void Player::Finalize()
 {
 	// パーティクルエフェクトの解放
+	if (moveEffect_) {
+		moveEffect_->Stop();
+		moveEffect_.reset();
+	}
 	if (dashSmokeEffect_) {
 		dashSmokeEffect_->Stop();
 		dashSmokeEffect_.reset();
