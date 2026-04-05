@@ -10,7 +10,7 @@ public:
 	/// <summary>
 	/// インスタンスの取得
 	/// </summary>
-	static SpriteCommon& GetInstance();
+	static SpriteCommon* GetInstance();
 	/// <summary>
 	/// インスタンスの削除
 	/// </summary>
@@ -28,6 +28,11 @@ public:		// メンバ関数
 	/// 共通描画設定
 	/// </summary>
 	void DrawSettingCommon();
+
+	/// <summary>
+	/// 終了処理
+	/// </summary>
+	void Finalize();
 public:		//	Getter,Setter
 	/// <summary>
 	/// DirectXCommon取得関数

@@ -22,6 +22,20 @@ void Object3DCommon::DrawSettingCommon()
 	dxCommon_->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
 }
 
+void Object3DCommon::Finalize()
+{
+	// 既に解放済みなら何もしない
+	if (!dxCommon_) { return; }
+
+	graphicsPipelineState.Reset();
+	rootSignature.Reset();
+	vertexShaderBlob.Reset();
+	pixelShaderBlob.Reset();
+
+	defaultCamera = nullptr;
+	dxCommon_ = nullptr;
+}
+
 
 void Object3DCommon::CreateRootSignature()
 {
@@ -198,7 +212,11 @@ Object3DCommon* Object3DCommon::GetInstance() {
 	return instance;
 }
 
-void Object3DCommon::DeleteInstance() {
-	delete instance;
-	instance = nullptr;
+void Object3DCommon::DeleteInstance() 
+{
+	if (instance) {
+		instance->Finalize();
+		delete instance;
+		instance = nullptr;
+	}
 }

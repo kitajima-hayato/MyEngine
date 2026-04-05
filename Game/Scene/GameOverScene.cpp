@@ -130,7 +130,7 @@ void GameOverScene::Update()
 		default:
 			break;
 		}
-		return; 
+		return;
 	}
 	oneMore_->SetSize(oneMoreBaseSize_);
 	select_->SetSize(selectBaseSize_);
@@ -141,12 +141,12 @@ void GameOverScene::Update()
 	Input* input = Input::GetInstance();
 
 	// F1でデバッグカメラON/OFF
-	if (input->TriggerKey(DIK_F1)) {
+	if (input->TriggerKey(DIK_1)) {
 		isDebugCameraActive_ = !isDebugCameraActive_;
 	}
 
 	// F2で速度切り替え
-	if (input->TriggerKey(DIK_F2)) {
+	if (input->TriggerKey(DIK_2)) {
 		isFastMoveMode_ = !isFastMoveMode_;
 	}
 
@@ -154,6 +154,8 @@ void GameOverScene::Update()
 	if (isDebugCameraActive_) {
 		UpdateDebugCamera();
 	}
+
+
 #endif
 	// 選択中だけ少し大きく
 	auto Scale = [](const Vector2& v, float s) { return Vector2{ v.x * s, v.y * s }; };
@@ -171,18 +173,7 @@ void GameOverScene::Update()
 	default:
 		break;
 	}
-	// タイトルへ戻る (1)
-	if (Input::GetInstance()->TriggerKey(DIK_1)) {
-		SceneManager::GetInstance()->ChangeScene("TITLE");
-	}
-	// ステージセレクトへ戻る (2)
-	else if (Input::GetInstance()->TriggerKey(DIK_2)) {
-		SceneManager::GetInstance()->ChangeScene("STAGESELECT");
-	}
-	// ゲームプレイへ戻る (3)
-	else if (Input::GetInstance()->TriggerKey(DIK_3)) {
-		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
-	}
+
 	// カメラの更新
 	camera->Update();
 
@@ -223,17 +214,20 @@ void GameOverScene::Update()
 
 void GameOverScene::Draw()
 {
+	// 背景の一括描画
 	backGround->Draw();
-	backBlack->Draw(); 
+	// 黒背景の描画
+	backBlack->Draw();
+	// プレイヤーの描画
 	if (isPlayerVisible_) {
 		PlayerModel->Draw();
 	}
-
+	// ゲームオーバーUIの描画
 	gameOverUI->Draw();
-
+	// 操作キーUIの描画
 	keyIcon_AD->Draw();
-
 	keyIcon_Space->Draw();
+	// 選択項目UIの描画
 	oneMore_->Draw();
 	select_->Draw();
 	title_->Draw();
@@ -252,32 +246,19 @@ void GameOverScene::DrawImgui()
 {
 #ifdef USE_IMGUI
 
-	// カメラの座標をimguiで編集できるようにする
-	ImGui::Begin("DebugCamera");
-
-	ImGui::Text("Debug Camera : %s", isDebugCameraActive_ ? "ON" : "OFF");
-	ImGui::Text("Speed Mode   : %s", isFastMoveMode_ ? "FAST" : "NORMAL");
-	ImGui::Text("F1 : Toggle Debug Camera");
-	ImGui::Text("F2 : Toggle Speed Mode");
-
-	ImGui::DragFloat3("CameraPos", &cameraTransform.translate.x, 0.1f);
-	ImGui::DragFloat3("CameraRot", &cameraTransform.rotate.x, 0.01f);
-
-	cameraTransform.translate = camera->GetTranslate();
-	cameraTransform.rotate = camera->GetRotate();
-	ImGui::DragFloat3("Translate", &cameraTransform.translate.x, 0.1f);
-	ImGui::DragFloat3("Rotate", &cameraTransform.rotate.x, 0.1f);
-
-	camera->SetTranslate(cameraTransform.translate);
-	camera->SetRotate(cameraTransform.rotate);
-
-
-
-	ImGui::End();
 	// カメラの調整
-	// カメラの配置情報の変更
-	ImGui::Begin("Camera Transform");
-	cameraTransform = { {0.0f,0.0f,0.0f}, camera->GetRotate(),camera->GetTranslate() };
+	ImGui::Begin("DebugCamera");
+	// デバックカメラの機能状態
+	ImGui::Text("1 : DebugCamera ON / Off");
+	ImGui::Text("2 : DebugCamera FastMoveMode ON / Off");
+	ImGui::Text("DebugCamera : %s", isDebugCameraActive_ ? "ON" : "OFF");
+	ImGui::Text("DebugCamera FastMode : %s", isFastMoveMode_ ? "ON" : "OFF");
+
+	// カメラのTransformを取得
+	cameraTransform = {
+		{0.0f,0.0f,0.0f},
+		camera->GetRotate(),
+		camera->GetTranslate() };
 	ImGui::DragFloat3("Camera Rotate", &cameraTransform.rotate.x, 0.1f);
 	ImGui::DragFloat3("Camera Translate", &cameraTransform.translate.x, 0.1f);
 
@@ -479,7 +460,7 @@ void GameOverScene::UpdatePlayerDropIntro(float dt)
 			vy_ = 0.0f;
 			isDropIntroRunning_ = false;
 			playerAnimTr_ = playerFinalTr_;
-			
+
 			StartPlayerShrinkSpin();
 		}
 	}
@@ -498,8 +479,6 @@ void GameOverScene::StartPlayerShrinkSpin()
 	// バウンドが終わった瞬間の姿勢から開始
 	playerOutroState_ = PlayerOutroState::ShrinkSpin;
 
-	// もし「最終姿勢にピタッとしてから」縮小させたいならこれもOK
-	// playerAnimTr_ = playerFinalTr_;
 }
 
 void GameOverScene::UpdatePlayerShrinkSpin(float dt)

@@ -89,8 +89,8 @@ void BackGround::Initialize()
 	setting.objectCount = 100;
 	setting.spawnRangeInterval = 0.8f;
 
-	setting.minScale = { 1.0f, 1.0f, 1.0f };
-	setting.maxScale = { 1.0f, 1.0f, 1.0f };
+	setting.minScale = { 0.5f, 0.5f, 1.0f };
+	setting.maxScale = { 1.5f, 1.5f, 1.0f };
 
 	setting.minRotation = { 0.0f, -0.1f, 0.0f };
 	setting.maxRotation = { 0.0f, 0.1f, 0.0f };

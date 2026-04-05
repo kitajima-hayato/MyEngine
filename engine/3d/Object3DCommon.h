@@ -15,6 +15,11 @@ public:	// メンバ関数
 	/// 共通描画設定
 	/// </summary>
 	void DrawSettingCommon();
+
+	/// <summary>
+	/// 明示的な終了処理
+	/// </summary>
+	void Finalize();
 public:	// Getter/Setter
 	/// <summary>
 	/// DirectXCommonの取得
