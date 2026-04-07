@@ -1,6 +1,8 @@
 #include "GamePlayHUD.h"
 #include "Input.h"
 #include "ImGuiManager.h"
+#include "Game/Application/Player/Player.h"
+
 void GamePlayHUD::Initialize()
 {
 	// ポーズアイコン
@@ -22,6 +24,25 @@ void GamePlayHUD::Initialize()
 
 	UiActive_ = false;
 	uiTimer = 0;
+
+	// 右上に配置するために開始座標を計算
+	const float totalWidth =
+		maxHp_ * heartSize_.x + (maxHp_ - 1) * heartSpacingX_;
+
+	heartStartPos_.x = screenSize_.x - heartMargin_.x - totalWidth;
+	heartStartPos_.y = heartMargin_.y;
+
+	// ハート生成
+	hpHearts_.clear();
+	hpHearts_.reserve(maxHp_);
+
+	for (uint32_t i = 0; i < maxHp_; ++i) {
+		Vector2 pos = heartStartPos_;
+		pos.x += i * (heartSize_.x + heartSpacingX_);
+
+		auto heart = MakeSprite(heartTexturePath_, pos, heartSize_, heartActiveColor_);
+		hpHearts_.push_back(std::move(heart));
+	}
 	
 }
 
@@ -33,11 +54,12 @@ void GamePlayHUD::Update()
 	controlUI_A->Update();
 	controlUI_S->Update();
 	controlUI_W->Update();
-	
+	// 操作UIの更新
 	UpdateControlUI();
-	
-	
-	
+	// HP表示の更新
+	for (auto& h : hpHearts_) {
+		if (h) { h->Update(); }
+	}
 }
 
 void GamePlayHUD::UpdateControlUI()
@@ -55,6 +77,7 @@ void GamePlayHUD::UpdateControlUI()
 		// 元の位置に戻す
 		controlUI_D->SetPosition({ 200.0f,70.0f });
 	}
+	// A
 	 if (Input::GetInstance()->PushKey(DIK_A)) {
         controlUI_A->SetColor(activeColor_);
         controlUI_A->SetPosition({ 100.0f - pressedOffset_, 70.0f });
@@ -100,7 +123,22 @@ void GamePlayHUD::Draw(bool isPaused, bool showControls)
 		controlUI_S->Draw();
 		controlUI_W->Draw();
 	}
-	pauseSprite_->Draw();
+	
+	// HP表示（Playerがセットされている前提）
+	if (player_) {
+		const uint32_t hp = player_->GetHealth();
+
+		for (uint32_t i = 0; i < hpHearts_.size(); ++i) {
+			if (!hpHearts_[i]) continue;
+
+			if (i < hp) {
+				hpHearts_[i]->SetColor(heartActiveColor_);
+			} else {
+				hpHearts_[i]->SetColor(heartInactiveColor_);
+			}
+			hpHearts_[i]->Draw();
+		}
+	}
 }
 
 void GamePlayHUD::DrawImGui()

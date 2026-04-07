@@ -69,6 +69,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 
 	gamePlayHUD_ = std::make_unique<GamePlayHUD>();
 	gamePlayHUD_->Initialize();
+	gamePlayHUD_->SetPlayer(player.get());
 
 	startCam_ = std::make_unique<StartCamPhase>();
 	startCam_->Initialize();

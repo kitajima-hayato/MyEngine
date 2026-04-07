@@ -3,6 +3,8 @@
 #include "engine/2d/Sprite.h"
 #include "engine/math/MyMath.h"
 
+class Player;
+
 class GamePlayHUD
 {
 public:
@@ -44,8 +46,19 @@ public:
 	/// </summary>
 	std::unique_ptr<Sprite> MakeSprite(const std::string& path, const Vector2& pos, const Vector2& size, const Vector4 color);
 
+	/// <summary>
+	/// プレイヤーのポインタをセット
+	/// </summary>
+	void SetPlayer(Player* player) { player_ = player; }
 
+	/// <summary>
+	/// 
+	/// </summary>
+	void SetScreenSize(float w, float h) { screenSize_ = { w, h }; }
 private:
+	// プレイヤーのポインタ
+	Player* player_ = nullptr;
+
 	// 操作UI
 	// DキーUI
 	std::unique_ptr<Sprite> controlUI_D;
@@ -78,6 +91,24 @@ private:
 
 	// 押された時のオフセット量
 	float pressedOffset_ = 5.0f;
+
+	// HP表示用のハートスプライト
+	std::vector<std::unique_ptr<Sprite>> hpHearts_;
+	uint32_t maxHp_ = 3;
+	// ハートの配置開始位置とサイズ、間隔
+	Vector2 heartStartPos_ = { 20.0f, 90.0f };
+	Vector2 heartSize_ = { 60.0f, 60.0f };
+	float heartSpacingX_ = 8.0f;
+	// ハートの色
+	Vector4 heartActiveColor_ = { 1,1,1,1 };
+	Vector4 heartInactiveColor_ = { 1,1,1,0.2f }; 
+
+	// ハートのテクスチャパス
+	std::string heartTexturePath_ = "resources/GamePlay/HP/HPUI.png";
+
+	// 画面サイズ（UI配置の基準）
+	Vector2 screenSize_ = { 1280.0f, 720.0f }; 
+	Vector2 heartMargin_ = { 20.0f, 20.0f };   
 
 	
 };
