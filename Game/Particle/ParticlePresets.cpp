@@ -132,3 +132,50 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSummonCircle(const Vector
 
 	return ps;
 }
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create("JumpDust",
+		"resources/Effects/Particles/Textures/smoke.dds");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::JumpDust);
+
+	ps->SetLoop(false);
+
+	// 短い間だけ、1回だけ出すイメージにする
+	ps->SetEmissionRate(10.0f);       
+	ps->SetBurstCount(10);             
+
+	ps->GetMainModule().duration = 0.12f;
+	ps->GetMainModule().startLifetime = 0.25f;
+
+	// 砂色（少し薄め）
+	ps->SetColor(Vector4(0.78f, 0.70f, 0.52f, 0.80f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateLandDust(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create("LandDust",
+		"resources/Effects/Particles/Textures/smoke.dds");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::LandDust);
+
+	ps->SetLoop(false);
+
+	ps->SetEmissionRate(20.0f);
+	ps->SetBurstCount(6);              
+
+	ps->GetMainModule().duration = 0.12f;
+	ps->GetMainModule().startLifetime = 0.20f;
+
+	// 色は最後の微調整
+	ps->SetColor(Vector4(1.0f, 1.0f, 1.0f, 0.95f));
+
+	ps->Pause();
+	return ps;
+}

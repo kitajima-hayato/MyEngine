@@ -12,34 +12,43 @@ struct PixelShaderOutput
     float4 color : SV_TARGET0;
 };
 
-
 cbuffer MaterialBuffer : register(b0)
 {
     Material gMaterial;
-};
+}
 
-Texture2D<float4> gTexture : register(t1); // SRVのregisterはt
-SamplerState gSampler : register(s0); // Samplerのregisterはs
-
-
+Texture2D<float4> gTexture : register(t1);
+SamplerState gSampler : register(s0);
 
 PixelShaderOutput main(VertexShaderOutput input)
 {
     PixelShaderOutput output;
-    output.color = float4(0.0f, 0.0f, 0.0f, 1.0f); // 初期化
 
-    float4 transformedUV = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform);
-    float4 textureColor = gTexture.Sample(gSampler, transformedUV.xy);
-    output.color = gMaterial.color * textureColor * input.color;
+    float2 uv = mul(float4(input.texcoord, 0.0f, 1.0f), gMaterial.uvTransform).xy;
+    float4 tex = gTexture.Sample(gSampler, uv);
+
+    // 明るさ（黒地のテクスチャ用）
+    float luminance = max(tex.r, max(tex.g, tex.b));
+
+    const float cutStart = 0.03f;
+    const float cutEnd = 0.15f;
+    float keyAlpha = smoothstep(cutStart, cutEnd, luminance);
+
+    float4 col = gMaterial.color * tex * input.color;
     
-   
-    if (output.color.a == 0.0f)
+
+    // 黒抜きで作ったαを適用
+    col.a *= keyAlpha;
+     // Premultiplied Alpha：RGBにαを掛ける（黒フチ対策の本体）
+    col.rgb *= col.a;
+
+    if (col.a <= 0.001f)
     {
         discard;
     }
-    //else
-    //{
-    //    output.color = gMaterial.color * textureColor;
-    //}
+
+   
+
+    output.color = col;
     return output;
 }

@@ -203,7 +203,7 @@ enum BlendMode {
     //!< ブレンド無し
     kBlendModeNone,
     //!< 通常αブレンド デフォルト src * srcA + Dest * ( 1 - srcA )
-    kBelendModeNormal,
+    kBlendModeNormal,
     //!< 加算 src * srcA + Dest * 1;
     kBlendModeAdd,
     //!< 減算 Dest * 1 - src * srcA 
