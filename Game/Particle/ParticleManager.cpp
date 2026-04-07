@@ -20,12 +20,12 @@ ParticleManager* ParticleManager::GetInstance()
 
 void ParticleManager::DeleteInstance()
 {
-	if (instance){
+	if (instance) {
 		instance->Finalize();
 		delete instance;
 		instance = nullptr;
 	}
-	
+
 }
 
 void ParticleManager::Finalize()
@@ -117,20 +117,20 @@ void ParticleManager::CreateRootSignature()
 {
 	D3D12_DESCRIPTOR_RANGE descriptorRange[1] = {};
 	descriptorRange[0].BaseShaderRegister = 0; // t0
-	descriptorRange[0].NumDescriptors = 1; 
+	descriptorRange[0].NumDescriptors = 1;
 	descriptorRange[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; // SRV
 	descriptorRange[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // Offsetを自動計算
 
 	D3D12_DESCRIPTOR_RANGE descriptorRangeTexture[1] = {};
 	descriptorRangeTexture[0].BaseShaderRegister = 1; // t1始まる
-	descriptorRangeTexture[0].NumDescriptors = 1; 
+	descriptorRangeTexture[0].NumDescriptors = 1;
 	descriptorRangeTexture[0].RangeType = D3D12_DESCRIPTOR_RANGE_TYPE_SRV; // SRV
 	descriptorRangeTexture[0].OffsetInDescriptorsFromTableStart = D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND; // Offsetを自動計算
 
 	D3D12_ROOT_PARAMETER rootParameters[3] = {};
 
 
-	// RootParameter作成。複数設定できるので配列。
+	// RootParameter作成。複数設定できるので配列
 	// 0.Material
 	rootParameters[0].ParameterType = D3D12_ROOT_PARAMETER_TYPE_CBV;
 	rootParameters[0].Descriptor.ShaderRegister = 0;
@@ -149,9 +149,9 @@ void ParticleManager::CreateRootSignature()
 
 	// Samplerの設定
 	staticSamplers[0].Filter = D3D12_FILTER_MIN_MAG_MIP_LINEAR; // バイリニアフィルタ
-	staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_WRAP; // 0~1の範囲外をリピート
-	staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
-	staticSamplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_WRAP;
+	staticSamplers[0].AddressU = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	staticSamplers[0].AddressV = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
+	staticSamplers[0].AddressW = D3D12_TEXTURE_ADDRESS_MODE_CLAMP;
 	staticSamplers[0].ComparisonFunc = D3D12_COMPARISON_FUNC_NEVER; // 比較しない
 	staticSamplers[0].MaxLOD = D3D12_FLOAT32_MAX; // ありったけのMipmapを使う
 	staticSamplers[0].ShaderRegister = 0; // レジスタ番号0を使う
@@ -208,11 +208,11 @@ void ParticleManager::CreateRootSignature()
 	blendDesc.RenderTarget[0].BlendEnable = true;
 
 	SetBlendMode(blendDesc, blendMode);
-	currentBlendMode = BlendMode::kBlendModeAdd;  // 現在のブレンドモード
+	//currentBlendMode = BlendMode::kBlendModeAdd;  // 現在のブレンドモード
 	// α値のブレンド
 	blendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
 	blendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
-	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_ZERO;
+	blendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
 	// RasterizerStateの設定
 	// カリングなし
 	rasterizerDesc.CullMode = D3D12_CULL_MODE_NONE;
@@ -271,6 +271,11 @@ void ParticleManager::SetBlendMode(D3D12_BLEND_DESC& desc, BlendMode mode)
 {
 	switch (mode)
 	{
+	case kBlendModeNormal: // 
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
+		break;
 	case kBlendModeAdd:
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
@@ -366,7 +371,7 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 
 	particleGroup.textureSrvIndex = TextureManager::GetInstance()->GetSrvIndex(particleGroup.materialData.textureFilePath);
 
-	
+
 	particleGroup.instancingResource = dxCommon->CreateBufferResource(sizeof(ParticleForGPU) * kMaxParticle);
 
 	// インスタンシング用のリソースを作成
@@ -374,12 +379,12 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 	// 書き込むためのアドレスを取得
 	particleGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&particleGroup.instancingData));
 
-	
+
 
 	srvManager->CreateSRVforStructuredBuffer(
-		particleGroup.instancingSrvIndex, 
-		particleGroup.instancingResource.Get(), 
-		kMaxParticle, 
+		particleGroup.instancingSrvIndex,
+		particleGroup.instancingResource.Get(),
+		kMaxParticle,
 		sizeof(ParticleForGPU));
 
 	// インスタンス数を初期化
@@ -464,7 +469,7 @@ void ParticleManager::UpdateParticle()
 
 void ParticleManager::Draw()
 {
-	
+
 	// コマンド : パイプラインステートオブジェクトを設定
 	dxCommon->GetCommandList()->SetPipelineState(graphicsPipelineState.Get());
 	// コマンド : プリミティブトロポジ(描画形状)を設定
@@ -479,8 +484,8 @@ void ParticleManager::Draw()
 
 	// 全てのパーティクルグループについて処理
 	for (auto& [name, particleGroup] : particleGroups)
-	{ 
-		if(particleGroup.kNumInstance == 0)
+	{
+		if (particleGroup.kNumInstance == 0)
 		{
 			continue;
 		}
@@ -494,9 +499,9 @@ void ParticleManager::Draw()
 		//srvManager->SetGraphicsDescriptorTable(1, particleGroup.instancingSrvIndex);
 
 		// シェーダリソースビューの設定
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2, 
+		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2,
 			srvManager->GetGPUDescriptorHandle(particleGroup.textureSrvIndex));
-		
+
 		// 描画
 		dxCommon->GetCommandList()->DrawInstanced(6, particleGroup.kNumInstance, 0, 0);
 	}
@@ -658,7 +663,7 @@ Particle ParticleManager::MakeSmokeParticle(std::mt19937& randomEngine, const Ve
 	std::uniform_real_distribution<float> distPosition(-0.3f, 0.3f);
 	std::uniform_real_distribution<float> distUpSpeed(0.3f, 0.8f);    // 上昇速度
 	std::uniform_real_distribution<float> distSideSpeed(-0.2f, 0.2f); // 横の揺れ
-	std::uniform_real_distribution<float> distLifetime(0.5f, 1.0f);   
+	std::uniform_real_distribution<float> distLifetime(0.5f, 1.0f);
 
 	// 主に上方向に移動
 	particle.velocity = {
@@ -777,6 +782,65 @@ Particle ParticleManager::MakeMagicCircleParticle(
 	return particle;
 }
 
+Particle ParticleManager::MakeJumpDustParticle(std::mt19937& randomEngine, const Vector3& position)
+{
+	Particle p;
+
+	// 足元から少しだけ散る
+	std::uniform_real_distribution<float> distX(-0.3f, 0.12f);
+	std::uniform_real_distribution<float> distSpeedX(-0.35f, 0.35f);
+	std::uniform_real_distribution<float> distSpeedY(0.25f, 0.65f);
+	std::uniform_real_distribution<float> distScale(0.10f, 0.16f);
+	std::uniform_real_distribution<float> distLife(0.12f, 0.22f);
+	// スケール（小さめでランダム）
+	const float s = distScale(randomEngine);
+	p.transform.scale = { s, s, s };
+	p.transform.rotate = { 0.0f, 0.0f, 0.0f };
+
+	// 位置（足元の周りに少し散らす）
+	p.transform.translate = position + Vector3{ distX(randomEngine), 0.02f, 0.0f };
+
+	// 速度（少しだけ上＋左右）
+	p.velocity = { distSpeedX(randomEngine), distSpeedY(randomEngine), 0.0f };
+
+	// 色（砂埃：薄い黄土色系）
+	p.color = { 0.85f, 0.78f, 0.60f, 1.0f };
+
+	p.lifeTime = distLife(randomEngine);
+	p.currentTime = 0.0f;
+
+	return p;
+}
+
+
+Particle ParticleManager::MakeLandDustParticle(std::mt19937& randomEngine, const Vector3& position)
+{
+
+	Particle p;
+
+	std::uniform_real_distribution<float> distX(-0.4f, 0.22f);
+	std::uniform_real_distribution<float> distSpeedX(-1.8f, 1.8f);
+	std::uniform_real_distribution<float> distSpeedY(0.12f, 0.40f);
+	std::uniform_real_distribution<float> distScale(0.12f, 0.24f);
+	std::uniform_real_distribution<float> distLife(0.18f, 0.35f);
+
+	const float s = distScale(randomEngine);
+	p.transform.scale = { s, s, s };
+	p.transform.rotate = { 0.0f, 0.0f, 0.0f };
+
+	p.transform.translate = position + Vector3{ distX(randomEngine), 0.02f, 0.0f };
+
+	p.velocity = { distSpeedX(randomEngine), distSpeedY(randomEngine), 0.0f };
+
+	// 砂色（αは控えめに）
+	p.color = { 0.82f, 0.74f, 0.58f, 0.85f };
+
+	p.lifeTime = distLife(randomEngine);
+	p.currentTime = 0.0f;
+
+	return p;
+}
+
 void ParticleManager::CreateRingVertex()
 {
 	std::vector<VertexData> vertices;
@@ -877,6 +941,7 @@ void ParticleManager::DrawRing()
 	cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
 
 }
+
 
 Particle ParticleManager::MakeRingEffect(const Vector3& position) {
 	Particle particle;
@@ -1016,25 +1081,32 @@ void ParticleManager::DrawCylinder()
 
 void ParticleManager::EnsureParticleGroup(const std::string& name, const std::string& textureFilePath)
 {
+	// パーティクルグループが存在しない場合は作成
 	if (!HasParticleGroup(name))
 	{
+		// パーティクルグループを作成
 		CreateParticleGroup(name, textureFilePath);
 	}
 }
 
 Particle ParticleManager::MakeParticleByType(std::mt19937& randomEngine, const Vector3& position, EffectType type)
 {
+	// EffectTypeに応じて適切なパーティクルを生成
 	switch (type)
 	{
-		case EffectType::Explosion:
-			return MakeExplosionParticle(randomEngine, position);
-		case EffectType::Smoke:
-			return MakeSmokeParticle(randomEngine, position);
-		case EffectType::Spark:
-			return MakeSparkParticle(randomEngine, position);
-		case EffectType::Default:
-			default:
-				return MakeParticle(randomEngine, position);
+	case EffectType::Explosion:
+		return MakeExplosionParticle(randomEngine, position);
+	case EffectType::Smoke:
+		return MakeSmokeParticle(randomEngine, position);
+	case EffectType::Spark:
+		return MakeSparkParticle(randomEngine, position);
+	case EffectType::JumpDust:
+		return MakeJumpDustParticle(randomEngine, position);
+	case EffectType::LandDust:
+		return MakeLandDustParticle(randomEngine, position);
+	case EffectType::Default:
+	default:
+		return MakeParticle(randomEngine, position);
 	}
 }
 
@@ -1056,6 +1128,12 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 		break;
 	case EffectType::Spark:
 		particle = MakeSparkParticle(randomEngine, position);
+		break;
+	case EffectType::JumpDust:
+		particle = MakeJumpDustParticle(randomEngine, position);
+		break;
+	case EffectType::LandDust:
+		particle = MakeLandDustParticle(randomEngine, position);
 		break;
 	case EffectType::Default:
 	default:

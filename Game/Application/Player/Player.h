@@ -307,16 +307,32 @@ private:
 	void StompEnemy(Collider* enemy);
 	
 	/// <summary>
-	/// 
+	/// ダメージブロックに触れているかの判定
 	/// </summary>
 	/// <returns></returns>
 	bool IsTouchingDamageBlock();
 
 	/// <summary>
-	/// 
+	/// ダメージブロックに触れているかの追跡とダメージ処理
 	/// </summary>
 	/// <returns></returns>
 	bool IsTouchingHazardSpike()const;
+
+	/// <summary>
+	/// ジャンプ開始のパーティクルの発生
+	/// </summary>
+	void EmitJumpParticle();
+
+	/// <summary>
+	/// 着地時のパーティクルの発生
+	/// </summary>
+	void EmitLandParticle();
+
+	/// <summary>
+	/// 足元の発生位置
+	/// </summary>
+	/// <returns>パーティクルを発生させる足元の位置</returns>
+	Vector3 GetFootParticlePos() const;
 
 	
 public:	/// Setter / Getter
@@ -452,5 +468,10 @@ private:	// メンバ変数
 
 	// 通常移動のパーティクルが再生中か
 	bool wasMoving_ = false;
+
+	// ジャンプの開始と着地時のパーティクル
+	std::unique_ptr<ParticleSystem> jumpEffect_;
+	std::unique_ptr<ParticleSystem> landEffect_;
+
 };
 

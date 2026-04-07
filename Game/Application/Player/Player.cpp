@@ -212,6 +212,42 @@ bool Player::IsTouchingHazardSpike() const
 	return false;
 }
 
+void Player::EmitJumpParticle()
+{
+	jumpEffect_->SetTranslate(GetFootParticlePos());
+	jumpEffect_->Play();
+}
+
+void Player::EmitLandParticle()
+{
+	// 足元にパーティクルを出す
+	if (!landEffect_ || !playerModel_) { return; }
+	// 足元の位置を取得
+	Vector3 base = GetFootParticlePos();
+
+	// 左右に少しずらして2回
+	landEffect_->SetTranslate(base + Vector3{ -0.20f, 0.0f, 0.0f });
+	landEffect_->Play();
+
+	landEffect_->SetTranslate(base + Vector3{ +0.20f, 0.0f, 0.0f });
+	landEffect_->Play();
+}
+
+Vector3 Player::GetFootParticlePos() const
+{
+	Vector3 p = playerModel_->GetTranslate();
+
+	// AABBの一番下（足元）に合わせる
+	const AABB aabb = GetAABB();
+	p.y = aabb.min.y;
+
+	// 地面に少しだけめり込ませる（見た目が安定する）
+	p.y += 0.02f;
+
+	// 2D寄りならZはそのままでOK。必要なら少し手前に出す等も可
+	return p;
+}
+
 void Player::Respawn(const Vector3& pos)
 {
 	velocity_ = {};
@@ -475,6 +511,11 @@ void Player::Initialize(Vector3 position)
 	stompEffect_->SetEmissionRate(30.0f);
 	stompEffect_->SetLoop(false);
 	stompEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+	// ジャンプの開始と着地のパーティクル
+	jumpEffect_ = ParticlePresets::CreateJumpDust(position);
+	landEffect_ = ParticlePresets::CreateLandDust(position);
+
 }
 
 
@@ -507,6 +548,9 @@ void Player::Update()
 	if (dashSmokeEffect_)dashSmokeEffect_->Update();
 	if (dashStartEffect_)dashStartEffect_->Update();
 	if (stompEffect_)stompEffect_->Update();
+
+	if (jumpEffect_)jumpEffect_->Update();
+	if (landEffect_)landEffect_->Update();
 }
 
 
@@ -720,8 +764,14 @@ void Player::Jump()
 	if (onGround_) {
 		// ジャンプキーが押されたら
 		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+			// ジャンプの開始エフェクトの発生
+			EmitJumpParticle();
+
 			// ジャンプ処理 / ジャンプ距離を縦のスピードに入れる
 			velocity_.y = status_.kJumpPower;
+
+			// 空中にいる状態にする
+			onGround_ = false;
 		}
 	} else {
 		// 重力適応処理
@@ -809,6 +859,10 @@ void Player::LandingCollisionMove(CollisionMapInfo& collisionInfo)
 		// 床に衝突したら移動量を調整
 		velocity_.y = 0.0f;
 		onGround_ = true;
+
+		// 着地エフェクトの発生
+		EmitLandParticle();
+
 		return;  // 着地したらここで終了
 	}
 
@@ -1049,6 +1103,14 @@ void Player::Finalize()
 	if (stompEffect_) {
 		stompEffect_->Stop();
 		stompEffect_.reset();
+	}
+	if (jumpEffect_) {
+		jumpEffect_->Stop();
+		jumpEffect_.reset();
+	}
+	if (landEffect_) {
+		landEffect_->Stop();
+		landEffect_.reset();
 	}
 }
 

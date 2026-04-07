@@ -49,5 +49,17 @@ public:
     /// 召喚魔法陣（下から上へエネルギーが上がる）
     /// </summary>
 	static std::unique_ptr<ParticleSystem> CreateSummonCircle(const Vector3& position = { 0, 0, 0 });
+
+	/// <summary>
+	/// ジャンプ始まりの足元の砂埃エフェクト
+	/// </summary>
+	static std::unique_ptr<ParticleSystem>CreateJumpDust(const Vector3& position = { 0, 0, 0 });
+
+	/// <summary>
+	/// 着地の足元の砂埃エフェクト
+	/// </summary>
+	/// <param name="position"></param>
+	/// <returns></returns>
+	static std::unique_ptr<ParticleSystem>CreateLandDust(const Vector3& position = { 0, 0, 0 });
 };
 
