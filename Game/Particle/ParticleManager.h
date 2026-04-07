@@ -33,6 +33,8 @@ public:
 		Smoke,			// 煙
 		Spark,			// 火花
 		MagicCircle,	// 魔法陣
+		JumpDust,		// ジャンプダスト
+		LandDust,		// 着地ダスト
 	};
 
 	/// <summary>
@@ -219,6 +221,18 @@ public:
 	/// <returns>パーティクルを返す</returns>
 	Particle MakeMagicCircleParticle(std::mt19937& randomEngine,const Vector3& position,float angle,float radius);
 
+	/// <summary>
+	/// ジャンプダストパーティクル生成
+	/// </summary>
+	Particle MakeJumpDustParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
+	/// 着地ダストパーティクル生成
+	/// </summary>
+	/// <param name="randomEngine">乱数</param>
+	/// <param name="position">発生位置</param>
+	/// <returns>パーティクル情報</returns>
+	Particle MakeLandDustParticle(std::mt19937& randomEngine, const Vector3& position);
 
 	/// <summary>
 	/// Ringエフェクト

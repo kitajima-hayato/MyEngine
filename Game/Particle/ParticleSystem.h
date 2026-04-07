@@ -85,7 +85,7 @@ public:
 	/// </summary>
 	void Emit(uint32_t count);
 
-	
+
 
 
 public:	// Getter / Setter
@@ -198,8 +198,11 @@ public:	// Getter / Setter
 	/// <returns>現在のカラーの取得</returns>
 	Vector4 GetColorOverride()const { return colorOverride; }
 
-
-
+	/// <summary>
+	/// エミッション頻度の設定・取得
+	/// </summary>
+	/// <param name="count"></param>
+	void SetBurstCount(uint32_t count) { emitterData.count = (std::max)(1u, count); }
 
 public:	// モジュールへのアクセス
 	EmissionModule& GetEmissionModule() { return emission; }
@@ -245,7 +248,7 @@ private:
 	// 色のオーバーライド
 	Vector4 colorOverride = { 1.0f, 1.0f, 1.0f, 1.0f };
 	// 色のオーバーライドを使用するかどうか
-	bool useColorOverride = false; 
+	bool useColorOverride = false;
 
 	// モデルの向きの補正値
 	const float modelYawOffset = -1.570796326f;
