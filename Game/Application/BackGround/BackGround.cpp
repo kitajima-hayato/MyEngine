@@ -99,16 +99,17 @@ void BackGround::Initialize()
 
 	// 群れの設定値
 	// 群れの数
-	setting.clusterCountMin = 3;
-	setting.clusterCountMax = 5;
+	setting.clusterCountMin = 2;
+	setting.clusterCountMax = 4;
 	// 1群れ当たりの花の数
-	setting.clusterSizeMin = 3;
-	setting.clusterSizeMax = 5;
+	setting.clusterSizeMin = 4;
+	setting.clusterSizeMax = 8;
 	// 群れの広がり半径
-	setting.clusterRadiusMin = 3.0f;
-	setting.clusterRadiusMax = 5.0f;
+	setting.clusterRadiusMin = 1.5f;
+	setting.clusterRadiusMax = 3.0f;
 	// 単独で生える花の割合
-	setting.singleSpawnRatio = 0.4f;
+	setting.singleSpawnRatio = 0.1f;
+	setting.spawnRangeInterval = 0.4f;
 
 	setting.fixY = true;
 	setting.fixZ = true;
