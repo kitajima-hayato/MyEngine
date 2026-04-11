@@ -413,6 +413,7 @@
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
     <ClInclude Include="engine\3d\Object3DInstancingCommon.h" />
+    <ClInclude Include="Game\Application\Enemy\SpawnParams\EnemySpawnParams.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">

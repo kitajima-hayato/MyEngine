@@ -190,6 +190,7 @@
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationObject.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationInstanceData.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationSpawnSetting.h" />
+    <ClInclude Include="Game\Application\Enemy\SpawnParams\EnemySpawnParams.h" />
     <ClInclude Include="Game\Scene\GameOverScene.h" />
     <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />

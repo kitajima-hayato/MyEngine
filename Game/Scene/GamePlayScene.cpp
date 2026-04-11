@@ -302,57 +302,38 @@ void GamePlayScene::InitializeEnemy()
 
 void GamePlayScene::GenerateEnemy()
 {
-	// エネミーを一旦クリア
+	// 既存のエネミーをクリア
 	enemies.clear();
-
+	// マップからエネミーデータを取得
 	const EnemyLayerData& enemyLayerData = map->GetEnemyLayerData();
 	const auto& enemyData = enemyLayerData.enemyData;
-
+	// データの行数をマップの高さとする
 	const uint32_t mapHeight = static_cast<uint32_t>(enemyData.size());
-	for (uint32_t y = 0; y < mapHeight; y++) {
+	for (uint32_t y = 0; y < mapHeight; ++y) {
 		const uint32_t mapWidth = static_cast<uint32_t>(enemyData[y].size());
-		for (uint32_t x = 0; x < mapWidth; x++) {
+		for (uint32_t x = 0; x < mapWidth; ++x) {
+			// インデックスから敵の種類を取得
 			EnemyType type = enemyData[y][x];
-			// 敵の種類がNoneならスキップ
-			if (EnemyType::None == type) {
+			// Noneだったらスキップ
+			if (type == EnemyType::None) {
 				continue;
 			}
-
-			// 敵の生成
-			// EnemyTypeから敵の種類を特定して生成
-			std::string enemyId;
-			switch (type) {
-			case EnemyType::NormalEnemy:
-				enemyId = "NormalEnemy";
-				break;
-			case EnemyType::FlyingEnemy:
-				enemyId = "FlyingEnemy";
-				break;
-			case EnemyType::SideMoveFlyingEnemy:
-				enemyId = "SideMoveFlyingEnemy";
-				break;
-			case EnemyType::SideMoveEnemy:
-				enemyId = "SideMoveEnemy";
-				break;
-			default:
-				continue;
-			}
-
-			// ファクトリーでエネミーを生成
-			auto enemy = EnemyFactory::CreateEnemy(enemyId);
-			// 生成失敗チェック
-			if (!enemy) continue;
-			// エネミーの初期化
-			enemy->Initialize();
-			enemy->SetMapQuery(&mapCollisionQuery);
-			// マップ上の位置にセット
+			// インデックスからワールド座標に変換して、エネミーを生成
 			Vector3 enemyPos = map->GetMapChipPositionByIndex(x, y);
-			// オフセット
 			enemyPos.x += enemySpawnOffset_;
 			enemyPos.y -= enemySpawnOffset_;
-			enemy->SetTranslate(enemyPos);
-			// エネミーリストに追加
-			enemies.push_back(std::move(enemy));
+			// 生成に必要なパラメータをまとめる
+			EnemySpawnParams params;
+			params.type = type;
+			params.position = enemyPos;
+			params.mapQuery = &mapCollisionQuery;
+
+			// ファクトリーでエネミーを生成してリストに追加
+			auto enemy = EnemyFactory::CreateEnemy(params);
+			if (enemy) {
+				// 生成したらリストに追加
+				enemies.push_back(std::move(enemy));
+			}
 		}
 	}
 }
