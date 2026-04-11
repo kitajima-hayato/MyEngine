@@ -4,6 +4,7 @@
 #include "../Flying/FlyingEnemy.h"
 #include "../Flying/SideMoveFlyingEnemy.h"
 #include "../Ground/SideMoveEnemy.h"
+#include "../Ground/PatrolEnemy.h"
 
 std::unique_ptr<EnemyBase> EnemyFactory::CreateEnemy(const EnemySpawnParams& params)
 {
@@ -27,6 +28,9 @@ std::unique_ptr<EnemyBase> EnemyFactory::CreateEnemy(const EnemySpawnParams& par
 		// 左右に移動するエネミー
 		case EnemyType::SideMoveEnemy:
 			enemy = std::make_unique<SideMoveEnemy>();
+			break;
+			case EnemyType::PatrolEnemy:
+			enemy = std::make_unique<PatrolEnemy>();
 			break;
 		default:
 			Logger::Log("No EnemyType matched");
