@@ -9,4 +9,6 @@ enum class EnemyType {
 	SideMoveFlyingEnemy = 3,
 	SideMoveEnemy = 4,
 	PatrolEnemy = 5,
+	TimedDropEnemy = 6,
+	ReactiveDropEnemy = 7,
 };

@@ -135,9 +135,6 @@
     <ClCompile Include="engine\3d\SkyBox\SkyBox.cpp">
       <Filter>engine\3d\SkyBox</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\StageType.cpp">
-      <Filter>Game\Application\Map</Filter>
-    </ClCompile>
     <ClCompile Include="Game\Camera\CameraController.cpp">
       <Filter>Game\Camera</Filter>
     </ClCompile>
@@ -206,6 +203,9 @@
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
     <ClCompile Include="engine\3d\Object3DInstancingCommon.cpp" />
     <ClCompile Include="Game\Application\Enemy\Ground\PatrolEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -335,9 +335,6 @@
     <ClInclude Include="engine\3d\SkyBox\SkyBox.h">
       <Filter>engine\3d\SkyBox</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\StageType.h">
-      <Filter>Game\Application\Map</Filter>
-    </ClInclude>
     <ClInclude Include="Game\Application\ModelList.h">
       <Filter>Game</Filter>
     </ClInclude>
@@ -416,6 +413,9 @@
     <ClInclude Include="engine\3d\Object3DInstancingCommon.h" />
     <ClInclude Include="Game\Application\Enemy\SpawnParams\EnemySpawnParams.h" />
     <ClInclude Include="Game\Application\Enemy\Ground\PatrolEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />
+    <ClInclude Include="Game\Application\Enemy\Drop\TimedDropEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">

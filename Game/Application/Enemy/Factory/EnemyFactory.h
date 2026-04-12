@@ -12,6 +12,9 @@ class NormalEnemy;
 class FlyingEnemy;
 class SideMoveFlyingEnemy;
 class SideMoveEnemy;
+class PatrolEnemy;
+class TimedDropEnemy;
+class ReactiveDropEnemy;
 class EnemyFactory
 {
 public:

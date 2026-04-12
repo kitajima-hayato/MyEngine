@@ -327,6 +327,7 @@ void GamePlayScene::GenerateEnemy()
 			params.type = type;
 			params.position = enemyPos;
 			params.mapQuery = &mapCollisionQuery;
+			params.player = player.get();
 
 			// ファクトリーでエネミーを生成してリストに追加
 			auto enemy = EnemyFactory::CreateEnemy(params);
