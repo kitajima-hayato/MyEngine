@@ -516,11 +516,43 @@ void Player::Initialize(Vector3 position)
 	jumpEffect_ = ParticlePresets::CreateJumpDust(position);
 	landEffect_ = ParticlePresets::CreateLandDust(position);
 
+	// ジャンプブロックに乗っているときの上昇エフェクト / 初期状態は停止
+	jumpBlockArrowEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
+	jumpBlockArrowEffect_->Pause();
+
 }
 
 
 void Player::Update()
 {
+	// ジャンプブロックに乗っているか
+	bool onJumpBlockNow = onGround_ && IsOnJumpBlock();
+
+	// ジャンプブロックに乗っているときだけ上昇エフェクトを出す
+	if (jumpBlockArrowEffect_ && playerModel_) {
+		// 上昇エフェクトの発生位置
+		Vector3 effectPosition = playerModel_->GetTranslate();
+		effectPosition.z -= 0.5f;
+		// プレイヤーの周りに出す
+		jumpBlockArrowEffect_->SetTranslate(effectPosition);
+
+		// プレイヤーの頭上にエフェクトを出す / 乗っていたら
+		if (onJumpBlockNow) {
+			// プレイヤーの頭上にエフェクトを出す / 乗っていたら
+			if (!wasOnJumpBlock_) {
+				jumpBlockArrowEffect_->Play();
+			}
+		} 
+		// 乗っていないときはエフェクトを停止
+		else {
+			jumpBlockArrowEffect_->Pause();
+		}
+	}
+
+	// 前フレームの状態を保持
+	wasOnJumpBlock_ = onJumpBlockNow;
+
+	
 	if (isDying_) {
 		UpdateDeathDemo();
 		playerModel_->Update();
@@ -551,6 +583,9 @@ void Player::Update()
 
 	if (jumpEffect_)jumpEffect_->Update();
 	if (landEffect_)landEffect_->Update();
+	if (jumpBlockArrowEffect_)jumpBlockArrowEffect_->Update();
+	
+
 }
 
 
@@ -766,9 +801,15 @@ void Player::Jump()
 		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
 			// ジャンプの開始エフェクトの発生
 			EmitJumpParticle();
-
-			// ジャンプ処理 / ジャンプ距離を縦のスピードに入れる
-			velocity_.y = status_.kJumpPower;
+			
+			// ジャンプブロックの上にいたら高く跳ねる
+			if (IsOnJumpBlock()) {
+				velocity_.y = status_.kJumpBlockPower;
+			} 
+			// 通常のジャンプ
+			else {
+				velocity_.y = status_.kJumpPower;
+			}
 
 			// 空中にいる状態にする
 			onGround_ = false;
@@ -863,51 +904,41 @@ void Player::LandingCollisionMove(CollisionMapInfo& collisionInfo)
 		// 着地エフェクトの発生
 		EmitLandParticle();
 
-		return;  // 着地したらここで終了
+		return;
 	}
 
 	// 地面にいる場合の継続判定
 	if (onGround_) {
-		// 下方向に速度がない場合のみチェック（安定化）
+		// 
 		if (velocity_.y <= 0.0f) {
-			// 現在の座標で判定
 			Vector3 position = playerModel_->GetTranslate();
 
-			// 足元の2点の位置を取得
 			Vector3 leftBottom = CornerPosition(position, kLeftBottom);
 			Vector3 rightBottom = CornerPosition(position, kRightBottom);
 
-			// 少し下の位置でチェック（より確実に）
 			Vector3 checkOffset = Vector3(0.0f, -status_.kEpsilon * 2.0f, 0.0f);
 
-			// 左点の判定
 			IndexSet leftIndex = map_->GetMapChipIndexSetByPosition(leftBottom + checkOffset);
 			BlockType leftBlock = map_->GetMapChipTypeByIndex(leftIndex.xIndex, leftIndex.yIndex);
 
-			// 右点の判定
 			IndexSet rightIndex = map_->GetMapChipIndexSetByPosition(rightBottom + checkOffset);
 			BlockType rightBlock = map_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
 
-
-			// 両方の点が地面から離れた場合のみ、地面から離れたとする
 			if (!IsHitBlockTable(leftBlock) && !IsHitBlockTable(rightBlock)) {
 				onGround_ = false;
 			}
 
-			// ゴールブロックの判定
 			if (IsHitGoalBlockTable(leftBlock) || IsHitGoalBlockTable(rightBlock)) {
 				isGoal_ = true;
 			}
 
-			// ダメージブロックの判定
 			if (IsHitBlockDamageTable(leftBlock) || IsHitBlockDamageTable(rightBlock)) {
-				// ダメージ処理
 				TakeDamage();
 			}
-
 		}
 	}
 }
+
 
 void Player::WallCollisionMove(CollisionMapInfo& collisionInfo)
 {
@@ -1034,6 +1065,7 @@ bool Player::IsHitBlockTable(BlockType type)
 	case BlockType::SoilBlock:
 	case BlockType::breakBlock:
 	case BlockType::unBreakable:
+	case BlockType::jumpBlock:
 		return true;
 
 	default:
@@ -1111,6 +1143,10 @@ void Player::Finalize()
 	if (landEffect_) {
 		landEffect_->Stop();
 		landEffect_.reset();
+	}
+	if (jumpBlockArrowEffect_) {
+		jumpBlockArrowEffect_->Stop();
+		jumpBlockArrowEffect_.reset();
 	}
 }
 
@@ -1213,4 +1249,26 @@ void Player::ImGui()
 
 
 #endif
+}
+
+bool Player::IsOnJumpBlock()
+{
+	if (!map_ || !playerModel_) { return false; }
+
+	Vector3 position = playerModel_->GetTranslate();
+
+	// 足元2点を取得
+	Vector3 leftBottom = CornerPosition(position, kLeftBottom);
+	Vector3 rightBottom = CornerPosition(position, kRightBottom);
+
+	// 少し下を調べる
+	Vector3 checkOffset = Vector3(0.0f, -status_.kEpsilon * 2.0f, 0.0f);
+
+	IndexSet leftIndex = map_->GetMapChipIndexSetByPosition(leftBottom + checkOffset);
+	IndexSet rightIndex = map_->GetMapChipIndexSetByPosition(rightBottom + checkOffset);
+
+	BlockType leftBlock = map_->GetMapChipTypeByIndex(leftIndex.xIndex, leftIndex.yIndex);
+	BlockType rightBlock = map_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
+
+	return (leftBlock == BlockType::jumpBlock || rightBlock == BlockType::jumpBlock);
 }

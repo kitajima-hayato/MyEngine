@@ -38,7 +38,7 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 	case BlockType::moveBlock:
 		blockModel->SetModel("GamePlay/Blocks/moveblock");
 		break;
-	case BlockType::sandBlock:
+	case BlockType::jumpBlock:
 		blockModel->SetModel("GamePlay/Blocks/sandblock");
 		break;
 	case BlockType::kGoalUp:

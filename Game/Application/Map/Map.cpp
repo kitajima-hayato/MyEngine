@@ -15,7 +15,7 @@ ImVec4 GetBlockColorByType(BlockType blockType) {
 	case BlockType::kGoalDown:   return ImVec4(0.4f, 0.8f, 0.8f, 1.0f);
 	case BlockType::breakBlock:  return ImVec4(0.8f, 0.8f, 0.4f, 1.0f);
 	case BlockType::moveBlock:   return ImVec4(0.8f, 0.4f, 0.8f, 1.0f);
-	case BlockType::sandBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
+	case BlockType::jumpBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
 	case BlockType::unBreakable: return ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
 	case BlockType::damageBlock: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
 	default:                     return ImVec4(0.5f, 0.5f, 0.5f, 1.0f);

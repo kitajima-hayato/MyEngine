@@ -14,7 +14,7 @@ enum class BlockType
 	kGoalDown = 4,
 	breakBlock = 5,
 	moveBlock = 6,
-	sandBlock = 7,
+	jumpBlock = 7,
 	unBreakable = 8,
 	damageBlock = 9,
 

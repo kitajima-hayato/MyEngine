@@ -943,6 +943,44 @@ void ParticleManager::DrawRing()
 }
 
 
+Particle ParticleManager::MakeUpArrowParticle(std::mt19937& randomEngine, const Vector3& position)
+{
+	// パーティクルの基礎情報
+	Particle p;
+	// 位置のばらつき
+	std::uniform_real_distribution<float> distX(-0.5f, 0.5f);
+	std::uniform_real_distribution<float> distY(-0.3f, 0.3f);
+	std::uniform_real_distribution<float> distSpeedX(-0.05f, 0.05f);
+	std::uniform_real_distribution<float> distSpeedY(0.6f, 1.0f);
+	std::uniform_real_distribution<float> distScale(0.18f, 0.28f);
+	std::uniform_real_distribution<float> distLife(0.35f, 0.55f);
+
+	float s = distScale(randomEngine);
+
+	p.transform.scale = { s, s, s };
+	p.transform.rotate = { 0.0f, 0.0f, 0.0f };
+	p.transform.translate = position + Vector3{
+		distX(randomEngine),
+		distY(randomEngine),
+		0.0f
+	};
+
+	// 上方向に流す
+	p.velocity = {
+		distSpeedX(randomEngine),
+		distSpeedY(randomEngine),
+		0.0f
+	};
+
+	// 目立つ色
+	p.color = { 1.0f, 0.95f, 0.3f, 1.0f };
+
+	p.lifeTime = distLife(randomEngine);
+	p.currentTime = 0.0f;
+
+	return p;
+}
+
 Particle ParticleManager::MakeRingEffect(const Vector3& position) {
 	Particle particle;
 	particle.transform.scale = { 1.0f, 1.0f, 1.0f };     // サイズ（大きすぎると画面外）
@@ -1104,6 +1142,8 @@ Particle ParticleManager::MakeParticleByType(std::mt19937& randomEngine, const V
 		return MakeJumpDustParticle(randomEngine, position);
 	case EffectType::LandDust:
 		return MakeLandDustParticle(randomEngine, position);
+	case EffectType::UpArrow:
+		return MakeUpArrowParticle(randomEngine, position);
 	case EffectType::Default:
 	default:
 		return MakeParticle(randomEngine, position);
@@ -1134,6 +1174,9 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 		break;
 	case EffectType::LandDust:
 		particle = MakeLandDustParticle(randomEngine, position);
+		break;
+	case EffectType::UpArrow:
+		particle = MakeUpArrowParticle(randomEngine, position);
 		break;
 	case EffectType::Default:
 	default:

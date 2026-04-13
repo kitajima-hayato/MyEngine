@@ -95,6 +95,9 @@ struct PlayerStatus {
 	// 壁に衝突したときの減衰率
 	float kAttenuationWall = 1.0f;
 
+	// jumpブロックに触れたときのジャンプ力
+	float kJumpBlockPower = 0.7f;
+
 	//振り向きパラメーター
 	// 角度の補間タイム
 	float kTurnTime = 0.1f;
@@ -150,17 +153,27 @@ public:
 	/// </summary>
 	/// <param name="pos"></param>
 	void Respawn(const Vector3& pos);
-
-	// 死亡演出を開始（その場で少し上に跳ねて、こちらを向いて落ちる）
+	/// <summary>
+	/// 死亡演出の開始
+	/// </summary>
+	/// <param name="cameraPos">演出位置のカメラ座標</param>
 	void BeginDeathDemo(const Vector3& cameraPos);
 
-	// 死亡演出中か
+	/// <summary>
+	/// 死亡演出中かどうか
+	/// </summary>
+	/// <returns>死亡演出中かどうか</returns>
 	bool IsInDeathDemo() const;
 
-	// 死亡演出が終わったか
+	/// <summary>
+	/// 死亡演出が終わったかどうか
+	/// </summary>
+	/// <returns>死亡演出が終わったかどうか</returns>
 	bool IsDeathDemoFinished() const;
 
-	// 落下による死亡を消費する（落下死のフラグをリセットして、死亡演出に入る）
+	/// <summary>
+	/// 落下による死亡を更新
+	/// </summary>
 	void UpdateDeathDemo();
 
 private:
@@ -183,6 +196,11 @@ private:
 	/// ImGui表示
 	/// </summary>
 	void ImGui();
+
+	/// <summary>
+	/// ジャンプブロックに接しているか
+	/// </summary>
+	bool IsOnJumpBlock();
 
 	/// <summary>
 	/// マップ衝突チェック
@@ -305,7 +323,7 @@ private:
 	/// </summary>
 	/// <param name="enemy"></param>
 	void StompEnemy(Collider* enemy);
-	
+
 	/// <summary>
 	/// ダメージブロックに触れているかの判定
 	/// </summary>
@@ -334,7 +352,7 @@ private:
 	/// <returns>パーティクルを発生させる足元の位置</returns>
 	Vector3 GetFootParticlePos() const;
 
-	
+
 public:	/// Setter / Getter
 	// 死亡判定の高さを設定
 	void SetDeathHeight(float deathHeight) { deathHeight_ = deathHeight; }
@@ -464,7 +482,7 @@ private:	// メンバ変数
 	float deathJumpSpeed_ = 12.0f;
 	float deathGravity_ = 32.0f;
 
-	Vector3 deathFaceRot_ = { 0,0,0 }; 
+	Vector3 deathFaceRot_ = { 0,0,0 };
 
 	// 通常移動のパーティクルが再生中か
 	bool wasMoving_ = false;
@@ -472,6 +490,8 @@ private:	// メンバ変数
 	// ジャンプの開始と着地時のパーティクル
 	std::unique_ptr<ParticleSystem> jumpEffect_;
 	std::unique_ptr<ParticleSystem> landEffect_;
-
+	// ジャンプブロックに触れたときのエフェクト
+	std::unique_ptr<ParticleSystem> jumpBlockArrowEffect_;
+	bool wasOnJumpBlock_ = false;
 };
 

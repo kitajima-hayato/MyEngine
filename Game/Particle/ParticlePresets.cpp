@@ -179,3 +179,23 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateLandDust(const Vector3& p
 	ps->Pause();
 	return ps;
 }
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpBlockArrow(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"JumpBlockArrow",
+		"resources/Effects/Particles/Textures/upArrow.png");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::UpArrow);
+
+	// jumpBlock 上にいる間だけ見せたいのでループ
+	ps->SetLoop(true);
+
+	// ほどよい頻度
+	ps->SetEmissionRate(12.0f);
+
+	// 色を少し強調
+	ps->SetColor(Vector4(1.8f, 0.45f, 0.45f, 1.0f));
+	return ps;
+}
