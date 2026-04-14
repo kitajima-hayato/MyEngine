@@ -17,6 +17,8 @@ enum class BlockType
 	jumpBlock = 7,
 	unBreakable = 8,
 	damageBlock = 9,
+	toggleBlockOn = 10,
+	toggleBlockOff = 11,
 
 	// 範囲検索の最終値
 	/// 検索を行う際にCountを指定することで範囲検索を可能にできる

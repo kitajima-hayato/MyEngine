@@ -18,6 +18,8 @@ ImVec4 GetBlockColorByType(BlockType blockType) {
 	case BlockType::jumpBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
 	case BlockType::unBreakable: return ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
 	case BlockType::damageBlock: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
+	case BlockType::toggleBlockOn: return ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
+	case BlockType::toggleBlockOff: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
 	default:                     return ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
 	}
 }
@@ -245,6 +247,8 @@ void Map::Update()
 				"JumpBlock",
 				"Unbreakable",
 				"DamageBlock",
+				"ToggleBlockOn",
+				"ToggleBlockOff",
 			};
 
 			static int currentHazardTypeInt = 0;
@@ -831,3 +835,18 @@ HazardType Map::GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const
 	return mapChipData_.hazardData[yIndex][xIndex];
 }
 
+bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
+{
+	// マップ外チェック
+	if (yIndex >= blockArray_.size() || xIndex >= blockArray_[yIndex].size()) {
+		return false;
+	}
+
+	// 特定の座標ブロックの存在チェック
+	Block* block = blockArray_[yIndex][xIndex];
+	if (!block) {
+		return false;
+	}
+	// ブロックの種類に応じた当たり判定
+	return block->IsSolid(jumpToggleState_);
+}

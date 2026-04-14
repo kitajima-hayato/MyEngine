@@ -89,6 +89,13 @@ public:	// Setter / Getter
 	/// </summary>
 	void SetBroken() { isAlive_ = false; }
 
+	/// <summary>
+	/// トグル状態に応じて判定が有効かどうか
+	/// </summary>
+	/// <param name="toggleState">現状</param>
+	/// <returns>切り替える値</returns>
+	bool IsSolid(bool toggleState)const;
+
 
 private:
 

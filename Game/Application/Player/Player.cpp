@@ -799,6 +799,9 @@ void Player::Jump()
 	if (onGround_) {
 		// ジャンプキーが押されたら
 		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+			// ジャンプスイッチの切り替え
+			map_->ToggleJumpSwitch();
+
 			// ジャンプの開始エフェクトの発生
 			EmitJumpParticle();
 			
@@ -924,7 +927,8 @@ void Player::LandingCollisionMove(CollisionMapInfo& collisionInfo)
 			IndexSet rightIndex = map_->GetMapChipIndexSetByPosition(rightBottom + checkOffset);
 			BlockType rightBlock = map_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
 
-			if (!IsHitBlockTable(leftBlock) && !IsHitBlockTable(rightBlock)) {
+			if (!map_->IsSolidBlockAt(leftIndex.xIndex, leftIndex.yIndex) &&
+				!map_->IsSolidBlockAt(rightIndex.xIndex, rightIndex.yIndex)) {
 				onGround_ = false;
 			}
 
@@ -1018,10 +1022,12 @@ bool Player::CheckCollisionPoints(const std::array<Vector3, 2>& posList, Collisi
 		// マップチップの種類を取得
 		BlockType chip = map_->GetMapChipTypeByIndex(index.xIndex, index.yIndex);
 
-		if (IsHitBlockTable(chip)) {
+		// 当たり判定を取るブロックの種類かどうか
+		if (map_->IsSolidBlockAt(index.xIndex, index.yIndex)) {
 			isHit = true;
-		} else if (IsHitGoalBlockTable(chip)) {
-			// ゴール処理
+		} 
+		// ゴールの判定をとるブロックかどうか
+		else if (IsHitGoalBlockTable(chip)) {
 			isGoal_ = true;
 		}
 	}
