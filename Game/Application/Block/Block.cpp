@@ -119,10 +119,11 @@ Block* Block::CreateBlock(BlockType blockType, Vector3 position)
 
 void Block::UpdateToggleVisual(bool toggleState)
 {
-	 // トグルブロック以外の場合は処理しない
+	// トグルブロック以外の場合は処理しない
 	if (blockType != BlockType::toggleBlockOff && blockType != BlockType::toggleBlockOn) {
 		return;
 	}
+	// 現在の状態を判定
 	const bool isSolidNow = IsSolid(toggleState);
 
 	// 初回または状態変化時だけモデル差し替え
@@ -131,19 +132,18 @@ void Block::UpdateToggleVisual(bool toggleState)
 			if (isSolidNow) {
 				blockModel->SetModel("GamePlay/Blocks/toggleblock_on");
 			} else {
-				//blockModel->SetModel("GamePlay/Blocks/toggleblock_on_off");
-				blockModel->SetModel("GamePlay/Blocks/nullblock");
+				blockModel->SetModel("GamePlay/Blocks/toggleblock_on_off");
 			}
 		} else if (blockType == BlockType::toggleBlockOff) {
 			if (isSolidNow) {
 				blockModel->SetModel("GamePlay/Blocks/toggleblock_off");
 			} else {
-				//blockModel->SetModel("GamePlay/Blocks/toggleblock_off_off");
-				blockModel->SetModel("GamePlay/Blocks/nullblock");
+				blockModel->SetModel("GamePlay/Blocks/toggleblock_off_off");
 			}
 		}
-
+		// 前フレームの状態を保持
 		wasSolid_ = isSolidNow;
+		// モデルの差し替えフラグ
 		toggleVisualInitialized_ = true;
 	}
 
@@ -153,7 +153,7 @@ void Block::UpdateToggleVisual(bool toggleState)
 	} else {
 		transform.scale = { 0.7f, 0.7f, 0.7f };
 	}
-
+	// モデルに反映
 	blockModel->SetTransform(transform);
 }
 

@@ -838,28 +838,31 @@ void Map::BreakBlock(uint32_t xIndex, uint32_t yIndex)
 
 HazardType Map::GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const
 {
+	// マップ外チェック
 	uint32_t w = GetWidth();
 	uint32_t h = GetHeight();
 	if (xIndex >= w || yIndex >= h) { return HazardType::None; }
 	if (mapChipData_.hazardData.empty()) { return HazardType::None; }
+	// 指定インデックスのハザードの種類を返す
 	return mapChipData_.hazardData[yIndex][xIndex];
 }
 
 bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
 {
+	// マップ外チェック
 	if (yIndex >= blockArray_.size() || xIndex >= blockArray_[yIndex].size()) {
 		return false;
 	}
-
+	// その位置にブロックがあるか
 	Block* block = blockArray_[yIndex][xIndex];
 	if (!block) {
 		return false;
 	}
-
+	// ゴールは判定をとらない / 触れたらisgoalをtrueにするだけ
 	BlockType type = mapChipData_.mapData[yIndex][xIndex];
 	if (type == BlockType::kGoalUp || type == BlockType::kGoalDown) {
 		return false;
 	}
-
+	// ブロックの種類に応じて判定をとるか決める
 	return block->IsSolid(jumpToggleState_);
 }
