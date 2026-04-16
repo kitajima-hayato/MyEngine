@@ -125,15 +125,35 @@ void Block::UpdateToggleVisual(bool toggleState)
 	}
 	const bool isSolidNow = IsSolid(toggleState);
 
-	// ベースは位置と回転を維持
-	Vector3 scale = { 1.0f, 1.0f, 1.0f };
+	// 初回または状態変化時だけモデル差し替え
+	if (!toggleVisualInitialized_ || wasSolid_ != isSolidNow) {
+		if (blockType == BlockType::toggleBlockOn) {
+			if (isSolidNow) {
+				blockModel->SetModel("GamePlay/Blocks/toggleblock_on");
+			} else {
+				//blockModel->SetModel("GamePlay/Blocks/toggleblock_on_off");
+				blockModel->SetModel("GamePlay/Blocks/nullblock");
+			}
+		} else if (blockType == BlockType::toggleBlockOff) {
+			if (isSolidNow) {
+				blockModel->SetModel("GamePlay/Blocks/toggleblock_off");
+			} else {
+				//blockModel->SetModel("GamePlay/Blocks/toggleblock_off_off");
+				blockModel->SetModel("GamePlay/Blocks/nullblock");
+			}
+		}
 
-	// 無効時は縮小する
-	if (!isSolidNow) {
-		scale = { 0.7f,0.7f, 0.7f }; 
+		wasSolid_ = isSolidNow;
+		toggleVisualInitialized_ = true;
 	}
-	// モデルに反映する
-	transform.scale = scale;
+
+	// スケール反映
+	if (isSolidNow) {
+		transform.scale = { 1.0f, 1.0f, 1.0f };
+	} else {
+		transform.scale = { 0.7f, 0.7f, 0.7f };
+	}
+
 	blockModel->SetTransform(transform);
 }
 

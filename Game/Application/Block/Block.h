@@ -123,5 +123,9 @@ private:
 	// ブロックが壊れているかどうか
 	bool isAlive_ = true;    
 
+
+	// トグルブロックの状態
+	bool wasSolid_ = true; 
+	bool toggleVisualInitialized_ = false;
 };
 

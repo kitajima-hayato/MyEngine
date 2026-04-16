@@ -847,16 +847,19 @@ HazardType Map::GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const
 
 bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
 {
-	// マップ外チェック
 	if (yIndex >= blockArray_.size() || xIndex >= blockArray_[yIndex].size()) {
 		return false;
 	}
 
-	// 特定の座標ブロックの存在チェック
 	Block* block = blockArray_[yIndex][xIndex];
 	if (!block) {
 		return false;
 	}
-	// ブロックの種類に応じた当たり判定
+
+	BlockType type = mapChipData_.mapData[yIndex][xIndex];
+	if (type == BlockType::kGoalUp || type == BlockType::kGoalDown) {
+		return false;
+	}
+
 	return block->IsSolid(jumpToggleState_);
 }
