@@ -15,9 +15,11 @@ ImVec4 GetBlockColorByType(BlockType blockType) {
 	case BlockType::kGoalDown:   return ImVec4(0.4f, 0.8f, 0.8f, 1.0f);
 	case BlockType::breakBlock:  return ImVec4(0.8f, 0.8f, 0.4f, 1.0f);
 	case BlockType::moveBlock:   return ImVec4(0.8f, 0.4f, 0.8f, 1.0f);
-	case BlockType::sandBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
+	case BlockType::jumpBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
 	case BlockType::unBreakable: return ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
 	case BlockType::damageBlock: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
+	case BlockType::toggleBlockOn: return ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
+	case BlockType::toggleBlockOff: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
 	default:                     return ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
 	}
 }
@@ -242,9 +244,11 @@ void Map::Update()
 				"GoalDown",
 				"BreakBlock",
 				"MoveBlock",
-				"SandBlock",
+				"JumpBlock",
 				"Unbreakable",
 				"DamageBlock",
+				"ToggleBlockOn",
+				"ToggleBlockOff",
 			};
 
 			static int currentHazardTypeInt = 0;
@@ -260,6 +264,9 @@ void Map::Update()
 				"FlyingEnemy",
 				"SideMoveFlyingEnemy",
 				"SideMoveEnemy",
+				"PatrolEnemy",
+				"TimedDropEnemy",
+				"ReactiveDropEnemy",
 			};
 
 			if (static_cast<EditLayerMode>(editModeInt) == EditLayerMode::Block) {
@@ -365,9 +372,21 @@ void Map::Update()
 						// Enemy overlay
 						if (cellEnemy != EnemyType::None) {
 							ImU32 col = IM_COL32(60, 255, 60, 255);
+
 							if (cellEnemy == EnemyType::FlyingEnemy) {
 								col = IM_COL32(60, 140, 255, 255);
+							} else if (cellEnemy == EnemyType::SideMoveFlyingEnemy) {
+								col = IM_COL32(120, 180, 255, 255);
+							} else if (cellEnemy == EnemyType::SideMoveEnemy) {
+								col = IM_COL32(255, 180, 60, 255);
+							} else if (cellEnemy == EnemyType::PatrolEnemy) {
+								col = IM_COL32(255, 255, 60, 255);
+							} else if (cellEnemy == EnemyType::TimedDropEnemy) {
+								col = IM_COL32(255, 80, 80, 255);
+							} else if (cellEnemy == EnemyType::ReactiveDropEnemy) {
+								col = IM_COL32(255, 80, 180, 255);
 							}
+
 							ImVec2 eMin(pMin.x + 2.0f, pMin.y + 2.0f);
 							ImVec2 eMax(pMax.x - 2.0f, pMax.y - 2.0f);
 							dl->AddRect(eMin, eMax, col, 0.0f, 0, 2.0f);
@@ -816,3 +835,18 @@ HazardType Map::GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const
 	return mapChipData_.hazardData[yIndex][xIndex];
 }
 
+bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
+{
+	// マップ外チェック
+	if (yIndex >= blockArray_.size() || xIndex >= blockArray_[yIndex].size()) {
+		return false;
+	}
+
+	// 特定の座標ブロックの存在チェック
+	Block* block = blockArray_[yIndex][xIndex];
+	if (!block) {
+		return false;
+	}
+	// ブロックの種類に応じた当たり判定
+	return block->IsSolid(jumpToggleState_);
+}

@@ -38,7 +38,7 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 	case BlockType::moveBlock:
 		blockModel->SetModel("GamePlay/Blocks/moveblock");
 		break;
-	case BlockType::sandBlock:
+	case BlockType::jumpBlock:
 		blockModel->SetModel("GamePlay/Blocks/sandblock");
 		break;
 	case BlockType::kGoalUp:
@@ -52,6 +52,12 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 		break;
 	case BlockType::damageBlock:
 		blockModel->SetModel("GamePlay/Blocks/damageblock");
+		break;
+	case BlockType::toggleBlockOn:
+		blockModel->SetModel("GamePlay/Blocks/toggleblock_on");
+		break;
+	case BlockType::toggleBlockOff:
+		blockModel->SetModel("GamePlay/Blocks/toggleblock_off");
 		break;
 	default:
 		blockModel->SetModel("GamePlay/Blocks/grassblock");
@@ -109,4 +115,28 @@ Block* Block::CreateBlock(BlockType blockType, Vector3 position)
 	newBlock->Initialize(blockType, position);
 	// 生成したブロックを返す
 	return newBlock;
+}
+
+
+bool Block::IsSolid(bool toggleState) const
+{
+	// Airブロックは常に非表示で判定もない
+	if (!isAlive_) {
+		return false;
+	}
+	// ブロックの種類に応じて判定の有無を返す
+	switch (blockType) {
+		// Airブロックは常に非表示で判定もない
+	case BlockType::Air:
+		return false;
+		// Onブロックはトグル状態がオンのときだけ判定がある
+	case BlockType::toggleBlockOn:
+		return toggleState;
+		// Offブロックはトグル状態がオフのときだけ判定がある
+	case BlockType::toggleBlockOff:
+		return !toggleState;
+
+	default:
+		return true;
+	}
 }

@@ -35,6 +35,7 @@ public:
 		MagicCircle,	// 魔法陣
 		JumpDust,		// ジャンプダスト
 		LandDust,		// 着地ダスト
+		UpArrow,		// 上向きの矢印
 	};
 
 	/// <summary>
@@ -233,6 +234,14 @@ public:
 	/// <param name="position">発生位置</param>
 	/// <returns>パーティクル情報</returns>
 	Particle MakeLandDustParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
+	/// 上向きの矢印パーティクル生成
+	/// </summary>
+	/// <param name="randomEngine">ランダムエンジン</param>
+	/// <param name="position">発生位置</param>
+	/// <returns>パーティクル情報</returns>
+	Particle MakeUpArrowParticle(std::mt19937& randomEngine, const Vector3& position);
 
 	/// <summary>
 	/// Ringエフェクト

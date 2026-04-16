@@ -61,5 +61,13 @@ public:
 	/// <param name="position"></param>
 	/// <returns></returns>
 	static std::unique_ptr<ParticleSystem>CreateLandDust(const Vector3& position = { 0, 0, 0 });
+
+	/// <summary>
+	/// ジャンプブロックの上に出る矢印エフェクト
+	/// </summary>
+	/// <param name="position">発生位置</param>
+	/// <returns>パーティクルシステム</returns>
+	static std::unique_ptr<ParticleSystem> CreateJumpBlockArrow(const Vector3& position = { 0, 0, 0 });
+
 };
 
