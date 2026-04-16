@@ -46,6 +46,12 @@ public:
 	/// </summary>
 	static Block* CreateBlock(BlockType blockType, Vector3 position);
 
+	/// <summary>
+	/// トグル状態に応じてサイズの変更
+	/// </summary>
+	/// <param name="toggleState">現在のOnOff状態</param>
+	void UpdateToggleVisual(bool toggleState);
+
 public:	// Setter / Getter
 	/// <summary>
 	/// ブロックのSRTを取得

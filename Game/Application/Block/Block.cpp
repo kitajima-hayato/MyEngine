@@ -117,6 +117,26 @@ Block* Block::CreateBlock(BlockType blockType, Vector3 position)
 	return newBlock;
 }
 
+void Block::UpdateToggleVisual(bool toggleState)
+{
+	 // トグルブロック以外の場合は処理しない
+	if (blockType != BlockType::toggleBlockOff && blockType != BlockType::toggleBlockOn) {
+		return;
+	}
+	const bool isSolidNow = IsSolid(toggleState);
+
+	// ベースは位置と回転を維持
+	Vector3 scale = { 1.0f, 1.0f, 1.0f };
+
+	// 無効時は縮小する
+	if (!isSolidNow) {
+		scale = { 0.7f,0.7f, 0.7f }; 
+	}
+	// モデルに反映する
+	transform.scale = scale;
+	blockModel->SetTransform(transform);
+}
+
 
 bool Block::IsSolid(bool toggleState) const
 {

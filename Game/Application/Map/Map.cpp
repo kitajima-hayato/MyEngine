@@ -60,6 +60,7 @@ void Map::Update()
 				continue;
 			}
 			block->Update();
+			block->UpdateToggleVisual(jumpToggleState_);
 		}
 	}
 	// ハザードの更新
@@ -82,9 +83,18 @@ void Map::Update()
 	ImGui::Text("Size: %u x %u", GetWidth(), GetHeight());
 	ImGui::Separator();
 
+	// トグル状態の表示
+	ImGui::Text("Jump Toggle State:");
+	ImGui::SameLine();
+	if (jumpToggleState_) {
+		ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "ON");
+	} else {
+		ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "OFF");
+	}
+
 	// 使い回す：ファイル名入力とメッセージ
-	static char mapFileName[256] = "1-1.csv";
-	static char enemyFileName[256] = "1-1_EnemyLayer.csv";
+	static char mapFileName[256] = ".csv";
+	static char enemyFileName[256] = "_EnemyLayer.csv";
 	static std::string message;
 
 	// ヘルパー：拡張子を除いたベース名を作る
