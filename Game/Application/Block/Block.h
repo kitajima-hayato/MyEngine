@@ -3,6 +3,8 @@
 #include "BlockType.h"
 #include "Game/Collision/Collider.h"
 #include <memory>
+
+#include "Game/Particle/ParticlePresets.h"
 class Block : public Collider
 {
 public: // 判定
@@ -127,5 +129,10 @@ private:
 	// トグルブロックの状態
 	bool wasSolid_ = true; 
 	bool toggleVisualInitialized_ = false;
+
+	// トグルブロック関連の演出パーティクル
+	std::unique_ptr<ParticleSystem> toggleOnEffect_;
+	std::unique_ptr<ParticleSystem> toggleOffEffect_;
+
 };
 

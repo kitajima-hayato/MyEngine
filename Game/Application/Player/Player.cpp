@@ -235,6 +235,7 @@ void Player::EmitLandParticle()
 
 Vector3 Player::GetFootParticlePos() const
 {
+	// プレイヤーの位置を取得
 	Vector3 p = playerModel_->GetTranslate();
 
 	// AABBの一番下（足元）に合わせる
@@ -250,20 +251,17 @@ Vector3 Player::GetFootParticlePos() const
 
 void Player::Respawn(const Vector3& pos)
 {
+	// 位置をリスポーン地点に移動
 	velocity_ = {};
 	if (playerModel_) {
 		playerModel_->SetTranslate(pos);
 		playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
 	}
 
+	// 状態をリセット
 	isDead_ = false;
 	isDeathByFalling_ = false;
-
 	onGround_ = true;
-
-	// 無敵点滅などの副作用があるなら必要に応じて初期化
-	// isEnemyHit_ = false;
-	// isVisible_ = true;
 }
 
 void Player::BeginDeathDemo(const Vector3& cameraPos)
@@ -280,7 +278,7 @@ void Player::BeginDeathDemo(const Vector3& cameraPos)
 	// その場でジャンプ開始
 	deathVel_ = { 0.0f, deathJumpSpeed_, 0.0f };
 
-	// こちらを向く=
+	// こちらを向く
 	deathFaceRot_ = { 0.0f, 1.6f, 0.0f };
 	playerModel_->SetRotate(deathFaceRot_);
 }

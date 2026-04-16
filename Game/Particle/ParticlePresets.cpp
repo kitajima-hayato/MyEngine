@@ -199,3 +199,49 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpBlockArrow(const Vect
 	ps->SetColor(Vector4(1.8f, 0.45f, 0.45f, 1.0f));
 	return ps;
 }
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOnBurst(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"ToggleOnBurst",
+		"resources/Effects/Particles/Textures/square.dds");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::Spark);
+
+	ps->SetLoop(false);
+	ps->SetEmissionRate(35.0f);
+	ps->SetBurstCount(8);
+
+	ps->GetMainModule().duration = 0.10f;
+	ps->GetMainModule().startLifetime = 0.20f;
+
+	// 少し緑寄り
+	ps->SetColor(Vector4(0.45f, 1.2f, 0.45f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOffBurst(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"ToggleOffBurst",
+		"resources/Effects/Particles/Textures/wind.dds");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::Smoke);
+
+	ps->SetLoop(false);
+	ps->SetEmissionRate(20.0f);
+	ps->SetBurstCount(6);
+
+	ps->GetMainModule().duration = 0.10f;
+	ps->GetMainModule().startLifetime = 0.18f;
+
+	// 少し赤寄り
+	ps->SetColor(Vector4(1.1f, 0.45f, 0.45f, 0.85f));
+
+	ps->Pause();
+	return ps;
+}

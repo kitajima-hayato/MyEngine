@@ -82,6 +82,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 
 	// ブレンドモードの設定
 	blendMode = BlendMode::kBlendModeAdd;
+	//blendMode = BlendMode::kBlendModeNormal;
 	// ランダムエンジンの初期化
 	InitializeRandomEngine();
 	// パイプラインの生成

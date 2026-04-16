@@ -111,7 +111,7 @@ private:
 	float coolDownTimer_ = 0.0f;
 
 	// 仮の地面のY座標
-	float dropDistance_ = 3.0f;
+	float dropDistance_ = 5.0f;
 	float targetY_ = 0.0f;
 
 	// 落下前の演出管理用のタイマー
