@@ -21,7 +21,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateExplosion(const Vector3& 
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateSmoke(const Vector3& position)
 {
 	auto particleSystem = ParticleSystem::Create(
-		"Smoke", "resources/Effects/Particles/Textures/smoke.dds");
+		"Smoke", "resources/Effects/Particles/Textures/smoke.dds",BlendMode::kBlendModeNormal);
 	// 位置の設定
 	particleSystem->SetTranslate(position);
 	// エミッション設定 / 描画される粒子の数
@@ -39,7 +39,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSmoke(const Vector3& posi
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateSparks(const Vector3& position)
 {
 	auto particleSystem = ParticleSystem::Create(
-		"Sparks", "resources/Effects/Particles/Textures/star.dds");
+		"Sparks", "resources/Effects/Particles/Textures/star.dds",BlendMode::kBlendModeAdd);
 	// 位置の設定
 	particleSystem->SetTranslate(position);
 	// エミッション設定 / 描画される粒子の数
@@ -136,7 +136,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSummonCircle(const Vector
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& position)
 {
 	auto ps = ParticleSystem::Create("JumpDust",
-		"resources/Effects/Particles/Textures/smoke.dds");
+		"resources/Effects/Particles/Textures/smoke.dds", BlendMode::kBlendModeNormal);
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::JumpDust);
@@ -184,7 +184,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpBlockArrow(const Vect
 {
 	auto ps = ParticleSystem::Create(
 		"JumpBlockArrow",
-		"resources/Effects/Particles/Textures/upArrow.png");
+		"resources/Effects/Particles/Textures/upArrow.png", BlendMode::kBlendModeAdd);
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::UpArrow);
