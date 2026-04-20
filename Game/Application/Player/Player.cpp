@@ -235,6 +235,7 @@ void Player::EmitLandParticle()
 
 Vector3 Player::GetFootParticlePos() const
 {
+	// プレイヤーの位置を取得
 	Vector3 p = playerModel_->GetTranslate();
 
 	// AABBの一番下（足元）に合わせる
@@ -250,20 +251,17 @@ Vector3 Player::GetFootParticlePos() const
 
 void Player::Respawn(const Vector3& pos)
 {
+	// 位置をリスポーン地点に移動
 	velocity_ = {};
 	if (playerModel_) {
 		playerModel_->SetTranslate(pos);
 		playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
 	}
 
+	// 状態をリセット
 	isDead_ = false;
 	isDeathByFalling_ = false;
-
 	onGround_ = true;
-
-	// 無敵点滅などの副作用があるなら必要に応じて初期化
-	// isEnemyHit_ = false;
-	// isVisible_ = true;
 }
 
 void Player::BeginDeathDemo(const Vector3& cameraPos)
@@ -280,7 +278,7 @@ void Player::BeginDeathDemo(const Vector3& cameraPos)
 	// その場でジャンプ開始
 	deathVel_ = { 0.0f, deathJumpSpeed_, 0.0f };
 
-	// こちらを向く=
+	// こちらを向く
 	deathFaceRot_ = { 0.0f, 1.6f, 0.0f };
 	playerModel_->SetRotate(deathFaceRot_);
 }
@@ -487,7 +485,9 @@ void Player::Initialize(Vector3 position)
 	moveEffect_->Pause();
 	moveEffect_->SetEmissionRate(5.0f);
 	moveEffect_->SetLoop(true);
-	moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	//moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	moveEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
 
 	// ダッシュエフェクトの初期化
 	// 足元の煙エフェクト(ダッシュ)
@@ -496,14 +496,19 @@ void Player::Initialize(Vector3 position)
 	dashSmokeEffect_->Pause();
 	dashSmokeEffect_->SetEmissionRate(15.0f);
 	dashSmokeEffect_->SetLoop(true);
-	dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	//dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	dashSmokeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+
 	// ダッシュ開始時の衝撃波
 	dashStartEffect_ = ParticlePresets::CreateSparks(position);
 	dashStartEffect_->Pause();
 	// 一気に
-	dashStartEffect_->SetEmissionRate(50.0f);
+	dashStartEffect_->SetEmissionRate(20.0f);
 	// 一度の発生のためループはしない
 	dashStartEffect_->SetLoop(false);
+	// 色 / 黄色
+	dashStartEffect_->SetColor(Vector4(1.0f, 1.0f, 0.5f, 1.0f));
 
 	// 踏みつけエフェクトの初期化
 	stompEffect_ = ParticlePresets::CreateSparks(position);
@@ -512,15 +517,48 @@ void Player::Initialize(Vector3 position)
 	stompEffect_->SetLoop(false);
 	stompEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
+
 	// ジャンプの開始と着地のパーティクル
 	jumpEffect_ = ParticlePresets::CreateJumpDust(position);
 	landEffect_ = ParticlePresets::CreateLandDust(position);
+
+	// ジャンプブロックに乗っているときの上昇エフェクト / 初期状態は停止
+	jumpBlockArrowEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
+	jumpBlockArrowEffect_->Pause();
 
 }
 
 
 void Player::Update()
 {
+	// ジャンプブロックに乗っているか
+	bool onJumpBlockNow = onGround_ && IsOnJumpBlock();
+
+	// ジャンプブロックに乗っているときだけ上昇エフェクトを出す
+	if (jumpBlockArrowEffect_ && playerModel_) {
+		// 上昇エフェクトの発生位置
+		Vector3 effectPosition = playerModel_->GetTranslate();
+		effectPosition.z -= 0.5f;
+		// プレイヤーの周りに出す
+		jumpBlockArrowEffect_->SetTranslate(effectPosition);
+
+		// プレイヤーの頭上にエフェクトを出す / 乗っていたら
+		if (onJumpBlockNow) {
+			// プレイヤーの頭上にエフェクトを出す / 乗っていたら
+			if (!wasOnJumpBlock_) {
+				jumpBlockArrowEffect_->Play();
+			}
+		} 
+		// 乗っていないときはエフェクトを停止
+		else {
+			jumpBlockArrowEffect_->Pause();
+		}
+	}
+
+	// 前フレームの状態を保持
+	wasOnJumpBlock_ = onJumpBlockNow;
+
+	
 	if (isDying_) {
 		UpdateDeathDemo();
 		playerModel_->Update();
@@ -551,6 +589,9 @@ void Player::Update()
 
 	if (jumpEffect_)jumpEffect_->Update();
 	if (landEffect_)landEffect_->Update();
+	if (jumpBlockArrowEffect_)jumpBlockArrowEffect_->Update();
+	
+
 }
 
 
@@ -764,11 +805,20 @@ void Player::Jump()
 	if (onGround_) {
 		// ジャンプキーが押されたら
 		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+			// ジャンプスイッチの切り替え
+			map_->ToggleJumpSwitch();
+
 			// ジャンプの開始エフェクトの発生
 			EmitJumpParticle();
-
-			// ジャンプ処理 / ジャンプ距離を縦のスピードに入れる
-			velocity_.y = status_.kJumpPower;
+			
+			// ジャンプブロックの上にいたら高く跳ねる
+			if (IsOnJumpBlock()) {
+				velocity_.y = status_.kJumpBlockPower;
+			} 
+			// 通常のジャンプ
+			else {
+				velocity_.y = status_.kJumpPower;
+			}
 
 			// 空中にいる状態にする
 			onGround_ = false;
@@ -863,51 +913,42 @@ void Player::LandingCollisionMove(CollisionMapInfo& collisionInfo)
 		// 着地エフェクトの発生
 		EmitLandParticle();
 
-		return;  // 着地したらここで終了
+		return;
 	}
 
 	// 地面にいる場合の継続判定
 	if (onGround_) {
-		// 下方向に速度がない場合のみチェック（安定化）
+		// 
 		if (velocity_.y <= 0.0f) {
-			// 現在の座標で判定
 			Vector3 position = playerModel_->GetTranslate();
 
-			// 足元の2点の位置を取得
 			Vector3 leftBottom = CornerPosition(position, kLeftBottom);
 			Vector3 rightBottom = CornerPosition(position, kRightBottom);
 
-			// 少し下の位置でチェック（より確実に）
 			Vector3 checkOffset = Vector3(0.0f, -status_.kEpsilon * 2.0f, 0.0f);
 
-			// 左点の判定
 			IndexSet leftIndex = map_->GetMapChipIndexSetByPosition(leftBottom + checkOffset);
 			BlockType leftBlock = map_->GetMapChipTypeByIndex(leftIndex.xIndex, leftIndex.yIndex);
 
-			// 右点の判定
 			IndexSet rightIndex = map_->GetMapChipIndexSetByPosition(rightBottom + checkOffset);
 			BlockType rightBlock = map_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
 
-
-			// 両方の点が地面から離れた場合のみ、地面から離れたとする
-			if (!IsHitBlockTable(leftBlock) && !IsHitBlockTable(rightBlock)) {
+			if (!map_->IsSolidBlockAt(leftIndex.xIndex, leftIndex.yIndex) &&
+				!map_->IsSolidBlockAt(rightIndex.xIndex, rightIndex.yIndex)) {
 				onGround_ = false;
 			}
 
-			// ゴールブロックの判定
 			if (IsHitGoalBlockTable(leftBlock) || IsHitGoalBlockTable(rightBlock)) {
 				isGoal_ = true;
 			}
 
-			// ダメージブロックの判定
 			if (IsHitBlockDamageTable(leftBlock) || IsHitBlockDamageTable(rightBlock)) {
-				// ダメージ処理
 				TakeDamage();
 			}
-
 		}
 	}
 }
+
 
 void Player::WallCollisionMove(CollisionMapInfo& collisionInfo)
 {
@@ -987,10 +1028,12 @@ bool Player::CheckCollisionPoints(const std::array<Vector3, 2>& posList, Collisi
 		// マップチップの種類を取得
 		BlockType chip = map_->GetMapChipTypeByIndex(index.xIndex, index.yIndex);
 
-		if (IsHitBlockTable(chip)) {
+		// 当たり判定を取るブロックの種類かどうか
+		if (map_->IsSolidBlockAt(index.xIndex, index.yIndex)) {
 			isHit = true;
-		} else if (IsHitGoalBlockTable(chip)) {
-			// ゴール処理
+		} 
+		// ゴールの判定をとるブロックかどうか
+		else if (IsHitGoalBlockTable(chip)) {
 			isGoal_ = true;
 		}
 	}
@@ -1034,6 +1077,7 @@ bool Player::IsHitBlockTable(BlockType type)
 	case BlockType::SoilBlock:
 	case BlockType::breakBlock:
 	case BlockType::unBreakable:
+	case BlockType::jumpBlock:
 		return true;
 
 	default:
@@ -1111,6 +1155,10 @@ void Player::Finalize()
 	if (landEffect_) {
 		landEffect_->Stop();
 		landEffect_.reset();
+	}
+	if (jumpBlockArrowEffect_) {
+		jumpBlockArrowEffect_->Stop();
+		jumpBlockArrowEffect_.reset();
 	}
 }
 
@@ -1213,4 +1261,26 @@ void Player::ImGui()
 
 
 #endif
+}
+
+bool Player::IsOnJumpBlock()
+{
+	if (!map_ || !playerModel_) { return false; }
+
+	Vector3 position = playerModel_->GetTranslate();
+
+	// 足元2点を取得
+	Vector3 leftBottom = CornerPosition(position, kLeftBottom);
+	Vector3 rightBottom = CornerPosition(position, kRightBottom);
+
+	// 少し下を調べる
+	Vector3 checkOffset = Vector3(0.0f, -status_.kEpsilon * 2.0f, 0.0f);
+
+	IndexSet leftIndex = map_->GetMapChipIndexSetByPosition(leftBottom + checkOffset);
+	IndexSet rightIndex = map_->GetMapChipIndexSetByPosition(rightBottom + checkOffset);
+
+	BlockType leftBlock = map_->GetMapChipTypeByIndex(leftIndex.xIndex, leftIndex.yIndex);
+	BlockType rightBlock = map_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
+
+	return (leftBlock == BlockType::jumpBlock || rightBlock == BlockType::jumpBlock);
 }

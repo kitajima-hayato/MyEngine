@@ -38,8 +38,13 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/goalblock/up");
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/goalblock/down");
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/damageblock");
+	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_on");
+	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_on_off");
+	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_off");
+	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_off_off");
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
+
 
 	// GameOverScene
 	ModelManager::GetInstance().LoadModel("Scenes/GameOver/Models/backblack");

@@ -46,8 +46,8 @@ public:
 	static std::unique_ptr<ParticleSystem> CreateComplexMagicCircle(const Vector3& position = { 0, 0, 0 });
 
 	/// <summary>
-    /// 召喚魔法陣（下から上へエネルギーが上がる）
-    /// </summary>
+	/// 召喚魔法陣（下から上へエネルギーが上がる）
+	/// </summary>
 	static std::unique_ptr<ParticleSystem> CreateSummonCircle(const Vector3& position = { 0, 0, 0 });
 
 	/// <summary>
@@ -61,5 +61,23 @@ public:
 	/// <param name="position"></param>
 	/// <returns></returns>
 	static std::unique_ptr<ParticleSystem>CreateLandDust(const Vector3& position = { 0, 0, 0 });
+
+	/// <summary>
+	/// ジャンプブロックの上に出る矢印エフェクト
+	/// </summary>
+	/// <param name="position">発生位置</param>
+	/// <returns>パーティクルシステム</returns>
+	static std::unique_ptr<ParticleSystem> CreateJumpBlockArrow(const Vector3& position = { 0, 0, 0 });
+
+
+	/// <summary>
+	/// トグルブロックが有効になった瞬間の演出
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateToggleOnBurst(const Vector3& position = { 0, 0, 0 });
+
+	/// <summary>
+	/// トグルブロックが無効になった瞬間の演出
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateToggleOffBurst(const Vector3& position = { 0, 0, 0 });
 };
 

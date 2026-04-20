@@ -15,9 +15,11 @@ ImVec4 GetBlockColorByType(BlockType blockType) {
 	case BlockType::kGoalDown:   return ImVec4(0.4f, 0.8f, 0.8f, 1.0f);
 	case BlockType::breakBlock:  return ImVec4(0.8f, 0.8f, 0.4f, 1.0f);
 	case BlockType::moveBlock:   return ImVec4(0.8f, 0.4f, 0.8f, 1.0f);
-	case BlockType::sandBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
+	case BlockType::jumpBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
 	case BlockType::unBreakable: return ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
 	case BlockType::damageBlock: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
+	case BlockType::toggleBlockOn: return ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
+	case BlockType::toggleBlockOff: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
 	default:                     return ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
 	}
 }
@@ -58,6 +60,7 @@ void Map::Update()
 				continue;
 			}
 			block->Update();
+			block->UpdateToggleVisual(jumpToggleState_);
 		}
 	}
 	// ハザードの更新
@@ -80,9 +83,18 @@ void Map::Update()
 	ImGui::Text("Size: %u x %u", GetWidth(), GetHeight());
 	ImGui::Separator();
 
+	// トグル状態の表示
+	ImGui::Text("Jump Toggle State:");
+	ImGui::SameLine();
+	if (jumpToggleState_) {
+		ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "ON");
+	} else {
+		ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "OFF");
+	}
+
 	// 使い回す：ファイル名入力とメッセージ
-	static char mapFileName[256] = "1-1.csv";
-	static char enemyFileName[256] = "1-1_EnemyLayer.csv";
+	static char mapFileName[256] = ".csv";
+	static char enemyFileName[256] = "_EnemyLayer.csv";
 	static std::string message;
 
 	// ヘルパー：拡張子を除いたベース名を作る
@@ -242,9 +254,11 @@ void Map::Update()
 				"GoalDown",
 				"BreakBlock",
 				"MoveBlock",
-				"SandBlock",
+				"JumpBlock",
 				"Unbreakable",
 				"DamageBlock",
+				"ToggleBlockOn",
+				"ToggleBlockOff",
 			};
 
 			static int currentHazardTypeInt = 0;
@@ -260,6 +274,9 @@ void Map::Update()
 				"FlyingEnemy",
 				"SideMoveFlyingEnemy",
 				"SideMoveEnemy",
+				"PatrolEnemy",
+				"TimedDropEnemy",
+				"ReactiveDropEnemy",
 			};
 
 			if (static_cast<EditLayerMode>(editModeInt) == EditLayerMode::Block) {
@@ -365,9 +382,21 @@ void Map::Update()
 						// Enemy overlay
 						if (cellEnemy != EnemyType::None) {
 							ImU32 col = IM_COL32(60, 255, 60, 255);
+
 							if (cellEnemy == EnemyType::FlyingEnemy) {
 								col = IM_COL32(60, 140, 255, 255);
+							} else if (cellEnemy == EnemyType::SideMoveFlyingEnemy) {
+								col = IM_COL32(120, 180, 255, 255);
+							} else if (cellEnemy == EnemyType::SideMoveEnemy) {
+								col = IM_COL32(255, 180, 60, 255);
+							} else if (cellEnemy == EnemyType::PatrolEnemy) {
+								col = IM_COL32(255, 255, 60, 255);
+							} else if (cellEnemy == EnemyType::TimedDropEnemy) {
+								col = IM_COL32(255, 80, 80, 255);
+							} else if (cellEnemy == EnemyType::ReactiveDropEnemy) {
+								col = IM_COL32(255, 80, 180, 255);
 							}
+
 							ImVec2 eMin(pMin.x + 2.0f, pMin.y + 2.0f);
 							ImVec2 eMax(pMax.x - 2.0f, pMax.y - 2.0f);
 							dl->AddRect(eMin, eMax, col, 0.0f, 0, 2.0f);
@@ -809,10 +838,31 @@ void Map::BreakBlock(uint32_t xIndex, uint32_t yIndex)
 
 HazardType Map::GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const
 {
+	// マップ外チェック
 	uint32_t w = GetWidth();
 	uint32_t h = GetHeight();
 	if (xIndex >= w || yIndex >= h) { return HazardType::None; }
 	if (mapChipData_.hazardData.empty()) { return HazardType::None; }
+	// 指定インデックスのハザードの種類を返す
 	return mapChipData_.hazardData[yIndex][xIndex];
 }
 
+bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
+{
+	// マップ外チェック
+	if (yIndex >= blockArray_.size() || xIndex >= blockArray_[yIndex].size()) {
+		return false;
+	}
+	// その位置にブロックがあるか
+	Block* block = blockArray_[yIndex][xIndex];
+	if (!block) {
+		return false;
+	}
+	// ゴールは判定をとらない / 触れたらisgoalをtrueにするだけ
+	BlockType type = mapChipData_.mapData[yIndex][xIndex];
+	if (type == BlockType::kGoalUp || type == BlockType::kGoalDown) {
+		return false;
+	}
+	// ブロックの種類に応じて判定をとるか決める
+	return block->IsSolid(jumpToggleState_);
+}

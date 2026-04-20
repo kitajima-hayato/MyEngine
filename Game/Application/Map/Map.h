@@ -161,14 +161,33 @@ public:	// Setter / Getter
 	/// <summary>
 	/// 破壊可能ブロックを壊す
 	/// </summary>
-	/// <param name="xIndex">当たった壊せるブロックの横Indexの番号</param>
-	/// <param name="yIndex">当たった壊せるブロックの縦Indexの番号</param>
+	/// <param name="xIndex">当たって壊せるブロックの横Indexの番号</param>
+	/// <param name="yIndex">当たって壊せるブロックの縦Indexの番号</param>
 	void BreakBlock(uint32_t xIndex, uint32_t yIndex);
 
 	/// <summary>
 	/// インデックスからマップチップの種類を設定
 	/// </summary>
 	HazardType GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const;
+
+	/// <summary>
+	/// ジャンプブロックのトグル状態を取得
+	/// </summary>
+	/// <returns>ブロックのOnとOff状態の取得</returns>
+	bool GetJumpToggleState()const { return jumpToggleState_; }
+
+	/// <summary>
+	/// ジャンプブロックのトグル状態を切り替える
+	/// </summary>
+	void ToggleJumpSwitch() { jumpToggleState_ = !jumpToggleState_; }
+
+	/// <summary>
+	/// 指定インデックスに当たり判定のあるブロックがあるか
+	/// </summary>
+	/// <param name="xIndex">走査する横インデックス</param>
+	/// <param name="yIndex">走査する縦インデックス</param>
+	/// <returns>当たり判定のあるブロックがあるかどうか</returns>
+	bool IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const;
 private:
 	// マップチップデータ
 	MapChipData mapChipData_;
@@ -201,5 +220,8 @@ private:
 
 	// 破壊可能ブロックのパーティクルエフェクト用
 	std::unique_ptr<ParticleSystem> breakParticleEmitter_;
+
+	// ブロックのトグル状態
+	bool jumpToggleState_ = true;
 
 };

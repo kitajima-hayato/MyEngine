@@ -21,7 +21,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateExplosion(const Vector3& 
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateSmoke(const Vector3& position)
 {
 	auto particleSystem = ParticleSystem::Create(
-		"Smoke", "resources/Effects/Particles/Textures/smoke.dds");
+		"Smoke", "resources/Effects/Particles/Textures/smoke2.png",BlendMode::kBlendModeNormal);
 	// 位置の設定
 	particleSystem->SetTranslate(position);
 	// エミッション設定 / 描画される粒子の数
@@ -39,15 +39,17 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSmoke(const Vector3& posi
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateSparks(const Vector3& position)
 {
 	auto particleSystem = ParticleSystem::Create(
-		"Sparks", "resources/Effects/Particles/Textures/star.dds");
+		"Sparks", "resources/Effects/Particles/Textures/star.png",BlendMode::kBlendModeNormal);
 	// 位置の設定
 	particleSystem->SetTranslate(position);
 	// エミッション設定 / 描画される粒子の数
-	particleSystem->SetEmissionRate(50.0f);
+	particleSystem->SetEmissionRate(1.0f);
 	// メイン設定 / ループ再生の有無、寿命など
 	particleSystem->SetLoop(false);
 	particleSystem->GetMainModule().duration = 0.15f;
 	particleSystem->GetMainModule().startLifetime = 0.25f;
+	// 白デフォルト
+	particleSystem->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 	// スパークタイプを設定
 	particleSystem->SetEffectType(ParticleManager::EffectType::Spark);
@@ -104,7 +106,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateComplexMagicCircle(const 
 	params.radius = 6.0f;
 	params.particleCount = 40;
 	params.rotationSpeed = 0.5f;
-	params.multiLayer = true;  // ← 多重円
+	params.multiLayer = true;
 	ps->SetMagicCircleParams(params);
 
 	ps->SetLoop(true);
@@ -136,7 +138,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSummonCircle(const Vector
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& position)
 {
 	auto ps = ParticleSystem::Create("JumpDust",
-		"resources/Effects/Particles/Textures/smoke.dds");
+		"resources/Effects/Particles/Textures/smoke2.png", BlendMode::kBlendModeNormal);
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::JumpDust);
@@ -151,7 +153,8 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& p
 	ps->GetMainModule().startLifetime = 0.25f;
 
 	// 砂色（少し薄め）
-	ps->SetColor(Vector4(0.78f, 0.70f, 0.52f, 0.80f));
+	//ps->SetColor(Vector4(0.78f, 0.70f, 0.52f, 0.80f));
+	ps->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 	ps->Pause();
 	return ps;
@@ -160,7 +163,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& p
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateLandDust(const Vector3& position)
 {
 	auto ps = ParticleSystem::Create("LandDust",
-		"resources/Effects/Particles/Textures/smoke.dds");
+		"resources/Effects/Particles/Textures/smoke2.png",BlendMode::kBlendModeNormal);
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::LandDust);
@@ -175,6 +178,72 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateLandDust(const Vector3& p
 
 	// 色は最後の微調整
 	ps->SetColor(Vector4(1.0f, 1.0f, 1.0f, 0.95f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpBlockArrow(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"JumpBlockArrow",
+		"resources/Effects/Particles/Textures/upArrow.png", BlendMode::kBlendModeAdd);
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::UpArrow);
+
+	// jumpBlock 上にいる間だけ見せたいのでループ
+	ps->SetLoop(true);
+
+	// ほどよい頻度
+	ps->SetEmissionRate(12.0f);
+
+	// 色を少し強調
+	ps->SetColor(Vector4(1.8f, 0.45f, 0.45f, 1.0f));
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOnBurst(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"ToggleOnBurst",
+		"resources/Effects/Particles/Textures/square.dds");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::Spark);
+
+	ps->SetLoop(false);
+	ps->SetEmissionRate(35.0f);
+	ps->SetBurstCount(8);
+
+	ps->GetMainModule().duration = 0.10f;
+	ps->GetMainModule().startLifetime = 0.20f;
+
+	// 少し緑寄り
+	ps->SetColor(Vector4(0.45f, 1.2f, 0.45f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOffBurst(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"ToggleOffBurst",
+		"resources/Effects/Particles/Textures/wind.dds");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::Smoke);
+
+	ps->SetLoop(false);
+	ps->SetEmissionRate(20.0f);
+	ps->SetBurstCount(6);
+
+	ps->GetMainModule().duration = 0.10f;
+	ps->GetMainModule().startLifetime = 0.18f;
+
+	// 少し赤寄り
+	ps->SetColor(Vector4(1.1f, 0.45f, 0.45f, 0.85f));
 
 	ps->Pause();
 	return ps;

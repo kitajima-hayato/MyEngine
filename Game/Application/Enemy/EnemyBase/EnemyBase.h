@@ -3,6 +3,7 @@
 #include "engine/3d/Object3D.h"
 #include "Game/Collision/Collider.h"
 #include "Game/Application/Map/IMapCollisionQuery.h"
+#include "../Types/EnemyType.h"
 
 /// <summary>
 /// エネミーの基本構造
@@ -22,6 +23,8 @@ struct Stats {
 	/// 攻撃力
 	int32_t attackPower;
 };
+
+
 
 class EnemyBase : public Collider
 {

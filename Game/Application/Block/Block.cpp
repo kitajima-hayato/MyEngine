@@ -1,5 +1,4 @@
 #include "Block.h"
-#include "engine/3d/ModelManager.h"
 
 void Block::OnCollision(Collider* other)
 {
@@ -38,7 +37,7 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 	case BlockType::moveBlock:
 		blockModel->SetModel("GamePlay/Blocks/moveblock");
 		break;
-	case BlockType::sandBlock:
+	case BlockType::jumpBlock:
 		blockModel->SetModel("GamePlay/Blocks/sandblock");
 		break;
 	case BlockType::kGoalUp:
@@ -53,12 +52,23 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 	case BlockType::damageBlock:
 		blockModel->SetModel("GamePlay/Blocks/damageblock");
 		break;
+	case BlockType::toggleBlockOn:
+		blockModel->SetModel("GamePlay/Blocks/toggleblock_on");
+		break;
+	case BlockType::toggleBlockOff:
+		blockModel->SetModel("GamePlay/Blocks/toggleblock_off");
+		break;
 	default:
 		blockModel->SetModel("GamePlay/Blocks/grassblock");
 		break;
 	}
 	blockModel->SetTransform(transform);
 
+
+	if (blockType == BlockType::toggleBlockOn || blockType == BlockType::toggleBlockOff) {
+		toggleOnEffect_ = ParticlePresets::CreateToggleOnBurst(position);
+		toggleOffEffect_ = ParticlePresets::CreateToggleOffBurst(position);
+	}
 
 }
 
@@ -93,6 +103,14 @@ void Block::Update() {
 		blockModel->SetTransform(transform);
 	}
 	blockModel->Update();
+
+	// トグルブロックの演出更新
+	if (toggleOnEffect_) {
+		toggleOnEffect_->Update();
+	}
+	if (toggleOffEffect_) {
+		toggleOffEffect_->Update();
+	}
 }
 
 void Block::Draw() {
@@ -109,4 +127,71 @@ Block* Block::CreateBlock(BlockType blockType, Vector3 position)
 	newBlock->Initialize(blockType, position);
 	// 生成したブロックを返す
 	return newBlock;
+}
+
+void Block::UpdateToggleVisual(bool toggleState)
+{
+	// トグルブロック以外の場合は処理しない
+	if (blockType != BlockType::toggleBlockOff && blockType != BlockType::toggleBlockOn) {
+		return;
+	}
+	// 現在の状態を判定
+	const bool isSolidNow = IsSolid(toggleState);
+
+	// 初回は記録だけ
+	if (!toggleVisualInitialized_) {
+		wasSolid_ = isSolidNow;
+		toggleVisualInitialized_ = true;
+	}
+	// 状態変化時だけ演出
+	else if (wasSolid_ != isSolidNow) {
+		Vector3 effectPos = transform.translate;
+		effectPos.z -= 1.0f;
+
+		if (isSolidNow) {
+			if (toggleOnEffect_) {
+				toggleOnEffect_->SetTranslate(effectPos);
+				toggleOnEffect_->Play();
+			}
+		} else {
+			if (toggleOffEffect_) {
+				toggleOffEffect_->SetTranslate(effectPos);
+				toggleOffEffect_->Play();
+			}
+		}
+
+		wasSolid_ = isSolidNow;
+	}
+
+	// 見た目更新
+	Vector3 scale = { 1.0f, 1.0f, 1.0f };
+	if (!isSolidNow) {
+		scale = { 0.7f, 0.7f, 0.7f };
+	}
+	transform.scale = scale;
+	blockModel->SetTransform(transform);
+}
+
+
+bool Block::IsSolid(bool toggleState) const
+{
+	// Airブロックは常に非表示で判定もない
+	if (!isAlive_) {
+		return false;
+	}
+	// ブロックの種類に応じて判定の有無を返す
+	switch (blockType) {
+		// Airブロックは常に非表示で判定もない
+	case BlockType::Air:
+		return false;
+		// Onブロックはトグル状態がオンのときだけ判定がある
+	case BlockType::toggleBlockOn:
+		return toggleState;
+		// Offブロックはトグル状態がオフのときだけ判定がある
+	case BlockType::toggleBlockOff:
+		return !toggleState;
+
+	default:
+		return true;
+	}
 }

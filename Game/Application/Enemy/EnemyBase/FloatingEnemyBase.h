@@ -1,6 +1,10 @@
 #pragma once
 #include "EnemyBase.h"
 
+/// <summary>
+/// 浮遊するエネミーの基底クラス
+/// ふわふわと動く挙動を共通化するためのクラス
+/// </summary>
 class FloatingEnemyBase : public EnemyBase
 {
 protected: // 派生クラスでアクセス可能なメンバ

@@ -4,7 +4,7 @@
 #include "MyMath.h"
 #include <random>
 #include "Game/Camera/Camera.h"
-
+#include <array>
 
 /// <summary>
 /// パーティクルマネージャー
@@ -17,13 +17,14 @@ public:
 
 	// パーティクル構造体
 	struct ParticleGroup {		// パーティクルグループ // 使用するテクスチャごとにパーティクルグループとしてまとめる
-		MaterialData materialData;			// マテリアルデータ					
-		std::list<Particle> particles;		// パーティクルのリスト		
+		MaterialData materialData;					// マテリアルデータ					
+		std::list<Particle> particles;				// パーティクルのリスト		
 		uint32_t instancingSrvIndex;					// インスタンシングデータ用のSRVインデックス	
 		Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;	// インスタンシングデータ用のリソース
-		UINT kNumInstance;					// インスタンス数
-		ParticleForGPU* instancingData;		// インスタンシングデータを書き込むためのポインタ
-		uint32_t textureSrvIndex;               // テクスチャインデックス
+		UINT kNumInstance;							// インスタンス数
+		ParticleForGPU* instancingData;				// インスタンシングデータを書き込むためのポインタ
+		uint32_t textureSrvIndex;				    // テクスチャインデックス
+		BlendMode blendMode = BlendMode::kBlendModeAdd;		// ブレンドモード
 	};
 
 	// エフェクトタイプ列挙型
@@ -35,6 +36,7 @@ public:
 		MagicCircle,	// 魔法陣
 		JumpDust,		// ジャンプダスト
 		LandDust,		// 着地ダスト
+		UpArrow,		// 上向きの矢印
 	};
 
 	/// <summary>
@@ -114,7 +116,7 @@ private:
 	/// <summary>
 	/// タイプ別パーティクル生成（色指定版）（追加）
 	/// </summary>
-	Particle MakeParticleByTypeWithColor(std::mt19937& randomEngine,const Vector3& position,EffectType type,const Vector4& colorTint);
+	Particle MakeParticleByTypeWithColor(std::mt19937& randomEngine, const Vector3& position, EffectType type, const Vector4& colorTint);
 
 
 public:
@@ -130,9 +132,12 @@ public:
 	/// <summary>
 	///  パーティクルグループの作成
 	/// </summary>
-	/// <param name="name"></param>
-	/// <param name="textureFilePath"></param>
-	void CreateParticleGroup(const std::string& name, const std::string textureFilePath);
+	/// <param name="name">パーティクルグループの名前</param>
+	/// <param name="textureFilePath">使用する画像のファイルパス</param>
+	/// <param name="blendMode">ブレンドモード（デフォルトは加算）</param>
+	void CreateParticleGroup(const std::string& name, 
+		const std::string textureFilePath, 
+		BlendMode blendMode = BlendMode::kBlendModeAdd);
 
 
 	/// <summary>
@@ -202,7 +207,7 @@ public:
 	/// <param name="position">発生位置</param>
 	/// <returns>パーティクルを返す</returns>
 	Particle MakeSmokeParticle(std::mt19937& randomEngine, const Vector3& position);
-	
+
 	/// <summary>
 	/// 火花パーティクル生成
 	/// </summary>
@@ -219,7 +224,7 @@ public:
 	/// <param name="angle">角度</param>
 	/// <param name="radius">半径</param>
 	/// <returns>パーティクルを返す</returns>
-	Particle MakeMagicCircleParticle(std::mt19937& randomEngine,const Vector3& position,float angle,float radius);
+	Particle MakeMagicCircleParticle(std::mt19937& randomEngine, const Vector3& position, float angle, float radius);
 
 	/// <summary>
 	/// ジャンプダストパーティクル生成
@@ -235,6 +240,14 @@ public:
 	Particle MakeLandDustParticle(std::mt19937& randomEngine, const Vector3& position);
 
 	/// <summary>
+	/// 上向きの矢印パーティクル生成
+	/// </summary>
+	/// <param name="randomEngine">ランダムエンジン</param>
+	/// <param name="position">発生位置</param>
+	/// <returns>パーティクル情報</returns>
+	Particle MakeUpArrowParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
 	/// Ringエフェクト
 	/// </summary>
 	/// <param name="position"></param>
@@ -247,7 +260,7 @@ public:
 	/// <returns></returns>
 	Particle MakeCylinderEffect(const Vector3& position);
 
-	
+
 
 	/// <summary>
 	/// Ring
@@ -291,7 +304,7 @@ public:
 	/// <param name="name"></param>
 	/// <param name="textureFilePath"></param>
 	void EnsureParticleGroup(const std::string& name, const std::string& textureFilePath);
-	
+
 	/// <summary>
 	/// エフェクトの発生(特殊エフェクト)
 	/// </summary>
@@ -307,14 +320,14 @@ public:
 	/// <param name="name"></param>
 	/// <param name="position"></param>
 	/// <param name="radius"></param>
-	void EmitMagicCircle(const std::string& name, const Vector3& position,uint32_t count, float radius);
+	void EmitMagicCircle(const std::string& name, const Vector3& position, uint32_t count, float radius);
 
 	/// <summary>
 	/// 複雑な魔法陣エフェクトの発生
 	/// </summary>
 	/// <param name="name"></param>
 	/// <param name="position"></param>
-	void EmitComplexMagicCircle(const std::string& name,const Vector3& position);
+	void EmitComplexMagicCircle(const std::string& name, const Vector3& position);
 
 	/// <summary>
 	/// エフェクトの発生(特殊エフェクト) / 色指定バージョン
@@ -360,7 +373,7 @@ private:
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	// グラフィックスパイプライン
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState = nullptr;
+	std::array<Microsoft::WRL::ComPtr<ID3D12PipelineState>, kCountOfBlendMode> graphicsPipelineStates;
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc;
 	// シェーダーバイナリ
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;

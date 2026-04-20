@@ -91,8 +91,17 @@ std::vector<DecorationInstanceData> DecorationPlacer::CreateLayout(
 				data.transform.translate = pos;
 				data.transform.rotate = RandomVector3(
 					setting.minRotation, setting.maxRotation);
-				data.transform.scale = RandomVector3(
-					setting.minScale, setting.maxScale);
+				std::uniform_real_distribution<float> scaleXYDist(
+					(std::min)(setting.minScale.x, setting.maxScale.x),
+					(std::max)(setting.minScale.x, setting.maxScale.x));
+
+				float scaleXY = scaleXYDist(mt);
+
+				data.transform.scale.x = scaleXY;
+				data.transform.scale.y = scaleXY;
+				data.transform.scale.z = std::uniform_real_distribution<float>(
+					(std::min)(setting.minScale.z, setting.maxScale.z),
+					(std::max)(setting.minScale.z, setting.maxScale.z))(mt);
 
 				result.push_back(data);
 				++createdCount;
@@ -131,8 +140,13 @@ std::vector<DecorationInstanceData> DecorationPlacer::CreateLayout(
 			data.transform.translate = pos;
 			data.transform.rotate = RandomVector3(
 				setting.minRotation, setting.maxRotation);
-			data.transform.scale = RandomVector3(
-				setting.minScale, setting.maxScale);
+
+			std::uniform_real_distribution<float> scaleDist(
+				(std::min)(setting.minScale.x, setting.maxScale.x),
+				(std::max)(setting.minScale.x, setting.maxScale.x));
+
+			float scale = scaleDist(mt);
+			data.transform.scale = { scale, scale, scale };
 
 			result.push_back(data);
 			++createdCount;

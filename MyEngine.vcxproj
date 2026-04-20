@@ -108,6 +108,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationPlacer.cpp" />
@@ -161,7 +162,6 @@
     <ClCompile Include="engine\InsideScene\SceneManager.cpp" />
     <ClCompile Include="engine\base\SrvManager.cpp" />
     <ClCompile Include="Game\Scene\TitleScene.cpp" />
-    <ClCompile Include="Game\Application\StageType.cpp" />
     <ClCompile Include="Game\Application\Enemy\Ground\NormalEnemy.cpp" />
     <ClCompile Include="engine\3d\SkyBox\SkyBox.cpp" />
     <ClCompile Include="engine\2d\RenderTexture.cpp" />
@@ -182,14 +182,19 @@
     <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
     <ClCompile Include="Game\Application\RespawnSequence.cpp" />
     <ClCompile Include="engine\3d\Object3DInstancingCommon.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\PatrolEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationPlacer.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationObject.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationInstanceData.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationSpawnSetting.h" />
+    <ClInclude Include="Game\Application\Enemy\SpawnParams\EnemySpawnParams.h" />
     <ClInclude Include="Game\Scene\GameOverScene.h" />
     <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
@@ -238,7 +243,6 @@
     <ClInclude Include="engine\InsideScene\SceneManager.h" />
     <ClInclude Include="engine\base\SrvManager.h" />
     <ClInclude Include="Game\Scene\TitleScene.h" />
-    <ClInclude Include="Game\Application\StageType.h" />
     <ClInclude Include="Game\Application\Enemy\Ground\NormalEnemy.h" />
     <ClInclude Include="Game\Loader\LevelLoader.h" />
     <ClInclude Include="engine\3d\SkyBox\SkyBox.h" />
@@ -263,6 +267,9 @@
     <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
     <ClInclude Include="Game\Application\RespawnSequence.h" />
     <ClInclude Include="engine\3d\Object3DInstancingCommon.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\PatrolEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\Drop\TimedDropEnemy.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
