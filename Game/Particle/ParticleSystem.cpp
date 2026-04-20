@@ -33,12 +33,13 @@ ParticleSystem::~ParticleSystem()
 
 std::unique_ptr<ParticleSystem> ParticleSystem::Create(
 	const std::string& particleName,
-	const std::string& texturePath)
+	const std::string& texturePath,
+	BlendMode blendMode)
 {
 	// パーティクルグループの自動生成
 	auto manager = ParticleManager::GetInstance();
 	if (!manager->HasParticleGroup(particleName)) {
-		manager->CreateParticleGroup(particleName, texturePath);
+		manager->CreateParticleGroup(particleName, texturePath, blendMode);
 	}
 	// パーティクルシステムの生成
 	auto particleSystem = std::make_unique<ParticleSystem>();

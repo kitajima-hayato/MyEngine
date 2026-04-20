@@ -235,6 +235,7 @@ void Player::EmitLandParticle()
 
 Vector3 Player::GetFootParticlePos() const
 {
+	// プレイヤーの位置を取得
 	Vector3 p = playerModel_->GetTranslate();
 
 	// AABBの一番下（足元）に合わせる
@@ -250,20 +251,17 @@ Vector3 Player::GetFootParticlePos() const
 
 void Player::Respawn(const Vector3& pos)
 {
+	// 位置をリスポーン地点に移動
 	velocity_ = {};
 	if (playerModel_) {
 		playerModel_->SetTranslate(pos);
 		playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
 	}
 
+	// 状態をリセット
 	isDead_ = false;
 	isDeathByFalling_ = false;
-
 	onGround_ = true;
-
-	// 無敵点滅などの副作用があるなら必要に応じて初期化
-	// isEnemyHit_ = false;
-	// isVisible_ = true;
 }
 
 void Player::BeginDeathDemo(const Vector3& cameraPos)
@@ -280,7 +278,7 @@ void Player::BeginDeathDemo(const Vector3& cameraPos)
 	// その場でジャンプ開始
 	deathVel_ = { 0.0f, deathJumpSpeed_, 0.0f };
 
-	// こちらを向く=
+	// こちらを向く
 	deathFaceRot_ = { 0.0f, 1.6f, 0.0f };
 	playerModel_->SetRotate(deathFaceRot_);
 }
@@ -487,7 +485,9 @@ void Player::Initialize(Vector3 position)
 	moveEffect_->Pause();
 	moveEffect_->SetEmissionRate(5.0f);
 	moveEffect_->SetLoop(true);
-	moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	//moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	moveEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
 
 	// ダッシュエフェクトの初期化
 	// 足元の煙エフェクト(ダッシュ)
@@ -496,14 +496,19 @@ void Player::Initialize(Vector3 position)
 	dashSmokeEffect_->Pause();
 	dashSmokeEffect_->SetEmissionRate(15.0f);
 	dashSmokeEffect_->SetLoop(true);
-	dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	//dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	dashSmokeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+
 	// ダッシュ開始時の衝撃波
 	dashStartEffect_ = ParticlePresets::CreateSparks(position);
 	dashStartEffect_->Pause();
 	// 一気に
-	dashStartEffect_->SetEmissionRate(50.0f);
+	dashStartEffect_->SetEmissionRate(20.0f);
 	// 一度の発生のためループはしない
 	dashStartEffect_->SetLoop(false);
+	// 色 / 黄色
+	dashStartEffect_->SetColor(Vector4(1.0f, 1.0f, 0.5f, 1.0f));
 
 	// 踏みつけエフェクトの初期化
 	stompEffect_ = ParticlePresets::CreateSparks(position);
@@ -511,6 +516,7 @@ void Player::Initialize(Vector3 position)
 	stompEffect_->SetEmissionRate(30.0f);
 	stompEffect_->SetLoop(false);
 	stompEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
 
 	// ジャンプの開始と着地のパーティクル
 	jumpEffect_ = ParticlePresets::CreateJumpDust(position);

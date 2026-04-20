@@ -3,6 +3,8 @@
 #include "BlockType.h"
 #include "Game/Collision/Collider.h"
 #include <memory>
+
+#include "Game/Particle/ParticlePresets.h"
 class Block : public Collider
 {
 public: // 判定
@@ -45,6 +47,12 @@ public:
 	/// ブロックの生成
 	/// </summary>
 	static Block* CreateBlock(BlockType blockType, Vector3 position);
+
+	/// <summary>
+	/// トグル状態に応じてサイズの変更
+	/// </summary>
+	/// <param name="toggleState">現在のOnOff状態</param>
+	void UpdateToggleVisual(bool toggleState);
 
 public:	// Setter / Getter
 	/// <summary>
@@ -116,6 +124,15 @@ private:
 
 	// ブロックが壊れているかどうか
 	bool isAlive_ = true;    
+
+
+	// トグルブロックの状態
+	bool wasSolid_ = true; 
+	bool toggleVisualInitialized_ = false;
+
+	// トグルブロック関連の演出パーティクル
+	std::unique_ptr<ParticleSystem> toggleOnEffect_;
+	std::unique_ptr<ParticleSystem> toggleOffEffect_;
 
 };
 

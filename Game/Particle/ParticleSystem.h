@@ -51,7 +51,8 @@ public:
 	/// <param name="particleName">パーティクルの名前</param>
 	/// <param name="texturePath">使用する画像ファイルの名前</param>
 	/// <returns></returns>
-	static std::unique_ptr<ParticleSystem>Create(const std::string& particleName, const std::string& texturePath);
+	static std::unique_ptr<ParticleSystem>Create(const std::string& particleName, const std::string& texturePath,
+		BlendMode blendMode = BlendMode::kBlendModeAdd);
 	/// <summary>
 	/// ワンショット再生
 	/// </summary>

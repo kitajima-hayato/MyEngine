@@ -59,8 +59,11 @@ void ParticleManager::Finalize()
 	ringVertexBuffer.Reset();
 	vertexResource.Reset();
 	materialResource.Reset();
-	graphicsPipelineState.Reset();
 	rootSignature.Reset();
+	// PSOは複数あるのでループでReset
+	for (auto& pso : graphicsPipelineStates) {
+		pso.Reset();
+	}
 
 	// 4) 外部参照を切る（Framework側の寿命に依存しないように）
 	camera = nullptr;
@@ -81,7 +84,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 	this->camera = camera;
 
 	// ブレンドモードの設定
-	blendMode = BlendMode::kBlendModeAdd;
+	//blendMode = BlendMode::kBlendModeAdd;
 	// ランダムエンジンの初期化
 	InitializeRandomEngine();
 	// パイプラインの生成
@@ -91,11 +94,6 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 	// マテリアルの初期化
 	InitializeMaterial();
 
-	// リングエフェクトの初期化
-	//CreateRingVertex();
-
-	// シリンダーエフェクト
-	//CreateCylinderVertex();
 }
 
 void ParticleManager::InitializeRandomEngine()
@@ -231,7 +229,7 @@ void ParticleManager::CreateRootSignature()
 	depthStencilDesc.DepthEnable = true;
 	//書き込みします
 	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-	//比較関数はLessEqual。つまり、近ければ描画される
+	//比較関数はLessEqual 近ければ描画される
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 }
 
@@ -240,62 +238,88 @@ void ParticleManager::CreateRootSignature()
 
 void ParticleManager::SetGraphicsPipeline()
 {
-	graphicsPipelineStateDesc.pRootSignature = rootSignature.Get();
-	graphicsPipelineStateDesc.InputLayout = inputLayoutDesc;
-	graphicsPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(),
-										vertexShaderBlob->GetBufferSize() };
-	graphicsPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(),
-										pixelShaderBlob->GetBufferSize() };
-	graphicsPipelineStateDesc.BlendState = blendDesc;
-	graphicsPipelineStateDesc.RasterizerState = rasterizerDesc;
-	// Dehiscenceの設定
-	graphicsPipelineStateDesc.DepthStencilState = depthStencilDesc;
-	graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	// 書き込むRTVの情報
-	graphicsPipelineStateDesc.NumRenderTargets = 1;
-	graphicsPipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-	// 利用するトポロジ（形状）のタイプ。三角形
-	graphicsPipelineStateDesc.PrimitiveTopologyType =
-		D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	// どのように画面に色を打ち込むのか設定（気にしなくて良い）
-	graphicsPipelineStateDesc.SampleDesc.Count = 1;
-	graphicsPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
-	// 実際に生成
-	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
-		IID_PPV_ARGS(&graphicsPipelineState));
-	assert(SUCCEEDED(hr));
+	for (int i = 0; i < kCountOfBlendMode; ++i)
+	{
+		D3D12_BLEND_DESC localBlendDesc{};
+		localBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		localBlendDesc.RenderTarget[0].BlendEnable = true;
+
+		SetBlendMode(localBlendDesc, static_cast<BlendMode>(i));
+
+		localBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		localBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		localBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
+		desc.pRootSignature = rootSignature.Get();
+		desc.InputLayout = inputLayoutDesc;
+		desc.VS = { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
+		desc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
+		desc.BlendState = localBlendDesc;
+		desc.RasterizerState = rasterizerDesc;
+		desc.DepthStencilState = depthStencilDesc;
+		desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		desc.NumRenderTargets = 1;
+		desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		desc.SampleDesc.Count = 1;
+		desc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+
+		HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(
+			&desc,
+			IID_PPV_ARGS(&graphicsPipelineStates[i]));
+		assert(SUCCEEDED(hr));
+	}
 }
 
 
 void ParticleManager::SetBlendMode(D3D12_BLEND_DESC& desc, BlendMode mode)
 {
+	// 指定したブレンドモードに設定
 	switch (mode)
 	{
-	case kBlendModeNormal: // 
+	case kBlendModeNone:
+		desc.RenderTarget[0].BlendEnable = false;
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+		break;
+
+	case kBlendModeNormal:
+		desc.RenderTarget[0].BlendEnable = true;
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
 		break;
+
 	case kBlendModeAdd:
+		desc.RenderTarget[0].BlendEnable = true;
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 		break;
+
 	case kBlendModeSubtract:
-		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].BlendEnable = true;
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 		break;
+
 	case kBlendModeMultiply:
+		desc.RenderTarget[0].BlendEnable = true;
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_DEST_COLOR;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
 		break;
+
 	case kBlendModeScreen:
+		desc.RenderTarget[0].BlendEnable = true;
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_COLOR;
 		break;
+
 	default:
 		assert(false);
 		break;
@@ -349,7 +373,8 @@ void ParticleManager::InitializeMaterial()
 	materialData->uvTransform = MakeIdentity4x4();
 }
 
-void ParticleManager::CreateParticleGroup(const std::string& name, const std::string textureFilePath)
+void ParticleManager::CreateParticleGroup(const std::string& name, const std::string textureFilePath,
+	BlendMode blendMode)
 {
 
 	// 登録済みの名前か確認
@@ -364,14 +389,16 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 	// マテリアルデータの作成
 	ParticleGroup& particleGroup = particleGroups[name];
 
+	// ブレンドモードの設定
+	particleGroup.blendMode = blendMode;
+
 	// 新たなパーティクルのマテリアルデータを作成
 	particleGroup.materialData.textureFilePath = textureFilePath;
 	// テクスチャの読み込み
 	TextureManager::GetInstance()->LoadTexture(particleGroup.materialData.textureFilePath);
-
+	// テクスチャのSRVインデックスを保存
 	particleGroup.textureSrvIndex = TextureManager::GetInstance()->GetSrvIndex(particleGroup.materialData.textureFilePath);
-
-
+	// インスタンシング用のリソースを作成
 	particleGroup.instancingResource = dxCommon->CreateBufferResource(sizeof(ParticleForGPU) * kMaxParticle);
 
 	// インスタンシング用のリソースを作成
@@ -380,7 +407,7 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 	particleGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&particleGroup.instancingData));
 
 
-
+	// SRVの作成
 	srvManager->CreateSRVforStructuredBuffer(
 		particleGroup.instancingSrvIndex,
 		particleGroup.instancingResource.Get(),
@@ -469,20 +496,13 @@ void ParticleManager::UpdateParticle()
 
 void ParticleManager::Draw()
 {
+	auto* commandList = dxCommon->GetCommandList();
 
-	// コマンド : パイプラインステートオブジェクトを設定
-	dxCommon->GetCommandList()->SetPipelineState(graphicsPipelineState.Get());
-	// コマンド : プリミティブトロポジ(描画形状)を設定
-	dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	// コマンド : VertexBufferViewを設定
-	dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->SetGraphicsRootSignature(rootSignature.Get());
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	// コマンド : ルートシグネチャを設定
-	dxCommon->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
-	// マテリアルデータの更新
-	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-
-	// 全てのパーティクルグループについて処理
 	for (auto& [name, particleGroup] : particleGroups)
 	{
 		if (particleGroup.kNumInstance == 0)
@@ -490,20 +510,18 @@ void ParticleManager::Draw()
 			continue;
 		}
 
-		// 行列データの更新
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(
+		commandList->SetPipelineState(
+			graphicsPipelineStates[static_cast<int>(particleGroup.blendMode)].Get());
+
+		commandList->SetGraphicsRootDescriptorTable(
 			1,
 			srvManager->GetGPUDescriptorHandle(particleGroup.instancingSrvIndex));
 
-		// インスタンシングデータの更新
-		//srvManager->SetGraphicsDescriptorTable(1, particleGroup.instancingSrvIndex);
-
-		// シェーダリソースビューの設定
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2,
+		commandList->SetGraphicsRootDescriptorTable(
+			2,
 			srvManager->GetGPUDescriptorHandle(particleGroup.textureSrvIndex));
 
-		// 描画
-		dxCommon->GetCommandList()->DrawInstanced(6, particleGroup.kNumInstance, 0, 0);
+		commandList->DrawInstanced(6, particleGroup.kNumInstance, 0, 0);
 	}
 }
 
@@ -722,12 +740,8 @@ Particle ParticleManager::MakeSparkParticle(std::mt19937& randomEngine, const Ve
 
 	// スパークらしい色（明るい黄色・オレンジ・白)
 	std::uniform_real_distribution<float> distColor(0.8f, 1.0f);
-	particle.color = {
-		1.0f,                        // 赤は最大
-		distColor(randomEngine),     // 緑はランダム（黄色っぽく）
-		distColor(randomEngine) * 0.2f, // 青は少なめ
-		1.0f
-	};
+	// 白
+	particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	particle.lifeTime = distLifetime(randomEngine);
 	particle.currentTime = 0.0f;
@@ -923,22 +937,22 @@ void ParticleManager::CreateRingVertex()
 
 void ParticleManager::DrawRing()
 {
-	if (!ringVertexBuffer) return;
+	//if (!ringVertexBuffer) return;
 
-	auto* cmdList = dxCommon->GetCommandList();
+	//auto* cmdList = dxCommon->GetCommandList();
 
-	// 必要なパイプラインセット
-	cmdList->SetGraphicsRootSignature(rootSignature.Get());
-	cmdList->SetPipelineState(graphicsPipelineState.Get());
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cmdList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
-	cmdList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	//// 必要なパイプラインセット
+	//cmdList->SetGraphicsRootSignature(rootSignature.Get());
+	//cmdList->SetPipelineState(graphicsPipelineState.Get());
+	//cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//cmdList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
+	//cmdList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	// テクスチャSRV（仮にindex=0とする）
-	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager->GetGPUDescriptorHandle(0);
-	cmdList->SetGraphicsRootDescriptorTable(2, textureHandle);
+	//// テクスチャSRV（仮にindex=0とする）
+	//D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager->GetGPUDescriptorHandle(0);
+	//cmdList->SetGraphicsRootDescriptorTable(2, textureHandle);
 
-	cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
+	//cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
 
 }
 
@@ -1097,22 +1111,22 @@ void ParticleManager::CreateCylinderVertex() {
 
 void ParticleManager::DrawCylinder()
 {
-	if (!ringVertexBuffer) return;
+	//if (!ringVertexBuffer) return;
 
-	auto* cmdList = dxCommon->GetCommandList();
+	//auto* cmdList = dxCommon->GetCommandList();
 
-	// 必要なパイプラインセット
-	cmdList->SetGraphicsRootSignature(rootSignature.Get());
-	cmdList->SetPipelineState(graphicsPipelineState.Get());
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cmdList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
-	cmdList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	//// 必要なパイプラインセット
+	//cmdList->SetGraphicsRootSignature(rootSignature.Get());
+	//cmdList->SetPipelineState(graphicsPipelineState.Get());
+	//cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//cmdList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
+	//cmdList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	// テクスチャSRV（仮にindex=0とする）
-	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager->GetGPUDescriptorHandle(0);
-	cmdList->SetGraphicsRootDescriptorTable(2, textureHandle);
+	//// テクスチャSRV（仮にindex=0とする）
+	//D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager->GetGPUDescriptorHandle(0);
+	//cmdList->SetGraphicsRootDescriptorTable(2, textureHandle);
 
-	cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
+	//cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
 
 
 }
