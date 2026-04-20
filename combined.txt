@@ -22,7 +22,14 @@
 └── └── └── ├── BlockType.h
 └── └── └── └── HazardType.h
 └── └── ├── Enemy/
+└── └── └── ├── Drop/
+└── └── └── └── ├── ReactiveDropEnemy.cpp
+└── └── └── └── ├── ReactiveDropEnemy.h
+└── └── └── └── ├── TimedDropEnemy.cpp
+└── └── └── └── └── TimedDropEnemy.h
 └── └── └── ├── EnemyBase/
+└── └── └── └── ├── DropEnemyBase.cpp
+└── └── └── └── ├── DropEnemyBase.h
 └── └── └── └── ├── EnemyBase.cpp
 └── └── └── └── ├── EnemyBase.h
 └── └── └── └── ├── FloatingEnemyBase.cpp
@@ -38,8 +45,12 @@
 └── └── └── ├── Ground/
 └── └── └── └── ├── NormalEnemy.cpp
 └── └── └── └── ├── NormalEnemy.h
+└── └── └── └── ├── PatrolEnemy.cpp
+└── └── └── └── ├── PatrolEnemy.h
 └── └── └── └── ├── SideMoveEnemy.cpp
 └── └── └── └── └── SideMoveEnemy.h
+└── └── └── ├── SpawnParams/
+└── └── └── └── └── EnemySpawnParams.h
 └── └── └── └── Types/
 └── └── └──     └── EnemyType.h
 └── └── ├── Map/
@@ -58,8 +69,6 @@
 └── └── └── └── Player.h
 └── └── ├── RespawnSequence.cpp
 └── └── ├── RespawnSequence.h
-└── └── ├── StageType.cpp
-└── └── ├── StageType.h
 └── └── └── UI/
 └── └──     ├── DamageFeedBack.cpp
 └── └──     ├── DamageFeedBack.h
@@ -294,16 +303,17 @@ void BackGround::Initialize()
 
 	// 群れの設定値
 	// 群れの数
-	setting.clusterCountMin = 3;
-	setting.clusterCountMax = 5;
+	setting.clusterCountMin = 2;
+	setting.clusterCountMax = 4;
 	// 1群れ当たりの花の数
-	setting.clusterSizeMin = 3;
-	setting.clusterSizeMax = 5;
+	setting.clusterSizeMin = 4;
+	setting.clusterSizeMax = 8;
 	// 群れの広がり半径
-	setting.clusterRadiusMin = 3.0f;
-	setting.clusterRadiusMax = 5.0f;
+	setting.clusterRadiusMin = 1.5f;
+	setting.clusterRadiusMax = 3.0f;
 	// 単独で生える花の割合
-	setting.singleSpawnRatio = 0.4f;
+	setting.singleSpawnRatio = 0.1f;
+	setting.spawnRangeInterval = 0.4f;
 
 	setting.fixY = true;
 	setting.fixZ = true;
@@ -738,8 +748,17 @@ std::vector<DecorationInstanceData> DecorationPlacer::CreateLayout(
 				data.transform.translate = pos;
 				data.transform.rotate = RandomVector3(
 					setting.minRotation, setting.maxRotation);
-				data.transform.scale = RandomVector3(
-					setting.minScale, setting.maxScale);
+				std::uniform_real_distribution<float> scaleXYDist(
+					(std::min)(setting.minScale.x, setting.maxScale.x),
+					(std::max)(setting.minScale.x, setting.maxScale.x));
+
+				float scaleXY = scaleXYDist(mt);
+
+				data.transform.scale.x = scaleXY;
+				data.transform.scale.y = scaleXY;
+				data.transform.scale.z = std::uniform_real_distribution<float>(
+					(std::min)(setting.minScale.z, setting.maxScale.z),
+					(std::max)(setting.minScale.z, setting.maxScale.z))(mt);
 
 				result.push_back(data);
 				++createdCount;
@@ -778,8 +797,13 @@ std::vector<DecorationInstanceData> DecorationPlacer::CreateLayout(
 			data.transform.translate = pos;
 			data.transform.rotate = RandomVector3(
 				setting.minRotation, setting.maxRotation);
-			data.transform.scale = RandomVector3(
-				setting.minScale, setting.maxScale);
+
+			std::uniform_real_distribution<float> scaleDist(
+				(std::min)(setting.minScale.x, setting.maxScale.x),
+				(std::max)(setting.minScale.x, setting.maxScale.x));
+
+			float scale = scaleDist(mt);
+			data.transform.scale = { scale, scale, scale };
 
 			result.push_back(data);
 			++createdCount;
@@ -933,7 +957,6 @@ struct DecorationSpawnSetting {
 File Path: Game/Application/Block/Block.cpp
 ============================================================
 #include "Block.h"
-#include "engine/3d/ModelManager.h"
 
 void Block::OnCollision(Collider* other)
 {
@@ -972,7 +995,7 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 	case BlockType::moveBlock:
 		blockModel->SetModel("GamePlay/Blocks/moveblock");
 		break;
-	case BlockType::sandBlock:
+	case BlockType::jumpBlock:
 		blockModel->SetModel("GamePlay/Blocks/sandblock");
 		break;
 	case BlockType::kGoalUp:
@@ -987,12 +1010,23 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 	case BlockType::damageBlock:
 		blockModel->SetModel("GamePlay/Blocks/damageblock");
 		break;
+	case BlockType::toggleBlockOn:
+		blockModel->SetModel("GamePlay/Blocks/toggleblock_on");
+		break;
+	case BlockType::toggleBlockOff:
+		blockModel->SetModel("GamePlay/Blocks/toggleblock_off");
+		break;
 	default:
 		blockModel->SetModel("GamePlay/Blocks/grassblock");
 		break;
 	}
 	blockModel->SetTransform(transform);
 
+
+	if (blockType == BlockType::toggleBlockOn || blockType == BlockType::toggleBlockOff) {
+		toggleOnEffect_ = ParticlePresets::CreateToggleOnBurst(position);
+		toggleOffEffect_ = ParticlePresets::CreateToggleOffBurst(position);
+	}
 
 }
 
@@ -1027,6 +1061,14 @@ void Block::Update() {
 		blockModel->SetTransform(transform);
 	}
 	blockModel->Update();
+
+	// トグルブロックの演出更新
+	if (toggleOnEffect_) {
+		toggleOnEffect_->Update();
+	}
+	if (toggleOffEffect_) {
+		toggleOffEffect_->Update();
+	}
 }
 
 void Block::Draw() {
@@ -1045,6 +1087,72 @@ Block* Block::CreateBlock(BlockType blockType, Vector3 position)
 	return newBlock;
 }
 
+void Block::UpdateToggleVisual(bool toggleState)
+{
+	// トグルブロック以外の場合は処理しない
+	if (blockType != BlockType::toggleBlockOff && blockType != BlockType::toggleBlockOn) {
+		return;
+	}
+	// 現在の状態を判定
+	const bool isSolidNow = IsSolid(toggleState);
+
+	// 初回は記録だけ
+	if (!toggleVisualInitialized_) {
+		wasSolid_ = isSolidNow;
+		toggleVisualInitialized_ = true;
+	}
+	// 状態変化時だけ演出
+	else if (wasSolid_ != isSolidNow) {
+		Vector3 effectPos = transform.translate;
+		effectPos.z -= 1.0f;
+
+		if (isSolidNow) {
+			if (toggleOnEffect_) {
+				toggleOnEffect_->SetTranslate(effectPos);
+				toggleOnEffect_->Play();
+			}
+		} else {
+			if (toggleOffEffect_) {
+				toggleOffEffect_->SetTranslate(effectPos);
+				toggleOffEffect_->Play();
+			}
+		}
+
+		wasSolid_ = isSolidNow;
+	}
+
+	// 見た目更新
+	Vector3 scale = { 1.0f, 1.0f, 1.0f };
+	if (!isSolidNow) {
+		scale = { 0.7f, 0.7f, 0.7f };
+	}
+	transform.scale = scale;
+	blockModel->SetTransform(transform);
+}
+
+
+bool Block::IsSolid(bool toggleState) const
+{
+	// Airブロックは常に非表示で判定もない
+	if (!isAlive_) {
+		return false;
+	}
+	// ブロックの種類に応じて判定の有無を返す
+	switch (blockType) {
+		// Airブロックは常に非表示で判定もない
+	case BlockType::Air:
+		return false;
+		// Onブロックはトグル状態がオンのときだけ判定がある
+	case BlockType::toggleBlockOn:
+		return toggleState;
+		// Offブロックはトグル状態がオフのときだけ判定がある
+	case BlockType::toggleBlockOff:
+		return !toggleState;
+
+	default:
+		return true;
+	}
+}
 
 ============================================================
 File Path: Game/Application/Block/Block.h
@@ -1054,6 +1162,8 @@ File Path: Game/Application/Block/Block.h
 #include "BlockType.h"
 #include "Game/Collision/Collider.h"
 #include <memory>
+
+#include "Game/Particle/ParticlePresets.h"
 class Block : public Collider
 {
 public: // 判定
@@ -1096,6 +1206,12 @@ public:
 	/// ブロックの生成
 	/// </summary>
 	static Block* CreateBlock(BlockType blockType, Vector3 position);
+
+	/// <summary>
+	/// トグル状態に応じてサイズの変更
+	/// </summary>
+	/// <param name="toggleState">現在のOnOff状態</param>
+	void UpdateToggleVisual(bool toggleState);
 
 public:	// Setter / Getter
 	/// <summary>
@@ -1140,6 +1256,13 @@ public:	// Setter / Getter
 	/// </summary>
 	void SetBroken() { isAlive_ = false; }
 
+	/// <summary>
+	/// トグル状態に応じて判定が有効かどうか
+	/// </summary>
+	/// <param name="toggleState">現状</param>
+	/// <returns>切り替える値</returns>
+	bool IsSolid(bool toggleState)const;
+
 
 private:
 
@@ -1160,6 +1283,15 @@ private:
 
 	// ブロックが壊れているかどうか
 	bool isAlive_ = true;    
+
+
+	// トグルブロックの状態
+	bool wasSolid_ = true; 
+	bool toggleVisualInitialized_ = false;
+
+	// トグルブロック関連の演出パーティクル
+	std::unique_ptr<ParticleSystem> toggleOnEffect_;
+	std::unique_ptr<ParticleSystem> toggleOffEffect_;
 
 };
 
@@ -1184,9 +1316,11 @@ enum class BlockType
 	kGoalDown = 4,
 	breakBlock = 5,
 	moveBlock = 6,
-	sandBlock = 7,
+	jumpBlock = 7,
 	unBreakable = 8,
 	damageBlock = 9,
+	toggleBlockOn = 10,
+	toggleBlockOff = 11,
 
 	// 範囲検索の最終値
 	/// 検索を行う際にCountを指定することで範囲検索を可能にできる
@@ -1242,6 +1376,459 @@ enum class HazardType : uint32_t {
 };
 
 ============================================================
+File Path: Game/Application/Enemy/Drop/ReactiveDropEnemy.cpp
+============================================================
+#include "ReactiveDropEnemy.h"
+#include "Game/Application/Player/Player.h"
+
+bool ReactiveDropEnemy::ShouldStartDrop()
+{
+	// プレイヤーの位置を追尾して落下攻撃を開始する条件を定義 / 管理する関数
+
+    // プレイヤーの情報が無い場合は落下攻撃をしない
+    if (!player_) {
+        return false;
+    }
+	// プレイヤーとの距離を計算して、一定距離以内なら落下攻撃を開始
+	float dx = std::abs(player_->GetTranslate().x - stats.transform.translate.x);
+	return dx <= triggerRangeX_;
+}
+
+
+============================================================
+File Path: Game/Application/Enemy/Drop/ReactiveDropEnemy.h
+============================================================
+#pragma once
+#include "../EnemyBase/DropEnemyBase.h"
+
+/// <summary>
+/// プレイヤーの位置を追尾して落下攻撃をしてくるエネミーのクラス
+/// 落下挙動は DropEnemyBase クラスで共通化し、追尾の管理をこのクラスで行う
+/// </summary>
+class ReactiveDropEnemy : public DropEnemyBase
+{
+private:
+	/// <summary>
+	/// 落下攻撃開始の条件 / プレイヤーの位置を追尾して開始する
+	/// </summary>
+	/// <returns>落下攻撃を開始するかどうか</returns>
+	bool ShouldStartDrop() override;
+
+	/// <summary>
+	/// モデル名の取得 
+	/// </summary>
+	const char* GetModelName() const override { return "GamePlay/Enemies/tentativeenemy"; }
+
+private:
+	// 攻撃を開始するためのプレイヤーとの距離
+	float triggerRangeX_ = 1.5f;
+};
+
+
+
+============================================================
+File Path: Game/Application/Enemy/Drop/TimedDropEnemy.cpp
+============================================================
+#include "TimedDropEnemy.h"
+
+bool TimedDropEnemy::ShouldStartDrop()
+{
+	// 落下の開始条件を定義し管理する関数
+
+	// 経過時間の計測
+	intervalTimer_ += 1.0f / 60.0f;
+
+	// 一定時間経過したら落下攻撃を開始
+	if (intervalTimer_ >= intervalDuration_) {
+		// タイマーのリセット
+		intervalTimer_ = 0.0f; 
+		return true;
+	}
+    return false;
+}
+
+
+============================================================
+File Path: Game/Application/Enemy/Drop/TimedDropEnemy.h
+============================================================
+#pragma once
+#include "../EnemyBase/DropEnemyBase.h"
+
+/// <summary>
+/// 一定時間後に落下攻撃をしてくるエネミーのクラス
+/// 落下挙動は DropEnemyBase クラスで共通化し、タイマーの管理をこのクラスで行う
+/// </summary>
+class TimedDropEnemy : public DropEnemyBase
+{
+private:
+	/// <summary>
+	/// 落下攻撃開始の条件 / 一定時間経過で開始する
+	/// </summary>
+	/// <returns>落下攻撃を開始するかどうか</returns>
+	bool ShouldStartDrop() override;
+
+	/// <summary>
+	/// モデル名の取得 
+	/// </summary>
+	const char* GetModelName() const override { return "GamePlay/Enemies/tentativeenemy"; }
+
+private:
+	// 落下開始までの計測タイマー
+	float intervalTimer_ = 0.0f;
+	// 落下開始までの時間
+	float intervalDuration_ = 2.0f;
+};
+
+
+
+============================================================
+File Path: Game/Application/Enemy/EnemyBase/DropEnemyBase.cpp
+============================================================
+#include "DropEnemyBase.h"
+#include <cmath>
+
+void DropEnemyBase::Initialize()
+{
+	stats = {
+		.transform = { 
+			{1.0f, 1.0f, 1.0f}, 
+			{0.0f, 0.0f, 0.0f}, 
+			{0.0f, startY_, 0.0f} },
+		.isAlive = true,
+		.velocity = { 0.0f, 0.0f, 0.0f },
+		.health = 1,
+		.attackPower = 1,
+	};
+	// モデルの初期化
+	model = std::make_unique<Object3D>();
+	model->Initialize();
+	// 継承先で各自モデルを指定する
+	model->SetModel(GetModelName());
+	model->SetTransform(stats.transform);
+
+	// 初期状態は待機状態
+	state_ = DropState::Waiting;
+	// クールダウンタイマーをリセット
+	coolDownTimer_ = 0.0f;
+}
+
+void DropEnemyBase::Draw()
+{
+	if (stats.isAlive) {
+		model->Draw();
+	}
+}
+
+void DropEnemyBase::Action()
+{
+	// 共通処理は無いためここでは何もしない
+}
+
+void DropEnemyBase::SetTranslate(const Vector3& translate)
+{
+	EnemyBase::SetTranslate(translate);
+	// 初期位置のY座標を設定
+	startX_ = translate.x;
+	startY_ = translate.y;
+	targetY_ = startY_ - dropDistance_;
+}
+
+void DropEnemyBase::Update()
+{
+	// 死亡している場合は処理しない
+	if (!stats.isAlive) return;
+
+
+	Move();
+
+	Action();
+
+	model->SetTransform(stats.transform);
+	model->Update();
+
+}
+
+void DropEnemyBase::Move()
+{
+	switch (state_)
+	{
+	case DropEnemyBase::DropState::Waiting:
+		// 待機状態ではY座標を固定して速度も0にする
+		stats.velocity = { 0.0f, 0.0f, 0.0f };
+		// 待機中の見た目
+		stats.transform.scale = { 1.0f, 1.0f, 1.0f };
+
+		// XYの値を初期位置に
+		stats.transform.translate.x = startX_; 
+		stats.transform.translate.y = startY_;
+
+		if (ShouldStartDrop()) {
+			// 落下攻撃開始の条件を満たしたら落下状態に遷移
+			state_ = DropState::Warning;
+			// 警告タイマーをリセット
+			warningTimer_ = 0.0f; 
+		}
+		break;
+	case DropEnemyBase::DropState::Warning:
+		UpdateWarning();
+		break;
+	case DropEnemyBase::DropState::Falling:
+		UpdateFalling();
+		break;
+	case DropEnemyBase::DropState::Cooldown:
+		UpdateCooldown();
+		break;
+	case DropEnemyBase::DropState::Returning:
+		UpdateReturning();
+		break;
+	default:
+		break;
+	}
+}
+
+void DropEnemyBase::UpdateWarning()
+{
+	// 60FPS
+	warningTimer_ += 1.0f / 60.0f;
+	// 移動量を0にして待機する
+	stats.velocity = { 0.0f, 0.0f, 0.0f };
+
+	// 予兆の見た目
+	stats.transform.scale = { 1.1f, 0.9f, 1.0f };
+
+	// 警告時間中は左右に小刻みに揺れる演出
+	float shake = std::sin(warningTimer_ * warningShakeFrequency_) * warningShakeAmplitude_;
+	stats.transform.translate.x = startX_ + shake;
+	
+	// 警告演出が終了したら落下状態に遷移
+	if (warningTimer_ >= warningTime_) {
+		// タイマーのリセット
+		warningTimer_ = 0.0f; 
+		// 元に戻す
+		stats.transform.scale = { 1.0f, 1.0f, 1.0f };
+		// ぶるぶる震える演出をリセット
+		stats.transform.translate.x = startX_;
+		// 落下速度を初期値に設定
+		currentFallSpeed_ = initialFallSpeed_;
+		// 警告時間が終了したら落下状態に遷移
+		state_ = DropState::Falling;
+	}
+}
+
+void DropEnemyBase::UpdateFalling()
+{
+	// 落下速度を加速させる
+	currentFallSpeed_ += fallAcceleration_;
+	if (currentFallSpeed_ > maxFallSpeed_) {
+		currentFallSpeed_ = maxFallSpeed_;
+	}
+
+	// 落下速度分Y座標を減少させる
+	stats.transform.translate.y -= currentFallSpeed_;
+	stats.velocity = { 0.0f, -currentFallSpeed_, 0.0f };
+	// 落下中の見た目
+	stats.transform.scale = { 0.9f, 1.15f, 1.0f };
+
+	if (HasReachedGround()) {
+		// Y座標を地面の位置に固定して速度も0にする
+		stats.transform.translate.y = targetY_; 
+		// 地面に到達したらクールダウン状態に遷移
+		state_ = DropState::Cooldown;
+
+		// クールダウンタイマーをリセット
+		coolDownTimer_ = 0.0f;
+
+		// 落下速度のリセット
+		currentFallSpeed_ = 0.0f; 
+
+		// 落下速度をリセット
+		stats.velocity = { 0.0f, 0.0f, 0.0f };
+	}
+}
+
+void DropEnemyBase::UpdateCooldown()
+{
+	// 60FPS
+	coolDownTimer_ += 1.0f / 60.0f;
+	// 移動量を0にして待機する
+	stats.velocity = { 0.0f, 0.0f, 0.0f };
+	// クールダウン中の見た目
+	stats.transform.scale = { 1.0f, 1.0f, 1.0f };
+
+	if (coolDownTimer_ >= coolDownTime_) {
+		// クールダウンが終了したら元の位置へ戻る状態に遷移
+		state_ = DropState::Returning;
+	}
+}
+
+void DropEnemyBase::UpdateReturning()
+{
+	// 戻る速度分Y座標を増加させる
+	stats.transform.translate.y += returnSpeed_;
+	// 元の位置に戻る速度を設定
+	stats.velocity = { 0.0f, returnSpeed_, 0.0f };
+	// 元の位置に戻る見た目
+	stats.transform.scale = { 1.05f, 0.95f, 1.0f };
+
+	// Y座標が初期位置に戻ったら
+	if(stats.transform.translate.y >= startY_) {
+		// Y座標を元の位置に固定して速度も0にする
+		stats.transform.translate.y = startY_;
+		// Xの値も初期位置に
+		stats.transform.translate.x = startX_;
+		// 速度をリセット
+		stats.velocity = { 0.0f, 0.0f, 0.0f };
+		// 元の位置に戻ったら待機状態に遷移
+		state_ = DropState::Waiting;
+	}
+}
+
+
+============================================================
+File Path: Game/Application/Enemy/EnemyBase/DropEnemyBase.h
+============================================================
+#pragma once
+#include "EnemyBase.h"
+
+/// <summary>
+/// 落下攻撃をしてくるエネミーの基底クラス
+/// </summary>
+class Player; // プレイヤークラスの前方宣言
+class DropEnemyBase : public EnemyBase
+{
+public:
+	/// <summary>
+	/// プレイヤーの情報をセットする関数 / 落下攻撃の条件でプレイヤーの位置を参照するため
+	/// </summary>
+	/// <param name="player">プレイヤーのポインタ</param>
+	void SetPlayer(Player* player) { player_ = player; }
+
+protected:
+
+	enum class DropState
+	{
+		Waiting,	// 天井での待機状態
+		Warning,	// 落下前の警告状態 / 演出用
+		Falling,	// 落下中
+		Cooldown,	// 落下地点で少し待機する
+		Returning,	// 元の位置へ戻る
+	};
+
+	/// <summary>
+	/// 落下攻撃の初期化
+	/// </summary>
+	void Initialize() override;
+
+	/// <summary>
+	/// 落下攻撃の描画処理 
+	/// </summary>
+	void Draw() override;
+
+	/// <summary>
+	/// 落下攻撃の攻撃処理 
+	/// </summary>
+	void Action() override;
+
+	/// <summary>
+	///	 落下攻撃の位置設定 
+	/// </summary>
+	/// <param name="translate"></param>
+	void SetTranslate(const Vector3& translate) override;
+
+	/// <summary>
+	/// 落下攻撃の共通処理
+	/// </summary>
+	void Update() override;
+
+	/// <summary>
+	/// 落下攻撃の動作処理 / ステート管理
+	/// </summary>
+	void Move() override;
+	
+	/// <summary>
+	/// 落下攻撃開始の共通処理
+	/// </summary>
+	/// <returns>落下攻撃を開始するかどうか</returns>
+	/// 継承先のクラスで各自の条件で開始できるようにするために純粋仮想関数とする
+	virtual bool ShouldStartDrop() = 0;
+
+	/// <summary>
+	/// モデル名の取得 継承先で各自モデルを指定できるように
+	/// </summary>
+	virtual const char* GetModelName() const = 0;
+private:
+
+	/// <summary>
+	/// 落下前の警告状態の更新処理 / 演出用の共通処理
+	/// </summary>
+	void UpdateWarning();
+
+	/// <summary>
+	/// 落下中の更新処理 / 落下の挙動を共通化
+	/// </summary>
+	void UpdateFalling();
+
+	/// <summary>
+	/// 元の位置へ戻る更新処理 / 戻る挙動を共通化
+	/// </summary>
+	void UpdateCooldown();
+
+	/// <summary>
+	/// 元の位置へ戻る更新処理 / 戻る挙動を共通化
+	/// </summary>
+	void UpdateReturning();
+
+	/// <summary>
+	/// 落下地点に到達したかどうかの判定 / 落下挙動を共通化
+	/// </summary>
+	/// <returns>落下地点に到達しているか</returns>
+	bool HasReachedGround() const {
+		// 落下地点に到達したかどうかの判定
+		return stats.transform.translate.y <= targetY_;
+	}
+
+private:
+	// 待機位置
+	float startY_ = 0.0f; 
+	// 落下速度
+	float fallSpeed_ = 0.15f;
+	// 戻る速度
+	float returnSpeed_ = 0.08f;
+	// 落下地点での待機時間
+	float coolDownTime_ = 1.0f;
+	// 落下地点での待機タイマー
+	float coolDownTimer_ = 0.0f;
+
+	// 仮の地面のY座標
+	float dropDistance_ = 5.0f;
+	float targetY_ = 0.0f;
+
+	// 落下前の演出管理用のタイマー
+	float warningTime_ = 0.25f;
+	float warningTimer_ = 0.0f;
+
+	// 落下前のぶるぶる震える演出の管理用の変数
+	float startX_ = 0.0f;
+	float warningShakeAmplitude_ = 0.05f;
+	float warningShakeFrequency_ = 40.0f;
+	
+	// 落下を加速させるための変数
+	float currentFallSpeed_ = 0.0f;
+	float initialFallSpeed_ = 0.05f;
+	float fallAcceleration_ = 0.015f;
+	float maxFallSpeed_ = 0.35f;
+
+
+	// 現在の状態
+	DropState state_ = DropState::Waiting;
+protected:
+	// 追尾するプレイヤー
+	Player* player_ = nullptr;
+};
+
+
+
+============================================================
 File Path: Game/Application/Enemy/EnemyBase/EnemyBase.cpp
 ============================================================
 #include "EnemyBase.h"
@@ -1257,6 +1844,7 @@ File Path: Game/Application/Enemy/EnemyBase/EnemyBase.h
 #include "engine/3d/Object3D.h"
 #include "Game/Collision/Collider.h"
 #include "Game/Application/Map/IMapCollisionQuery.h"
+#include "../Types/EnemyType.h"
 
 /// <summary>
 /// エネミーの基本構造
@@ -1276,6 +1864,8 @@ struct Stats {
 	/// 攻撃力
 	int32_t attackPower;
 };
+
+
 
 class EnemyBase : public Collider
 {
@@ -1399,6 +1989,10 @@ File Path: Game/Application/Enemy/EnemyBase/FloatingEnemyBase.h
 #pragma once
 #include "EnemyBase.h"
 
+/// <summary>
+/// 浮遊するエネミーの基底クラス
+/// ふわふわと動く挙動を共通化するためのクラス
+/// </summary>
 class FloatingEnemyBase : public EnemyBase
 {
 protected: // 派生クラスでアクセス可能なメンバ
@@ -1422,34 +2016,64 @@ File Path: Game/Application/Enemy/Factory/EnemyFactory.cpp
 ============================================================
 #include "EnemyFactory.h"
 #include <Logger.h>
+#include "../Ground/SideMoveEnemy.h"
 #include "../Ground/NormalEnemy.h"
+#include "../Ground/PatrolEnemy.h"
 #include "../Flying/FlyingEnemy.h"
 #include "../Flying/SideMoveFlyingEnemy.h"
-#include "../Ground/SideMoveEnemy.h"
+#include "../Drop/TimedDropEnemy.h"
+#include "../Drop/ReactiveDropEnemy.h"
 
-std::unique_ptr<EnemyBase> EnemyFactory::CreateEnemy(const std::string& type)
+
+std::unique_ptr<EnemyBase> EnemyFactory::CreateEnemy(const EnemySpawnParams& params)
 {
-	if(type == "NormalEnemy")
-	{
-		auto enemy = std::make_unique<NormalEnemy>();
-		return enemy;
+	// 生成するエネミーのインスタンスを格納するためのスマートポインタ
+	std::unique_ptr<EnemyBase> enemy = nullptr;
+
+	// EnemyTypeから敵の種類を特定して生成
+	switch (params.type) {
+		// その場で待機するエネミー
+	case EnemyType::NormalEnemy:
+		enemy = std::make_unique<NormalEnemy>();
+		break;
+		// 飛行するエネミー / ふわふわと浮遊する挙動
+	case EnemyType::FlyingEnemy:
+		enemy = std::make_unique<FlyingEnemy>();
+		break;
+		// 飛行しながら左に移動するエネミー / ふわふわと浮遊する挙動
+	case EnemyType::SideMoveFlyingEnemy:
+		enemy = std::make_unique<SideMoveFlyingEnemy>();
+		break;
+		// 左右に移動するエネミー
+	case EnemyType::SideMoveEnemy:
+		enemy = std::make_unique<SideMoveEnemy>();
+		break;
+		// 巡回する敵
+	case EnemyType::PatrolEnemy:
+		enemy = std::make_unique<PatrolEnemy>();
+		break;
+		// 一定時間ごとに落下攻撃をするエネミー
+	case EnemyType::TimedDropEnemy:
+		enemy = std::make_unique<TimedDropEnemy>();
+		break;
+		// プレイヤーの位置を追尾して落下攻撃をするエネミー
+	case EnemyType::ReactiveDropEnemy: {
+		auto  reactive = std::make_unique<ReactiveDropEnemy>();
+		// プレイヤーの情報をセットする / 落下攻撃の条件でプレイヤーの位置を参照するため
+		reactive->SetPlayer(params.player);
+		enemy = std::move(reactive);
+		break;
 	}
-	else if(type == "FlyingEnemy")
-	{
-		auto enemy = std::make_unique<FlyingEnemy>();
-		return enemy;
+	default:
+		Logger::Log("No EnemyType matched");
+		return nullptr; // 対応するエネミーがない場合はnullptrを返す
 	}
-	else if (type == "SideMoveFlyingEnemy")
-	{
-		auto enemy = std::make_unique<SideMoveFlyingEnemy>();
-		return enemy;
-	}
-	else if (type == "SideMoveEnemy") {
-		auto enemy = std::make_unique<SideMoveEnemy>();
-		return enemy;
-	}
-	Logger::Log("\nEnemy generation failed\nNo matching data found\n		or\nSpelling error\n\n");
-	return nullptr; // 対応するエネミーがない場合はnullptrを返す
+	// 生成したエネミーの初期化
+	enemy->Initialize();
+	enemy->SetMapQuery(params.mapQuery);
+	enemy->SetTranslate(params.position);
+	// 生成したエネミーを返す
+	return enemy;
 }
 
 
@@ -1458,11 +2082,11 @@ File Path: Game/Application/Enemy/Factory/EnemyFactory.h
 ============================================================
 #pragma once
 #include <memory>
-
 /// <summary>
 /// ファクトリメソッドパターンのファクトリー部分
 /// エネミーを生成する
 /// </summary>
+#include "../SpawnParams/EnemySpawnParams.h"
 
 /// エネミー全てのファクトリークラス
 #include "../EnemyBase/EnemyBase.h"
@@ -1470,15 +2094,18 @@ class NormalEnemy;
 class FlyingEnemy;
 class SideMoveFlyingEnemy;
 class SideMoveEnemy;
+class PatrolEnemy;
+class TimedDropEnemy;
+class ReactiveDropEnemy;
 class EnemyFactory
 {
 public:
 	/// <summary>
 	///  エネミーを生成するファクトリーメソッド
 	/// </summary>
-	/// <param name="type">生成するエネミーの名前</param>
+	/// <param name="params">エネミー生成パラメーター</param>
 	/// <returns>エネミーデータのインスタンス</returns>
-	static std::unique_ptr<EnemyBase> CreateEnemy(const std::string& type);
+	static std::unique_ptr<EnemyBase> CreateEnemy(const EnemySpawnParams& params);
 
 };
 
@@ -1868,6 +2495,161 @@ class NormalEnemy :
 
 
 ============================================================
+File Path: Game/Application/Enemy/Ground/PatrolEnemy.cpp
+============================================================
+#include "PatrolEnemy.h"
+
+// ラジアンの定数
+constexpr float kFaceRight = 3.14159265f; 
+constexpr float kFaceLeft = 0.0f; 
+
+void PatrolEnemy::Initialize()
+{
+	// ステータスの初期化
+	stats = {
+		{{1.0f, 1.0f, 1.0f},
+		 {0.0f, 0.0f, 0.0f},
+		 {0.0f, 0.0f, 0.0f}},
+		true,
+		{0.0f, 0.0f, 0.0f},
+		1,
+		1
+	};
+	// モデルの初期化
+	model = std::make_unique<Object3D>();
+	model->Initialize();
+	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	model->SetTransform(stats.transform);
+	// 巡回の初期設定
+	direction_ = 1;
+}
+
+void PatrolEnemy::Update()
+{
+	// 生存していない場合は更新処理を行わない
+	if (!stats.isAlive) {
+		return;
+	}
+	// 移動と行動の更新
+	Move();
+	// 行動の更新
+	Action();
+	// モデルのトランスフォームをステータスに合わせて更新
+	model->SetTransform(stats.transform);
+	model->Update();
+}
+
+
+void PatrolEnemy::Draw()
+{
+	// 生存している場合のみ描画
+	if (stats.isAlive) {
+		model->Draw();
+	}
+}
+
+void PatrolEnemy::Move()
+{
+	// 巡回の処理
+	// 左右の移動上限値 / 左右
+	float leftLimit = StartX_ - moveRange_;
+	float rightLimit = StartX_ + moveRange_;
+
+	// 現在の位置を取得
+	Vector3 pos = stats.transform.translate;
+
+	// 進行方向に移動
+	if (pos.x <= leftLimit) {
+		direction_ = 1;
+	}
+	else if (pos.x >= rightLimit) {
+		direction_ = -1;
+	}
+	// 位置を更新
+	pos.x += static_cast<float>(direction_) * moveSpeed_;
+	stats.transform.translate = pos;
+	// 速度を更新
+	stats.velocity.x = static_cast<float>(direction_) * moveSpeed_;
+
+	// 向き反転
+	if (direction_ > 0) {
+		stats.transform.rotate.y  = kFaceRight;
+	} else {
+		stats.transform.rotate.y = kFaceLeft;
+	}
+
+}
+
+void PatrolEnemy::Action()
+{
+}
+
+
+
+============================================================
+File Path: Game/Application/Enemy/Ground/PatrolEnemy.h
+============================================================
+#pragma once
+#include "../EnemyBase/EnemyBase.h"
+
+/// <summary>
+/// 指定した範囲を左右に往復してプレイヤーを見つけたら追いかけるエネミー
+/// </summary>
+class PatrolEnemy : public EnemyBase
+{
+	public:
+	/// <summary>
+	/// 初期化処理
+	/// </summary>
+	void Initialize() override;
+	/// <summary>
+	/// 更新処理
+	/// </summary>
+	void Update() override;
+	/// <summary>
+	/// 描画処理
+	/// </summary>
+	void Draw() override;
+	/// <summary>
+	/// 移動処理
+	/// </summary>
+	void Move() override;
+	/// <summary>
+	/// 行動処理
+	/// </summary>
+	void Action() override;
+
+	/// <summary>
+	/// 位置情報の設定
+	/// </summary>
+	/// <param name="translate">変更したい位置情報の値</param>
+	void SetTranslate(const Vector3& translate) override {
+		EnemyBase::SetTranslate(translate);
+		// 初期位置を設定する
+		StartX_ = translate.x; 
+	}
+
+	void OnStomped() override {
+		// プレイヤーに踏まれたときの処理
+		stats.isAlive = false; 
+		stats.health = 0;
+	}
+
+private:
+	// 初期位置 / 巡回の基準点
+	float StartX_ = 0.0f;
+	// 往復する範囲
+	float moveRange_ = 3.0f;
+	// 移動速度
+	float moveSpeed_ = 0.05f;
+	// 進行方向
+	int direction_ = 1; // 1:右, -1:左 
+
+};
+
+
+
+============================================================
 File Path: Game/Application/Enemy/Ground/SideMoveEnemy.cpp
 ============================================================
 #include "SideMoveEnemy.h"
@@ -2011,6 +2793,28 @@ class SideMoveEnemy :
 
 
 ============================================================
+File Path: Game/Application/Enemy/SpawnParams/EnemySpawnParams.h
+============================================================
+#pragma once
+#include "engine/math/MyMath.h"
+#include "Game/Application/Map/IMapCollisionQuery.h"
+#include "Game/Application/Enemy/Types/EnemyType.h"
+
+// 前方宣言
+class Player;
+/// エネミーの生成パラメーター
+struct EnemySpawnParams {
+	// 生成するエネミーの種類
+	EnemyType type;
+	// 生成位置
+	Vector3 position;
+	// マップ衝突クエリー
+	IMapCollisionQuery* mapQuery = nullptr;
+	// プレイヤーの情報
+	Player* player = nullptr;
+};
+
+============================================================
 File Path: Game/Application/Enemy/Types/EnemyType.h
 ============================================================
 #pragma once
@@ -2023,6 +2827,9 @@ enum class EnemyType {
 	FlyingEnemy = 2,
 	SideMoveFlyingEnemy = 3,
 	SideMoveEnemy = 4,
+	PatrolEnemy = 5,
+	TimedDropEnemy = 6,
+	ReactiveDropEnemy = 7,
 };
 
 ============================================================
@@ -2348,9 +3155,11 @@ ImVec4 GetBlockColorByType(BlockType blockType) {
 	case BlockType::kGoalDown:   return ImVec4(0.4f, 0.8f, 0.8f, 1.0f);
 	case BlockType::breakBlock:  return ImVec4(0.8f, 0.8f, 0.4f, 1.0f);
 	case BlockType::moveBlock:   return ImVec4(0.8f, 0.4f, 0.8f, 1.0f);
-	case BlockType::sandBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
+	case BlockType::jumpBlock:   return ImVec4(0.7f, 0.6f, 0.3f, 1.0f);
 	case BlockType::unBreakable: return ImVec4(0.3f, 0.3f, 0.3f, 1.0f);
 	case BlockType::damageBlock: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
+	case BlockType::toggleBlockOn: return ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
+	case BlockType::toggleBlockOff: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
 	default:                     return ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
 	}
 }
@@ -2391,6 +3200,7 @@ void Map::Update()
 				continue;
 			}
 			block->Update();
+			block->UpdateToggleVisual(jumpToggleState_);
 		}
 	}
 	// ハザードの更新
@@ -2413,9 +3223,18 @@ void Map::Update()
 	ImGui::Text("Size: %u x %u", GetWidth(), GetHeight());
 	ImGui::Separator();
 
+	// トグル状態の表示
+	ImGui::Text("Jump Toggle State:");
+	ImGui::SameLine();
+	if (jumpToggleState_) {
+		ImGui::TextColored(ImVec4(0.2f, 1.0f, 0.2f, 1.0f), "ON");
+	} else {
+		ImGui::TextColored(ImVec4(1.0f, 0.2f, 0.2f, 1.0f), "OFF");
+	}
+
 	// 使い回す：ファイル名入力とメッセージ
-	static char mapFileName[256] = "1-1.csv";
-	static char enemyFileName[256] = "1-1_EnemyLayer.csv";
+	static char mapFileName[256] = ".csv";
+	static char enemyFileName[256] = "_EnemyLayer.csv";
 	static std::string message;
 
 	// ヘルパー：拡張子を除いたベース名を作る
@@ -2575,9 +3394,11 @@ void Map::Update()
 				"GoalDown",
 				"BreakBlock",
 				"MoveBlock",
-				"SandBlock",
+				"JumpBlock",
 				"Unbreakable",
 				"DamageBlock",
+				"ToggleBlockOn",
+				"ToggleBlockOff",
 			};
 
 			static int currentHazardTypeInt = 0;
@@ -2593,6 +3414,9 @@ void Map::Update()
 				"FlyingEnemy",
 				"SideMoveFlyingEnemy",
 				"SideMoveEnemy",
+				"PatrolEnemy",
+				"TimedDropEnemy",
+				"ReactiveDropEnemy",
 			};
 
 			if (static_cast<EditLayerMode>(editModeInt) == EditLayerMode::Block) {
@@ -2698,9 +3522,21 @@ void Map::Update()
 						// Enemy overlay
 						if (cellEnemy != EnemyType::None) {
 							ImU32 col = IM_COL32(60, 255, 60, 255);
+
 							if (cellEnemy == EnemyType::FlyingEnemy) {
 								col = IM_COL32(60, 140, 255, 255);
+							} else if (cellEnemy == EnemyType::SideMoveFlyingEnemy) {
+								col = IM_COL32(120, 180, 255, 255);
+							} else if (cellEnemy == EnemyType::SideMoveEnemy) {
+								col = IM_COL32(255, 180, 60, 255);
+							} else if (cellEnemy == EnemyType::PatrolEnemy) {
+								col = IM_COL32(255, 255, 60, 255);
+							} else if (cellEnemy == EnemyType::TimedDropEnemy) {
+								col = IM_COL32(255, 80, 80, 255);
+							} else if (cellEnemy == EnemyType::ReactiveDropEnemy) {
+								col = IM_COL32(255, 80, 180, 255);
 							}
+
 							ImVec2 eMin(pMin.x + 2.0f, pMin.y + 2.0f);
 							ImVec2 eMax(pMax.x - 2.0f, pMax.y - 2.0f);
 							dl->AddRect(eMin, eMax, col, 0.0f, 0, 2.0f);
@@ -3142,13 +3978,34 @@ void Map::BreakBlock(uint32_t xIndex, uint32_t yIndex)
 
 HazardType Map::GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const
 {
+	// マップ外チェック
 	uint32_t w = GetWidth();
 	uint32_t h = GetHeight();
 	if (xIndex >= w || yIndex >= h) { return HazardType::None; }
 	if (mapChipData_.hazardData.empty()) { return HazardType::None; }
+	// 指定インデックスのハザードの種類を返す
 	return mapChipData_.hazardData[yIndex][xIndex];
 }
 
+bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
+{
+	// マップ外チェック
+	if (yIndex >= blockArray_.size() || xIndex >= blockArray_[yIndex].size()) {
+		return false;
+	}
+	// その位置にブロックがあるか
+	Block* block = blockArray_[yIndex][xIndex];
+	if (!block) {
+		return false;
+	}
+	// ゴールは判定をとらない / 触れたらisgoalをtrueにするだけ
+	BlockType type = mapChipData_.mapData[yIndex][xIndex];
+	if (type == BlockType::kGoalUp || type == BlockType::kGoalDown) {
+		return false;
+	}
+	// ブロックの種類に応じて判定をとるか決める
+	return block->IsSolid(jumpToggleState_);
+}
 
 
 ============================================================
@@ -3317,14 +4174,33 @@ public:	// Setter / Getter
 	/// <summary>
 	/// 破壊可能ブロックを壊す
 	/// </summary>
-	/// <param name="xIndex">当たった壊せるブロックの横Indexの番号</param>
-	/// <param name="yIndex">当たった壊せるブロックの縦Indexの番号</param>
+	/// <param name="xIndex">当たって壊せるブロックの横Indexの番号</param>
+	/// <param name="yIndex">当たって壊せるブロックの縦Indexの番号</param>
 	void BreakBlock(uint32_t xIndex, uint32_t yIndex);
 
 	/// <summary>
 	/// インデックスからマップチップの種類を設定
 	/// </summary>
 	HazardType GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const;
+
+	/// <summary>
+	/// ジャンプブロックのトグル状態を取得
+	/// </summary>
+	/// <returns>ブロックのOnとOff状態の取得</returns>
+	bool GetJumpToggleState()const { return jumpToggleState_; }
+
+	/// <summary>
+	/// ジャンプブロックのトグル状態を切り替える
+	/// </summary>
+	void ToggleJumpSwitch() { jumpToggleState_ = !jumpToggleState_; }
+
+	/// <summary>
+	/// 指定インデックスに当たり判定のあるブロックがあるか
+	/// </summary>
+	/// <param name="xIndex">走査する横インデックス</param>
+	/// <param name="yIndex">走査する縦インデックス</param>
+	/// <returns>当たり判定のあるブロックがあるかどうか</returns>
+	bool IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const;
 private:
 	// マップチップデータ
 	MapChipData mapChipData_;
@@ -3357,6 +4233,9 @@ private:
 
 	// 破壊可能ブロックのパーティクルエフェクト用
 	std::unique_ptr<ParticleSystem> breakParticleEmitter_;
+
+	// ブロックのトグル状態
+	bool jumpToggleState_ = true;
 
 };
 
@@ -3404,8 +4283,13 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/goalblock/up");
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/goalblock/down");
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/damageblock");
+	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_on");
+	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_on_off");
+	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_off");
+	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_off_off");
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
+
 
 	// GameOverScene
 	ModelManager::GetInstance().LoadModel("Scenes/GameOver/Models/backblack");
@@ -3728,6 +4612,7 @@ void Player::EmitLandParticle()
 
 Vector3 Player::GetFootParticlePos() const
 {
+	// プレイヤーの位置を取得
 	Vector3 p = playerModel_->GetTranslate();
 
 	// AABBの一番下（足元）に合わせる
@@ -3743,20 +4628,17 @@ Vector3 Player::GetFootParticlePos() const
 
 void Player::Respawn(const Vector3& pos)
 {
+	// 位置をリスポーン地点に移動
 	velocity_ = {};
 	if (playerModel_) {
 		playerModel_->SetTranslate(pos);
 		playerModel_->SetRotate({ 0.0f,0.0f,0.0f });
 	}
 
+	// 状態をリセット
 	isDead_ = false;
 	isDeathByFalling_ = false;
-
 	onGround_ = true;
-
-	// 無敵点滅などの副作用があるなら必要に応じて初期化
-	// isEnemyHit_ = false;
-	// isVisible_ = true;
 }
 
 void Player::BeginDeathDemo(const Vector3& cameraPos)
@@ -3773,7 +4655,7 @@ void Player::BeginDeathDemo(const Vector3& cameraPos)
 	// その場でジャンプ開始
 	deathVel_ = { 0.0f, deathJumpSpeed_, 0.0f };
 
-	// こちらを向く=
+	// こちらを向く
 	deathFaceRot_ = { 0.0f, 1.6f, 0.0f };
 	playerModel_->SetRotate(deathFaceRot_);
 }
@@ -3980,7 +4862,9 @@ void Player::Initialize(Vector3 position)
 	moveEffect_->Pause();
 	moveEffect_->SetEmissionRate(5.0f);
 	moveEffect_->SetLoop(true);
-	moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	//moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	moveEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
 
 	// ダッシュエフェクトの初期化
 	// 足元の煙エフェクト(ダッシュ)
@@ -3989,14 +4873,19 @@ void Player::Initialize(Vector3 position)
 	dashSmokeEffect_->Pause();
 	dashSmokeEffect_->SetEmissionRate(15.0f);
 	dashSmokeEffect_->SetLoop(true);
-	dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	//dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	dashSmokeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+
 	// ダッシュ開始時の衝撃波
 	dashStartEffect_ = ParticlePresets::CreateSparks(position);
 	dashStartEffect_->Pause();
 	// 一気に
-	dashStartEffect_->SetEmissionRate(50.0f);
+	dashStartEffect_->SetEmissionRate(20.0f);
 	// 一度の発生のためループはしない
 	dashStartEffect_->SetLoop(false);
+	// 色 / 黄色
+	dashStartEffect_->SetColor(Vector4(1.0f, 1.0f, 0.5f, 1.0f));
 
 	// 踏みつけエフェクトの初期化
 	stompEffect_ = ParticlePresets::CreateSparks(position);
@@ -4005,15 +4894,48 @@ void Player::Initialize(Vector3 position)
 	stompEffect_->SetLoop(false);
 	stompEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
+
 	// ジャンプの開始と着地のパーティクル
 	jumpEffect_ = ParticlePresets::CreateJumpDust(position);
 	landEffect_ = ParticlePresets::CreateLandDust(position);
+
+	// ジャンプブロックに乗っているときの上昇エフェクト / 初期状態は停止
+	jumpBlockArrowEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
+	jumpBlockArrowEffect_->Pause();
 
 }
 
 
 void Player::Update()
 {
+	// ジャンプブロックに乗っているか
+	bool onJumpBlockNow = onGround_ && IsOnJumpBlock();
+
+	// ジャンプブロックに乗っているときだけ上昇エフェクトを出す
+	if (jumpBlockArrowEffect_ && playerModel_) {
+		// 上昇エフェクトの発生位置
+		Vector3 effectPosition = playerModel_->GetTranslate();
+		effectPosition.z -= 0.5f;
+		// プレイヤーの周りに出す
+		jumpBlockArrowEffect_->SetTranslate(effectPosition);
+
+		// プレイヤーの頭上にエフェクトを出す / 乗っていたら
+		if (onJumpBlockNow) {
+			// プレイヤーの頭上にエフェクトを出す / 乗っていたら
+			if (!wasOnJumpBlock_) {
+				jumpBlockArrowEffect_->Play();
+			}
+		} 
+		// 乗っていないときはエフェクトを停止
+		else {
+			jumpBlockArrowEffect_->Pause();
+		}
+	}
+
+	// 前フレームの状態を保持
+	wasOnJumpBlock_ = onJumpBlockNow;
+
+	
 	if (isDying_) {
 		UpdateDeathDemo();
 		playerModel_->Update();
@@ -4044,6 +4966,9 @@ void Player::Update()
 
 	if (jumpEffect_)jumpEffect_->Update();
 	if (landEffect_)landEffect_->Update();
+	if (jumpBlockArrowEffect_)jumpBlockArrowEffect_->Update();
+	
+
 }
 
 
@@ -4257,11 +5182,20 @@ void Player::Jump()
 	if (onGround_) {
 		// ジャンプキーが押されたら
 		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+			// ジャンプスイッチの切り替え
+			map_->ToggleJumpSwitch();
+
 			// ジャンプの開始エフェクトの発生
 			EmitJumpParticle();
-
-			// ジャンプ処理 / ジャンプ距離を縦のスピードに入れる
-			velocity_.y = status_.kJumpPower;
+			
+			// ジャンプブロックの上にいたら高く跳ねる
+			if (IsOnJumpBlock()) {
+				velocity_.y = status_.kJumpBlockPower;
+			} 
+			// 通常のジャンプ
+			else {
+				velocity_.y = status_.kJumpPower;
+			}
 
 			// 空中にいる状態にする
 			onGround_ = false;
@@ -4356,51 +5290,42 @@ void Player::LandingCollisionMove(CollisionMapInfo& collisionInfo)
 		// 着地エフェクトの発生
 		EmitLandParticle();
 
-		return;  // 着地したらここで終了
+		return;
 	}
 
 	// 地面にいる場合の継続判定
 	if (onGround_) {
-		// 下方向に速度がない場合のみチェック（安定化）
+		// 
 		if (velocity_.y <= 0.0f) {
-			// 現在の座標で判定
 			Vector3 position = playerModel_->GetTranslate();
 
-			// 足元の2点の位置を取得
 			Vector3 leftBottom = CornerPosition(position, kLeftBottom);
 			Vector3 rightBottom = CornerPosition(position, kRightBottom);
 
-			// 少し下の位置でチェック（より確実に）
 			Vector3 checkOffset = Vector3(0.0f, -status_.kEpsilon * 2.0f, 0.0f);
 
-			// 左点の判定
 			IndexSet leftIndex = map_->GetMapChipIndexSetByPosition(leftBottom + checkOffset);
 			BlockType leftBlock = map_->GetMapChipTypeByIndex(leftIndex.xIndex, leftIndex.yIndex);
 
-			// 右点の判定
 			IndexSet rightIndex = map_->GetMapChipIndexSetByPosition(rightBottom + checkOffset);
 			BlockType rightBlock = map_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
 
-
-			// 両方の点が地面から離れた場合のみ、地面から離れたとする
-			if (!IsHitBlockTable(leftBlock) && !IsHitBlockTable(rightBlock)) {
+			if (!map_->IsSolidBlockAt(leftIndex.xIndex, leftIndex.yIndex) &&
+				!map_->IsSolidBlockAt(rightIndex.xIndex, rightIndex.yIndex)) {
 				onGround_ = false;
 			}
 
-			// ゴールブロックの判定
 			if (IsHitGoalBlockTable(leftBlock) || IsHitGoalBlockTable(rightBlock)) {
 				isGoal_ = true;
 			}
 
-			// ダメージブロックの判定
 			if (IsHitBlockDamageTable(leftBlock) || IsHitBlockDamageTable(rightBlock)) {
-				// ダメージ処理
 				TakeDamage();
 			}
-
 		}
 	}
 }
+
 
 void Player::WallCollisionMove(CollisionMapInfo& collisionInfo)
 {
@@ -4480,10 +5405,12 @@ bool Player::CheckCollisionPoints(const std::array<Vector3, 2>& posList, Collisi
 		// マップチップの種類を取得
 		BlockType chip = map_->GetMapChipTypeByIndex(index.xIndex, index.yIndex);
 
-		if (IsHitBlockTable(chip)) {
+		// 当たり判定を取るブロックの種類かどうか
+		if (map_->IsSolidBlockAt(index.xIndex, index.yIndex)) {
 			isHit = true;
-		} else if (IsHitGoalBlockTable(chip)) {
-			// ゴール処理
+		} 
+		// ゴールの判定をとるブロックかどうか
+		else if (IsHitGoalBlockTable(chip)) {
 			isGoal_ = true;
 		}
 	}
@@ -4527,6 +5454,7 @@ bool Player::IsHitBlockTable(BlockType type)
 	case BlockType::SoilBlock:
 	case BlockType::breakBlock:
 	case BlockType::unBreakable:
+	case BlockType::jumpBlock:
 		return true;
 
 	default:
@@ -4604,6 +5532,10 @@ void Player::Finalize()
 	if (landEffect_) {
 		landEffect_->Stop();
 		landEffect_.reset();
+	}
+	if (jumpBlockArrowEffect_) {
+		jumpBlockArrowEffect_->Stop();
+		jumpBlockArrowEffect_.reset();
 	}
 }
 
@@ -4708,6 +5640,28 @@ void Player::ImGui()
 #endif
 }
 
+bool Player::IsOnJumpBlock()
+{
+	if (!map_ || !playerModel_) { return false; }
+
+	Vector3 position = playerModel_->GetTranslate();
+
+	// 足元2点を取得
+	Vector3 leftBottom = CornerPosition(position, kLeftBottom);
+	Vector3 rightBottom = CornerPosition(position, kRightBottom);
+
+	// 少し下を調べる
+	Vector3 checkOffset = Vector3(0.0f, -status_.kEpsilon * 2.0f, 0.0f);
+
+	IndexSet leftIndex = map_->GetMapChipIndexSetByPosition(leftBottom + checkOffset);
+	IndexSet rightIndex = map_->GetMapChipIndexSetByPosition(rightBottom + checkOffset);
+
+	BlockType leftBlock = map_->GetMapChipTypeByIndex(leftIndex.xIndex, leftIndex.yIndex);
+	BlockType rightBlock = map_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
+
+	return (leftBlock == BlockType::jumpBlock || rightBlock == BlockType::jumpBlock);
+}
+
 ============================================================
 File Path: Game/Application/Player/Player.h
 ============================================================
@@ -4808,6 +5762,9 @@ struct PlayerStatus {
 	// 壁に衝突したときの減衰率
 	float kAttenuationWall = 1.0f;
 
+	// jumpブロックに触れたときのジャンプ力
+	float kJumpBlockPower = 0.7f;
+
 	//振り向きパラメーター
 	// 角度の補間タイム
 	float kTurnTime = 0.1f;
@@ -4863,17 +5820,27 @@ public:
 	/// </summary>
 	/// <param name="pos"></param>
 	void Respawn(const Vector3& pos);
-
-	// 死亡演出を開始（その場で少し上に跳ねて、こちらを向いて落ちる）
+	/// <summary>
+	/// 死亡演出の開始
+	/// </summary>
+	/// <param name="cameraPos">演出位置のカメラ座標</param>
 	void BeginDeathDemo(const Vector3& cameraPos);
 
-	// 死亡演出中か
+	/// <summary>
+	/// 死亡演出中かどうか
+	/// </summary>
+	/// <returns>死亡演出中かどうか</returns>
 	bool IsInDeathDemo() const;
 
-	// 死亡演出が終わったか
+	/// <summary>
+	/// 死亡演出が終わったかどうか
+	/// </summary>
+	/// <returns>死亡演出が終わったかどうか</returns>
 	bool IsDeathDemoFinished() const;
 
-	// 落下による死亡を消費する（落下死のフラグをリセットして、死亡演出に入る）
+	/// <summary>
+	/// 落下による死亡を更新
+	/// </summary>
 	void UpdateDeathDemo();
 
 private:
@@ -4896,6 +5863,11 @@ private:
 	/// ImGui表示
 	/// </summary>
 	void ImGui();
+
+	/// <summary>
+	/// ジャンプブロックに接しているか
+	/// </summary>
+	bool IsOnJumpBlock();
 
 	/// <summary>
 	/// マップ衝突チェック
@@ -5018,7 +5990,7 @@ private:
 	/// </summary>
 	/// <param name="enemy"></param>
 	void StompEnemy(Collider* enemy);
-	
+
 	/// <summary>
 	/// ダメージブロックに触れているかの判定
 	/// </summary>
@@ -5047,7 +6019,7 @@ private:
 	/// <returns>パーティクルを発生させる足元の位置</returns>
 	Vector3 GetFootParticlePos() const;
 
-	
+
 public:	/// Setter / Getter
 	// 死亡判定の高さを設定
 	void SetDeathHeight(float deathHeight) { deathHeight_ = deathHeight; }
@@ -5177,7 +6149,7 @@ private:	// メンバ変数
 	float deathJumpSpeed_ = 12.0f;
 	float deathGravity_ = 32.0f;
 
-	Vector3 deathFaceRot_ = { 0,0,0 }; 
+	Vector3 deathFaceRot_ = { 0,0,0 };
 
 	// 通常移動のパーティクルが再生中か
 	bool wasMoving_ = false;
@@ -5185,7 +6157,9 @@ private:	// メンバ変数
 	// ジャンプの開始と着地時のパーティクル
 	std::unique_ptr<ParticleSystem> jumpEffect_;
 	std::unique_ptr<ParticleSystem> landEffect_;
-
+	// ジャンプブロックに触れたときのエフェクト
+	std::unique_ptr<ParticleSystem> jumpBlockArrowEffect_;
+	bool wasOnJumpBlock_ = false;
 };
 
 
@@ -5417,31 +6391,6 @@ private:
 	float holdElapsed_ = 0.0f;
 	
 };
-
-============================================================
-File Path: Game/Application/StageType.cpp
-============================================================
-#include "StageType.h"
-
-
-============================================================
-File Path: Game/Application/StageType.h
-============================================================
-#pragma once
-
-enum class StatgeType {
-	stage1,
-	stage2,
-	stage3,
-	stage4,
-	stage5,
-	stage6,
-	stage7,
-	stage8,
-	stage9,
-	stage10,
-};
-
 
 ============================================================
 File Path: Game/Application/UI/DamageFeedBack.cpp
@@ -5712,6 +6661,8 @@ File Path: Game/Application/UI/GamePlayHUD.cpp
 #include "GamePlayHUD.h"
 #include "Input.h"
 #include "ImGuiManager.h"
+#include "Game/Application/Player/Player.h"
+
 void GamePlayHUD::Initialize()
 {
 	// ポーズアイコン
@@ -5733,6 +6684,25 @@ void GamePlayHUD::Initialize()
 
 	UiActive_ = false;
 	uiTimer = 0;
+
+	// 右上に配置するために開始座標を計算
+	const float totalWidth =
+		maxHp_ * heartSize_.x + (maxHp_ - 1) * heartSpacingX_;
+
+	heartStartPos_.x = screenSize_.x - heartMargin_.x - totalWidth;
+	heartStartPos_.y = heartMargin_.y;
+
+	// ハート生成
+	hpHearts_.clear();
+	hpHearts_.reserve(maxHp_);
+
+	for (uint32_t i = 0; i < maxHp_; ++i) {
+		Vector2 pos = heartStartPos_;
+		pos.x += i * (heartSize_.x + heartSpacingX_);
+
+		auto heart = MakeSprite(heartTexturePath_, pos, heartSize_, heartActiveColor_);
+		hpHearts_.push_back(std::move(heart));
+	}
 	
 }
 
@@ -5744,11 +6714,12 @@ void GamePlayHUD::Update()
 	controlUI_A->Update();
 	controlUI_S->Update();
 	controlUI_W->Update();
-	
+	// 操作UIの更新
 	UpdateControlUI();
-	
-	
-	
+	// HP表示の更新
+	for (auto& h : hpHearts_) {
+		if (h) { h->Update(); }
+	}
 }
 
 void GamePlayHUD::UpdateControlUI()
@@ -5766,6 +6737,7 @@ void GamePlayHUD::UpdateControlUI()
 		// 元の位置に戻す
 		controlUI_D->SetPosition({ 200.0f,70.0f });
 	}
+	// A
 	 if (Input::GetInstance()->PushKey(DIK_A)) {
         controlUI_A->SetColor(activeColor_);
         controlUI_A->SetPosition({ 100.0f - pressedOffset_, 70.0f });
@@ -5811,7 +6783,22 @@ void GamePlayHUD::Draw(bool isPaused, bool showControls)
 		controlUI_S->Draw();
 		controlUI_W->Draw();
 	}
-	pauseSprite_->Draw();
+	
+	// HP表示（Playerがセットされている前提）
+	if (player_) {
+		const uint32_t hp = player_->GetHealth();
+
+		for (uint32_t i = 0; i < hpHearts_.size(); ++i) {
+			if (!hpHearts_[i]) continue;
+
+			if (i < hp) {
+				hpHearts_[i]->SetColor(heartActiveColor_);
+			} else {
+				hpHearts_[i]->SetColor(heartInactiveColor_);
+			}
+			hpHearts_[i]->Draw();
+		}
+	}
 }
 
 void GamePlayHUD::DrawImGui()
@@ -5874,6 +6861,8 @@ File Path: Game/Application/UI/GamePlayHUD.h
 #include "engine/2d/Sprite.h"
 #include "engine/math/MyMath.h"
 
+class Player;
+
 class GamePlayHUD
 {
 public:
@@ -5915,8 +6904,19 @@ public:
 	/// </summary>
 	std::unique_ptr<Sprite> MakeSprite(const std::string& path, const Vector2& pos, const Vector2& size, const Vector4 color);
 
+	/// <summary>
+	/// プレイヤーのポインタをセット
+	/// </summary>
+	void SetPlayer(Player* player) { player_ = player; }
 
+	/// <summary>
+	/// 
+	/// </summary>
+	void SetScreenSize(float w, float h) { screenSize_ = { w, h }; }
 private:
+	// プレイヤーのポインタ
+	Player* player_ = nullptr;
+
 	// 操作UI
 	// DキーUI
 	std::unique_ptr<Sprite> controlUI_D;
@@ -5949,6 +6949,24 @@ private:
 
 	// 押された時のオフセット量
 	float pressedOffset_ = 5.0f;
+
+	// HP表示用のハートスプライト
+	std::vector<std::unique_ptr<Sprite>> hpHearts_;
+	uint32_t maxHp_ = 3;
+	// ハートの配置開始位置とサイズ、間隔
+	Vector2 heartStartPos_ = { 20.0f, 90.0f };
+	Vector2 heartSize_ = { 60.0f, 60.0f };
+	float heartSpacingX_ = 8.0f;
+	// ハートの色
+	Vector4 heartActiveColor_ = { 1,1,1,1 };
+	Vector4 heartInactiveColor_ = { 1,1,1,0.2f }; 
+
+	// ハートのテクスチャパス
+	std::string heartTexturePath_ = "resources/GamePlay/HP/HPUI.png";
+
+	// 画面サイズ（UI配置の基準）
+	Vector2 screenSize_ = { 1280.0f, 720.0f }; 
+	Vector2 heartMargin_ = { 20.0f, 20.0f };   
 
 	
 };
@@ -7414,8 +8432,11 @@ void ParticleManager::Finalize()
 	ringVertexBuffer.Reset();
 	vertexResource.Reset();
 	materialResource.Reset();
-	graphicsPipelineState.Reset();
 	rootSignature.Reset();
+	// PSOは複数あるのでループでReset
+	for (auto& pso : graphicsPipelineStates) {
+		pso.Reset();
+	}
 
 	// 4) 外部参照を切る（Framework側の寿命に依存しないように）
 	camera = nullptr;
@@ -7436,7 +8457,7 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 	this->camera = camera;
 
 	// ブレンドモードの設定
-	blendMode = BlendMode::kBlendModeAdd;
+	//blendMode = BlendMode::kBlendModeAdd;
 	// ランダムエンジンの初期化
 	InitializeRandomEngine();
 	// パイプラインの生成
@@ -7446,11 +8467,6 @@ void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager
 	// マテリアルの初期化
 	InitializeMaterial();
 
-	// リングエフェクトの初期化
-	//CreateRingVertex();
-
-	// シリンダーエフェクト
-	//CreateCylinderVertex();
 }
 
 void ParticleManager::InitializeRandomEngine()
@@ -7586,7 +8602,7 @@ void ParticleManager::CreateRootSignature()
 	depthStencilDesc.DepthEnable = true;
 	//書き込みします
 	depthStencilDesc.DepthWriteMask = D3D12_DEPTH_WRITE_MASK_ZERO;
-	//比較関数はLessEqual。つまり、近ければ描画される
+	//比較関数はLessEqual 近ければ描画される
 	depthStencilDesc.DepthFunc = D3D12_COMPARISON_FUNC_LESS_EQUAL;
 }
 
@@ -7595,62 +8611,88 @@ void ParticleManager::CreateRootSignature()
 
 void ParticleManager::SetGraphicsPipeline()
 {
-	graphicsPipelineStateDesc.pRootSignature = rootSignature.Get();
-	graphicsPipelineStateDesc.InputLayout = inputLayoutDesc;
-	graphicsPipelineStateDesc.VS = { vertexShaderBlob->GetBufferPointer(),
-										vertexShaderBlob->GetBufferSize() };
-	graphicsPipelineStateDesc.PS = { pixelShaderBlob->GetBufferPointer(),
-										pixelShaderBlob->GetBufferSize() };
-	graphicsPipelineStateDesc.BlendState = blendDesc;
-	graphicsPipelineStateDesc.RasterizerState = rasterizerDesc;
-	// Dehiscenceの設定
-	graphicsPipelineStateDesc.DepthStencilState = depthStencilDesc;
-	graphicsPipelineStateDesc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
-	// 書き込むRTVの情報
-	graphicsPipelineStateDesc.NumRenderTargets = 1;
-	graphicsPipelineStateDesc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
-	// 利用するトポロジ（形状）のタイプ。三角形
-	graphicsPipelineStateDesc.PrimitiveTopologyType =
-		D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
-	// どのように画面に色を打ち込むのか設定（気にしなくて良い）
-	graphicsPipelineStateDesc.SampleDesc.Count = 1;
-	graphicsPipelineStateDesc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
-	// 実際に生成
-	HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(&graphicsPipelineStateDesc,
-		IID_PPV_ARGS(&graphicsPipelineState));
-	assert(SUCCEEDED(hr));
+	for (int i = 0; i < kCountOfBlendMode; ++i)
+	{
+		D3D12_BLEND_DESC localBlendDesc{};
+		localBlendDesc.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
+		localBlendDesc.RenderTarget[0].BlendEnable = true;
+
+		SetBlendMode(localBlendDesc, static_cast<BlendMode>(i));
+
+		localBlendDesc.RenderTarget[0].SrcBlendAlpha = D3D12_BLEND_ONE;
+		localBlendDesc.RenderTarget[0].BlendOpAlpha = D3D12_BLEND_OP_ADD;
+		localBlendDesc.RenderTarget[0].DestBlendAlpha = D3D12_BLEND_INV_SRC_ALPHA;
+
+		D3D12_GRAPHICS_PIPELINE_STATE_DESC desc{};
+		desc.pRootSignature = rootSignature.Get();
+		desc.InputLayout = inputLayoutDesc;
+		desc.VS = { vertexShaderBlob->GetBufferPointer(), vertexShaderBlob->GetBufferSize() };
+		desc.PS = { pixelShaderBlob->GetBufferPointer(), pixelShaderBlob->GetBufferSize() };
+		desc.BlendState = localBlendDesc;
+		desc.RasterizerState = rasterizerDesc;
+		desc.DepthStencilState = depthStencilDesc;
+		desc.DSVFormat = DXGI_FORMAT_D24_UNORM_S8_UINT;
+		desc.NumRenderTargets = 1;
+		desc.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM_SRGB;
+		desc.PrimitiveTopologyType = D3D12_PRIMITIVE_TOPOLOGY_TYPE_TRIANGLE;
+		desc.SampleDesc.Count = 1;
+		desc.SampleMask = D3D12_DEFAULT_SAMPLE_MASK;
+
+		HRESULT hr = dxCommon->GetDevice()->CreateGraphicsPipelineState(
+			&desc,
+			IID_PPV_ARGS(&graphicsPipelineStates[i]));
+		assert(SUCCEEDED(hr));
+	}
 }
 
 
 void ParticleManager::SetBlendMode(D3D12_BLEND_DESC& desc, BlendMode mode)
 {
+	// 指定したブレンドモードに設定
 	switch (mode)
 	{
-	case kBlendModeNormal: // 
+	case kBlendModeNone:
+		desc.RenderTarget[0].BlendEnable = false;
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
+		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
+		break;
+
+	case kBlendModeNormal:
+		desc.RenderTarget[0].BlendEnable = true;
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_ALPHA;
 		break;
+
 	case kBlendModeAdd:
+		desc.RenderTarget[0].BlendEnable = true;
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 		break;
+
 	case kBlendModeSubtract:
-		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
+		desc.RenderTarget[0].BlendEnable = true;
+		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_SRC_ALPHA;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_REV_SUBTRACT;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ONE;
 		break;
+
 	case kBlendModeMultiply:
+		desc.RenderTarget[0].BlendEnable = true;
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_DEST_COLOR;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_ZERO;
 		break;
+
 	case kBlendModeScreen:
+		desc.RenderTarget[0].BlendEnable = true;
 		desc.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
 		desc.RenderTarget[0].BlendOp = D3D12_BLEND_OP_ADD;
 		desc.RenderTarget[0].DestBlend = D3D12_BLEND_INV_SRC_COLOR;
 		break;
+
 	default:
 		assert(false);
 		break;
@@ -7704,7 +8746,8 @@ void ParticleManager::InitializeMaterial()
 	materialData->uvTransform = MakeIdentity4x4();
 }
 
-void ParticleManager::CreateParticleGroup(const std::string& name, const std::string textureFilePath)
+void ParticleManager::CreateParticleGroup(const std::string& name, const std::string textureFilePath,
+	BlendMode blendMode)
 {
 
 	// 登録済みの名前か確認
@@ -7719,14 +8762,16 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 	// マテリアルデータの作成
 	ParticleGroup& particleGroup = particleGroups[name];
 
+	// ブレンドモードの設定
+	particleGroup.blendMode = blendMode;
+
 	// 新たなパーティクルのマテリアルデータを作成
 	particleGroup.materialData.textureFilePath = textureFilePath;
 	// テクスチャの読み込み
 	TextureManager::GetInstance()->LoadTexture(particleGroup.materialData.textureFilePath);
-
+	// テクスチャのSRVインデックスを保存
 	particleGroup.textureSrvIndex = TextureManager::GetInstance()->GetSrvIndex(particleGroup.materialData.textureFilePath);
-
-
+	// インスタンシング用のリソースを作成
 	particleGroup.instancingResource = dxCommon->CreateBufferResource(sizeof(ParticleForGPU) * kMaxParticle);
 
 	// インスタンシング用のリソースを作成
@@ -7735,7 +8780,7 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 	particleGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&particleGroup.instancingData));
 
 
-
+	// SRVの作成
 	srvManager->CreateSRVforStructuredBuffer(
 		particleGroup.instancingSrvIndex,
 		particleGroup.instancingResource.Get(),
@@ -7824,20 +8869,13 @@ void ParticleManager::UpdateParticle()
 
 void ParticleManager::Draw()
 {
+	auto* commandList = dxCommon->GetCommandList();
 
-	// コマンド : パイプラインステートオブジェクトを設定
-	dxCommon->GetCommandList()->SetPipelineState(graphicsPipelineState.Get());
-	// コマンド : プリミティブトロポジ(描画形状)を設定
-	dxCommon->GetCommandList()->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	// コマンド : VertexBufferViewを設定
-	dxCommon->GetCommandList()->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	commandList->IASetVertexBuffers(0, 1, &vertexBufferView);
+	commandList->SetGraphicsRootSignature(rootSignature.Get());
+	commandList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	// コマンド : ルートシグネチャを設定
-	dxCommon->GetCommandList()->SetGraphicsRootSignature(rootSignature.Get());
-	// マテリアルデータの更新
-	dxCommon->GetCommandList()->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
-
-	// 全てのパーティクルグループについて処理
 	for (auto& [name, particleGroup] : particleGroups)
 	{
 		if (particleGroup.kNumInstance == 0)
@@ -7845,20 +8883,18 @@ void ParticleManager::Draw()
 			continue;
 		}
 
-		// 行列データの更新
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(
+		commandList->SetPipelineState(
+			graphicsPipelineStates[static_cast<int>(particleGroup.blendMode)].Get());
+
+		commandList->SetGraphicsRootDescriptorTable(
 			1,
 			srvManager->GetGPUDescriptorHandle(particleGroup.instancingSrvIndex));
 
-		// インスタンシングデータの更新
-		//srvManager->SetGraphicsDescriptorTable(1, particleGroup.instancingSrvIndex);
-
-		// シェーダリソースビューの設定
-		dxCommon->GetCommandList()->SetGraphicsRootDescriptorTable(2,
+		commandList->SetGraphicsRootDescriptorTable(
+			2,
 			srvManager->GetGPUDescriptorHandle(particleGroup.textureSrvIndex));
 
-		// 描画
-		dxCommon->GetCommandList()->DrawInstanced(6, particleGroup.kNumInstance, 0, 0);
+		commandList->DrawInstanced(6, particleGroup.kNumInstance, 0, 0);
 	}
 }
 
@@ -8077,12 +9113,8 @@ Particle ParticleManager::MakeSparkParticle(std::mt19937& randomEngine, const Ve
 
 	// スパークらしい色（明るい黄色・オレンジ・白)
 	std::uniform_real_distribution<float> distColor(0.8f, 1.0f);
-	particle.color = {
-		1.0f,                        // 赤は最大
-		distColor(randomEngine),     // 緑はランダム（黄色っぽく）
-		distColor(randomEngine) * 0.2f, // 青は少なめ
-		1.0f
-	};
+	// 白
+	particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	particle.lifeTime = distLifetime(randomEngine);
 	particle.currentTime = 0.0f;
@@ -8278,25 +9310,63 @@ void ParticleManager::CreateRingVertex()
 
 void ParticleManager::DrawRing()
 {
-	if (!ringVertexBuffer) return;
+	//if (!ringVertexBuffer) return;
 
-	auto* cmdList = dxCommon->GetCommandList();
+	//auto* cmdList = dxCommon->GetCommandList();
 
-	// 必要なパイプラインセット
-	cmdList->SetGraphicsRootSignature(rootSignature.Get());
-	cmdList->SetPipelineState(graphicsPipelineState.Get());
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cmdList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
-	cmdList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	//// 必要なパイプラインセット
+	//cmdList->SetGraphicsRootSignature(rootSignature.Get());
+	//cmdList->SetPipelineState(graphicsPipelineState.Get());
+	//cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//cmdList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
+	//cmdList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	// テクスチャSRV（仮にindex=0とする）
-	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager->GetGPUDescriptorHandle(0);
-	cmdList->SetGraphicsRootDescriptorTable(2, textureHandle);
+	//// テクスチャSRV（仮にindex=0とする）
+	//D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager->GetGPUDescriptorHandle(0);
+	//cmdList->SetGraphicsRootDescriptorTable(2, textureHandle);
 
-	cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
+	//cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
 
 }
 
+
+Particle ParticleManager::MakeUpArrowParticle(std::mt19937& randomEngine, const Vector3& position)
+{
+	// パーティクルの基礎情報
+	Particle p;
+	// 位置のばらつき
+	std::uniform_real_distribution<float> distX(-0.5f, 0.5f);
+	std::uniform_real_distribution<float> distY(-0.3f, 0.3f);
+	std::uniform_real_distribution<float> distSpeedX(-0.05f, 0.05f);
+	std::uniform_real_distribution<float> distSpeedY(0.6f, 1.0f);
+	std::uniform_real_distribution<float> distScale(0.18f, 0.28f);
+	std::uniform_real_distribution<float> distLife(0.35f, 0.55f);
+
+	float s = distScale(randomEngine);
+
+	p.transform.scale = { s, s, s };
+	p.transform.rotate = { 0.0f, 0.0f, 0.0f };
+	p.transform.translate = position + Vector3{
+		distX(randomEngine),
+		distY(randomEngine),
+		0.0f
+	};
+
+	// 上方向に流す
+	p.velocity = {
+		distSpeedX(randomEngine),
+		distSpeedY(randomEngine),
+		0.0f
+	};
+
+	// 目立つ色
+	p.color = { 1.0f, 0.95f, 0.3f, 1.0f };
+
+	p.lifeTime = distLife(randomEngine);
+	p.currentTime = 0.0f;
+
+	return p;
+}
 
 Particle ParticleManager::MakeRingEffect(const Vector3& position) {
 	Particle particle;
@@ -8414,22 +9484,22 @@ void ParticleManager::CreateCylinderVertex() {
 
 void ParticleManager::DrawCylinder()
 {
-	if (!ringVertexBuffer) return;
+	//if (!ringVertexBuffer) return;
 
-	auto* cmdList = dxCommon->GetCommandList();
+	//auto* cmdList = dxCommon->GetCommandList();
 
-	// 必要なパイプラインセット
-	cmdList->SetGraphicsRootSignature(rootSignature.Get());
-	cmdList->SetPipelineState(graphicsPipelineState.Get());
-	cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
-	cmdList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
-	cmdList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
+	//// 必要なパイプラインセット
+	//cmdList->SetGraphicsRootSignature(rootSignature.Get());
+	//cmdList->SetPipelineState(graphicsPipelineState.Get());
+	//cmdList->IASetPrimitiveTopology(D3D_PRIMITIVE_TOPOLOGY_TRIANGLELIST);
+	//cmdList->IASetVertexBuffers(0, 1, &ringVertexBufferView);
+	//cmdList->SetGraphicsRootConstantBufferView(0, materialResource->GetGPUVirtualAddress());
 
-	// テクスチャSRV（仮にindex=0とする）
-	D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager->GetGPUDescriptorHandle(0);
-	cmdList->SetGraphicsRootDescriptorTable(2, textureHandle);
+	//// テクスチャSRV（仮にindex=0とする）
+	//D3D12_GPU_DESCRIPTOR_HANDLE textureHandle = srvManager->GetGPUDescriptorHandle(0);
+	//cmdList->SetGraphicsRootDescriptorTable(2, textureHandle);
 
-	cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
+	//cmdList->DrawInstanced(ringVertexCount, 1, 0, 0);
 
 
 }
@@ -8459,6 +9529,8 @@ Particle ParticleManager::MakeParticleByType(std::mt19937& randomEngine, const V
 		return MakeJumpDustParticle(randomEngine, position);
 	case EffectType::LandDust:
 		return MakeLandDustParticle(randomEngine, position);
+	case EffectType::UpArrow:
+		return MakeUpArrowParticle(randomEngine, position);
 	case EffectType::Default:
 	default:
 		return MakeParticle(randomEngine, position);
@@ -8489,6 +9561,9 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 		break;
 	case EffectType::LandDust:
 		particle = MakeLandDustParticle(randomEngine, position);
+		break;
+	case EffectType::UpArrow:
+		particle = MakeUpArrowParticle(randomEngine, position);
 		break;
 	case EffectType::Default:
 	default:
@@ -8590,7 +9665,7 @@ File Path: Game/Particle/ParticleManager.h
 #include "MyMath.h"
 #include <random>
 #include "Game/Camera/Camera.h"
-
+#include <array>
 
 /// <summary>
 /// パーティクルマネージャー
@@ -8603,13 +9678,14 @@ public:
 
 	// パーティクル構造体
 	struct ParticleGroup {		// パーティクルグループ // 使用するテクスチャごとにパーティクルグループとしてまとめる
-		MaterialData materialData;			// マテリアルデータ					
-		std::list<Particle> particles;		// パーティクルのリスト		
+		MaterialData materialData;					// マテリアルデータ					
+		std::list<Particle> particles;				// パーティクルのリスト		
 		uint32_t instancingSrvIndex;					// インスタンシングデータ用のSRVインデックス	
 		Microsoft::WRL::ComPtr<ID3D12Resource> instancingResource;	// インスタンシングデータ用のリソース
-		UINT kNumInstance;					// インスタンス数
-		ParticleForGPU* instancingData;		// インスタンシングデータを書き込むためのポインタ
-		uint32_t textureSrvIndex;               // テクスチャインデックス
+		UINT kNumInstance;							// インスタンス数
+		ParticleForGPU* instancingData;				// インスタンシングデータを書き込むためのポインタ
+		uint32_t textureSrvIndex;				    // テクスチャインデックス
+		BlendMode blendMode = BlendMode::kBlendModeAdd;		// ブレンドモード
 	};
 
 	// エフェクトタイプ列挙型
@@ -8621,6 +9697,7 @@ public:
 		MagicCircle,	// 魔法陣
 		JumpDust,		// ジャンプダスト
 		LandDust,		// 着地ダスト
+		UpArrow,		// 上向きの矢印
 	};
 
 	/// <summary>
@@ -8700,7 +9777,7 @@ private:
 	/// <summary>
 	/// タイプ別パーティクル生成（色指定版）（追加）
 	/// </summary>
-	Particle MakeParticleByTypeWithColor(std::mt19937& randomEngine,const Vector3& position,EffectType type,const Vector4& colorTint);
+	Particle MakeParticleByTypeWithColor(std::mt19937& randomEngine, const Vector3& position, EffectType type, const Vector4& colorTint);
 
 
 public:
@@ -8716,9 +9793,12 @@ public:
 	/// <summary>
 	///  パーティクルグループの作成
 	/// </summary>
-	/// <param name="name"></param>
-	/// <param name="textureFilePath"></param>
-	void CreateParticleGroup(const std::string& name, const std::string textureFilePath);
+	/// <param name="name">パーティクルグループの名前</param>
+	/// <param name="textureFilePath">使用する画像のファイルパス</param>
+	/// <param name="blendMode">ブレンドモード（デフォルトは加算）</param>
+	void CreateParticleGroup(const std::string& name, 
+		const std::string textureFilePath, 
+		BlendMode blendMode = BlendMode::kBlendModeAdd);
 
 
 	/// <summary>
@@ -8788,7 +9868,7 @@ public:
 	/// <param name="position">発生位置</param>
 	/// <returns>パーティクルを返す</returns>
 	Particle MakeSmokeParticle(std::mt19937& randomEngine, const Vector3& position);
-	
+
 	/// <summary>
 	/// 火花パーティクル生成
 	/// </summary>
@@ -8805,7 +9885,7 @@ public:
 	/// <param name="angle">角度</param>
 	/// <param name="radius">半径</param>
 	/// <returns>パーティクルを返す</returns>
-	Particle MakeMagicCircleParticle(std::mt19937& randomEngine,const Vector3& position,float angle,float radius);
+	Particle MakeMagicCircleParticle(std::mt19937& randomEngine, const Vector3& position, float angle, float radius);
 
 	/// <summary>
 	/// ジャンプダストパーティクル生成
@@ -8821,6 +9901,14 @@ public:
 	Particle MakeLandDustParticle(std::mt19937& randomEngine, const Vector3& position);
 
 	/// <summary>
+	/// 上向きの矢印パーティクル生成
+	/// </summary>
+	/// <param name="randomEngine">ランダムエンジン</param>
+	/// <param name="position">発生位置</param>
+	/// <returns>パーティクル情報</returns>
+	Particle MakeUpArrowParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
 	/// Ringエフェクト
 	/// </summary>
 	/// <param name="position"></param>
@@ -8833,7 +9921,7 @@ public:
 	/// <returns></returns>
 	Particle MakeCylinderEffect(const Vector3& position);
 
-	
+
 
 	/// <summary>
 	/// Ring
@@ -8877,7 +9965,7 @@ public:
 	/// <param name="name"></param>
 	/// <param name="textureFilePath"></param>
 	void EnsureParticleGroup(const std::string& name, const std::string& textureFilePath);
-	
+
 	/// <summary>
 	/// エフェクトの発生(特殊エフェクト)
 	/// </summary>
@@ -8893,14 +9981,14 @@ public:
 	/// <param name="name"></param>
 	/// <param name="position"></param>
 	/// <param name="radius"></param>
-	void EmitMagicCircle(const std::string& name, const Vector3& position,uint32_t count, float radius);
+	void EmitMagicCircle(const std::string& name, const Vector3& position, uint32_t count, float radius);
 
 	/// <summary>
 	/// 複雑な魔法陣エフェクトの発生
 	/// </summary>
 	/// <param name="name"></param>
 	/// <param name="position"></param>
-	void EmitComplexMagicCircle(const std::string& name,const Vector3& position);
+	void EmitComplexMagicCircle(const std::string& name, const Vector3& position);
 
 	/// <summary>
 	/// エフェクトの発生(特殊エフェクト) / 色指定バージョン
@@ -8946,7 +10034,7 @@ private:
 	D3D12_DEPTH_STENCIL_DESC depthStencilDesc{};
 	D3D12_RASTERIZER_DESC rasterizerDesc{};
 	// グラフィックスパイプライン
-	Microsoft::WRL::ComPtr<ID3D12PipelineState> graphicsPipelineState = nullptr;
+	std::array<Microsoft::WRL::ComPtr<ID3D12PipelineState>, kCountOfBlendMode> graphicsPipelineStates;
 	D3D12_GRAPHICS_PIPELINE_STATE_DESC graphicsPipelineStateDesc;
 	// シェーダーバイナリ
 	Microsoft::WRL::ComPtr<IDxcBlob> vertexShaderBlob;
@@ -9028,7 +10116,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateExplosion(const Vector3& 
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateSmoke(const Vector3& position)
 {
 	auto particleSystem = ParticleSystem::Create(
-		"Smoke", "resources/Effects/Particles/Textures/smoke.dds");
+		"Smoke", "resources/Effects/Particles/Textures/smoke2.png",BlendMode::kBlendModeNormal);
 	// 位置の設定
 	particleSystem->SetTranslate(position);
 	// エミッション設定 / 描画される粒子の数
@@ -9046,15 +10134,17 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSmoke(const Vector3& posi
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateSparks(const Vector3& position)
 {
 	auto particleSystem = ParticleSystem::Create(
-		"Sparks", "resources/Effects/Particles/Textures/star.dds");
+		"Sparks", "resources/Effects/Particles/Textures/star.png",BlendMode::kBlendModeNormal);
 	// 位置の設定
 	particleSystem->SetTranslate(position);
 	// エミッション設定 / 描画される粒子の数
-	particleSystem->SetEmissionRate(50.0f);
+	particleSystem->SetEmissionRate(1.0f);
 	// メイン設定 / ループ再生の有無、寿命など
 	particleSystem->SetLoop(false);
 	particleSystem->GetMainModule().duration = 0.15f;
 	particleSystem->GetMainModule().startLifetime = 0.25f;
+	// 白デフォルト
+	particleSystem->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 	// スパークタイプを設定
 	particleSystem->SetEffectType(ParticleManager::EffectType::Spark);
@@ -9111,7 +10201,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateComplexMagicCircle(const 
 	params.radius = 6.0f;
 	params.particleCount = 40;
 	params.rotationSpeed = 0.5f;
-	params.multiLayer = true;  // ← 多重円
+	params.multiLayer = true;
 	ps->SetMagicCircleParams(params);
 
 	ps->SetLoop(true);
@@ -9143,7 +10233,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSummonCircle(const Vector
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& position)
 {
 	auto ps = ParticleSystem::Create("JumpDust",
-		"resources/Effects/Particles/Textures/smoke.dds");
+		"resources/Effects/Particles/Textures/smoke2.png", BlendMode::kBlendModeNormal);
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::JumpDust);
@@ -9158,7 +10248,8 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& p
 	ps->GetMainModule().startLifetime = 0.25f;
 
 	// 砂色（少し薄め）
-	ps->SetColor(Vector4(0.78f, 0.70f, 0.52f, 0.80f));
+	//ps->SetColor(Vector4(0.78f, 0.70f, 0.52f, 0.80f));
+	ps->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 	ps->Pause();
 	return ps;
@@ -9167,7 +10258,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& p
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateLandDust(const Vector3& position)
 {
 	auto ps = ParticleSystem::Create("LandDust",
-		"resources/Effects/Particles/Textures/smoke.dds");
+		"resources/Effects/Particles/Textures/smoke2.png",BlendMode::kBlendModeNormal);
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::LandDust);
@@ -9187,6 +10278,71 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateLandDust(const Vector3& p
 	return ps;
 }
 
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpBlockArrow(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"JumpBlockArrow",
+		"resources/Effects/Particles/Textures/upArrow.png", BlendMode::kBlendModeAdd);
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::UpArrow);
+
+	// jumpBlock 上にいる間だけ見せたいのでループ
+	ps->SetLoop(true);
+
+	// ほどよい頻度
+	ps->SetEmissionRate(12.0f);
+
+	// 色を少し強調
+	ps->SetColor(Vector4(1.8f, 0.45f, 0.45f, 1.0f));
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOnBurst(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"ToggleOnBurst",
+		"resources/Effects/Particles/Textures/square.dds");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::Spark);
+
+	ps->SetLoop(false);
+	ps->SetEmissionRate(35.0f);
+	ps->SetBurstCount(8);
+
+	ps->GetMainModule().duration = 0.10f;
+	ps->GetMainModule().startLifetime = 0.20f;
+
+	// 少し緑寄り
+	ps->SetColor(Vector4(0.45f, 1.2f, 0.45f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOffBurst(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"ToggleOffBurst",
+		"resources/Effects/Particles/Textures/wind.dds");
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::Smoke);
+
+	ps->SetLoop(false);
+	ps->SetEmissionRate(20.0f);
+	ps->SetBurstCount(6);
+
+	ps->GetMainModule().duration = 0.10f;
+	ps->GetMainModule().startLifetime = 0.18f;
+
+	// 少し赤寄り
+	ps->SetColor(Vector4(1.1f, 0.45f, 0.45f, 0.85f));
+
+	ps->Pause();
+	return ps;
+}
 
 ============================================================
 File Path: Game/Particle/ParticlePresets.h
@@ -9239,8 +10395,8 @@ public:
 	static std::unique_ptr<ParticleSystem> CreateComplexMagicCircle(const Vector3& position = { 0, 0, 0 });
 
 	/// <summary>
-    /// 召喚魔法陣（下から上へエネルギーが上がる）
-    /// </summary>
+	/// 召喚魔法陣（下から上へエネルギーが上がる）
+	/// </summary>
 	static std::unique_ptr<ParticleSystem> CreateSummonCircle(const Vector3& position = { 0, 0, 0 });
 
 	/// <summary>
@@ -9254,6 +10410,24 @@ public:
 	/// <param name="position"></param>
 	/// <returns></returns>
 	static std::unique_ptr<ParticleSystem>CreateLandDust(const Vector3& position = { 0, 0, 0 });
+
+	/// <summary>
+	/// ジャンプブロックの上に出る矢印エフェクト
+	/// </summary>
+	/// <param name="position">発生位置</param>
+	/// <returns>パーティクルシステム</returns>
+	static std::unique_ptr<ParticleSystem> CreateJumpBlockArrow(const Vector3& position = { 0, 0, 0 });
+
+
+	/// <summary>
+	/// トグルブロックが有効になった瞬間の演出
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateToggleOnBurst(const Vector3& position = { 0, 0, 0 });
+
+	/// <summary>
+	/// トグルブロックが無効になった瞬間の演出
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateToggleOffBurst(const Vector3& position = { 0, 0, 0 });
 };
 
 
@@ -9296,12 +10470,13 @@ ParticleSystem::~ParticleSystem()
 
 std::unique_ptr<ParticleSystem> ParticleSystem::Create(
 	const std::string& particleName,
-	const std::string& texturePath)
+	const std::string& texturePath,
+	BlendMode blendMode)
 {
 	// パーティクルグループの自動生成
 	auto manager = ParticleManager::GetInstance();
 	if (!manager->HasParticleGroup(particleName)) {
-		manager->CreateParticleGroup(particleName, texturePath);
+		manager->CreateParticleGroup(particleName, texturePath, blendMode);
 	}
 	// パーティクルシステムの生成
 	auto particleSystem = std::make_unique<ParticleSystem>();
@@ -9474,7 +10649,8 @@ public:
 	/// <param name="particleName">パーティクルの名前</param>
 	/// <param name="texturePath">使用する画像ファイルの名前</param>
 	/// <returns></returns>
-	static std::unique_ptr<ParticleSystem>Create(const std::string& particleName, const std::string& texturePath);
+	static std::unique_ptr<ParticleSystem>Create(const std::string& particleName, const std::string& texturePath,
+		BlendMode blendMode = BlendMode::kBlendModeAdd);
 	/// <summary>
 	/// ワンショット再生
 	/// </summary>
@@ -10783,6 +11959,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 
 	gamePlayHUD_ = std::make_unique<GamePlayHUD>();
 	gamePlayHUD_->Initialize();
+	gamePlayHUD_->SetPlayer(player.get());
 
 	startCam_ = std::make_unique<StartCamPhase>();
 	startCam_->Initialize();
@@ -11015,57 +12192,39 @@ void GamePlayScene::InitializeEnemy()
 
 void GamePlayScene::GenerateEnemy()
 {
-	// エネミーを一旦クリア
+	// 既存のエネミーをクリア
 	enemies.clear();
-
+	// マップからエネミーデータを取得
 	const EnemyLayerData& enemyLayerData = map->GetEnemyLayerData();
 	const auto& enemyData = enemyLayerData.enemyData;
-
+	// データの行数をマップの高さとする
 	const uint32_t mapHeight = static_cast<uint32_t>(enemyData.size());
-	for (uint32_t y = 0; y < mapHeight; y++) {
+	for (uint32_t y = 0; y < mapHeight; ++y) {
 		const uint32_t mapWidth = static_cast<uint32_t>(enemyData[y].size());
-		for (uint32_t x = 0; x < mapWidth; x++) {
+		for (uint32_t x = 0; x < mapWidth; ++x) {
+			// インデックスから敵の種類を取得
 			EnemyType type = enemyData[y][x];
-			// 敵の種類がNoneならスキップ
-			if (EnemyType::None == type) {
+			// Noneだったらスキップ
+			if (type == EnemyType::None) {
 				continue;
 			}
-
-			// 敵の生成
-			// EnemyTypeから敵の種類を特定して生成
-			std::string enemyId;
-			switch (type) {
-			case EnemyType::NormalEnemy:
-				enemyId = "NormalEnemy";
-				break;
-			case EnemyType::FlyingEnemy:
-				enemyId = "FlyingEnemy";
-				break;
-			case EnemyType::SideMoveFlyingEnemy:
-				enemyId = "SideMoveFlyingEnemy";
-				break;
-			case EnemyType::SideMoveEnemy:
-				enemyId = "SideMoveEnemy";
-				break;
-			default:
-				continue;
-			}
-
-			// ファクトリーでエネミーを生成
-			auto enemy = EnemyFactory::CreateEnemy(enemyId);
-			// 生成失敗チェック
-			if (!enemy) continue;
-			// エネミーの初期化
-			enemy->Initialize();
-			enemy->SetMapQuery(&mapCollisionQuery);
-			// マップ上の位置にセット
+			// インデックスからワールド座標に変換して、エネミーを生成
 			Vector3 enemyPos = map->GetMapChipPositionByIndex(x, y);
-			// オフセット
 			enemyPos.x += enemySpawnOffset_;
 			enemyPos.y -= enemySpawnOffset_;
-			enemy->SetTranslate(enemyPos);
-			// エネミーリストに追加
-			enemies.push_back(std::move(enemy));
+			// 生成に必要なパラメータをまとめる
+			EnemySpawnParams params;
+			params.type = type;
+			params.position = enemyPos;
+			params.mapQuery = &mapCollisionQuery;
+			params.player = player.get();
+
+			// ファクトリーでエネミーを生成してリストに追加
+			auto enemy = EnemyFactory::CreateEnemy(params);
+			if (enemy) {
+				// 生成したらリストに追加
+				enemies.push_back(std::move(enemy));
+			}
 		}
 	}
 }
@@ -15845,6 +17004,7 @@ File Path: MyEngine.vcxproj
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationPlacer.cpp" />
@@ -15898,7 +17058,6 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="engine\InsideScene\SceneManager.cpp" />
     <ClCompile Include="engine\base\SrvManager.cpp" />
     <ClCompile Include="Game\Scene\TitleScene.cpp" />
-    <ClCompile Include="Game\Application\StageType.cpp" />
     <ClCompile Include="Game\Application\Enemy\Ground\NormalEnemy.cpp" />
     <ClCompile Include="engine\3d\SkyBox\SkyBox.cpp" />
     <ClCompile Include="engine\2d\RenderTexture.cpp" />
@@ -15919,14 +17078,19 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="Game\Application\Enemy\Ground\SideMoveEnemy.cpp" />
     <ClCompile Include="Game\Application\RespawnSequence.cpp" />
     <ClCompile Include="engine\3d\Object3DInstancingCommon.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\PatrolEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationPlacer.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationObject.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationInstanceData.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationSpawnSetting.h" />
+    <ClInclude Include="Game\Application\Enemy\SpawnParams\EnemySpawnParams.h" />
     <ClInclude Include="Game\Scene\GameOverScene.h" />
     <ClInclude Include="Game\Scene\DebugScene\DebugScene.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\FloatingEnemyBase.h" />
@@ -15975,7 +17139,6 @@ File Path: MyEngine.vcxproj
     <ClInclude Include="engine\InsideScene\SceneManager.h" />
     <ClInclude Include="engine\base\SrvManager.h" />
     <ClInclude Include="Game\Scene\TitleScene.h" />
-    <ClInclude Include="Game\Application\StageType.h" />
     <ClInclude Include="Game\Application\Enemy\Ground\NormalEnemy.h" />
     <ClInclude Include="Game\Loader\LevelLoader.h" />
     <ClInclude Include="engine\3d\SkyBox\SkyBox.h" />
@@ -16000,6 +17163,9 @@ File Path: MyEngine.vcxproj
     <ClInclude Include="Game\Application\Enemy\Ground\SideMoveEnemy.h" />
     <ClInclude Include="Game\Application\RespawnSequence.h" />
     <ClInclude Include="engine\3d\Object3DInstancingCommon.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\PatrolEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\Drop\TimedDropEnemy.h" />
   </ItemGroup>
   <ItemGroup>
     <Text Include="externals\imgui\LICENSE.txt" />
@@ -16164,9 +17330,6 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="engine\3d\SkyBox\SkyBox.cpp">
       <Filter>engine\3d\SkyBox</Filter>
     </ClCompile>
-    <ClCompile Include="Game\Application\StageType.cpp">
-      <Filter>Game\Application\Map</Filter>
-    </ClCompile>
     <ClCompile Include="Game\Camera\CameraController.cpp">
       <Filter>Game\Camera</Filter>
     </ClCompile>
@@ -16234,6 +17397,10 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
     <ClCompile Include="engine\3d\Object3DInstancingCommon.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Ground\PatrolEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
+    <ClCompile Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -16363,9 +17530,6 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="engine\3d\SkyBox\SkyBox.h">
       <Filter>engine\3d\SkyBox</Filter>
     </ClInclude>
-    <ClInclude Include="Game\Application\StageType.h">
-      <Filter>Game\Application\Map</Filter>
-    </ClInclude>
     <ClInclude Include="Game\Application\ModelList.h">
       <Filter>Game</Filter>
     </ClInclude>
@@ -16442,6 +17606,11 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
     <ClInclude Include="engine\3d\Object3DInstancingCommon.h" />
+    <ClInclude Include="Game\Application\Enemy\SpawnParams\EnemySpawnParams.h" />
+    <ClInclude Include="Game\Application\Enemy\Ground\PatrolEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />
+    <ClInclude Include="Game\Application\Enemy\Drop\TimedDropEnemy.h" />
+    <ClInclude Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">
