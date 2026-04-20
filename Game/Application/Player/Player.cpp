@@ -485,8 +485,8 @@ void Player::Initialize(Vector3 position)
 	moveEffect_->Pause();
 	moveEffect_->SetEmissionRate(5.0f);
 	moveEffect_->SetLoop(true);
-	moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
-
+	//moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	moveEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 	// ダッシュエフェクトの初期化
 	// 足元の煙エフェクト(ダッシュ)
 	dashSmokeEffect_ = ParticlePresets::CreateSmoke(position);
@@ -494,7 +494,8 @@ void Player::Initialize(Vector3 position)
 	dashSmokeEffect_->Pause();
 	dashSmokeEffect_->SetEmissionRate(15.0f);
 	dashSmokeEffect_->SetLoop(true);
-	dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	//dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
+	dashSmokeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 	// ダッシュ開始時の衝撃波
 	dashStartEffect_ = ParticlePresets::CreateSparks(position);
 	dashStartEffect_->Pause();

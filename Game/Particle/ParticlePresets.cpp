@@ -21,7 +21,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateExplosion(const Vector3& 
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateSmoke(const Vector3& position)
 {
 	auto particleSystem = ParticleSystem::Create(
-		"Smoke", "resources/Effects/Particles/Textures/smoke.dds",BlendMode::kBlendModeNormal);
+		"Smoke", "resources/Effects/Particles/Textures/smoke2.png",BlendMode::kBlendModeNormal);
 	// 位置の設定
 	particleSystem->SetTranslate(position);
 	// エミッション設定 / 描画される粒子の数
@@ -136,7 +136,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSummonCircle(const Vector
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& position)
 {
 	auto ps = ParticleSystem::Create("JumpDust",
-		"resources/Effects/Particles/Textures/smoke.dds", BlendMode::kBlendModeNormal);
+		"resources/Effects/Particles/Textures/smoke2.png", BlendMode::kBlendModeNormal);
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::JumpDust);
@@ -151,7 +151,8 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& p
 	ps->GetMainModule().startLifetime = 0.25f;
 
 	// 砂色（少し薄め）
-	ps->SetColor(Vector4(0.78f, 0.70f, 0.52f, 0.80f));
+	//ps->SetColor(Vector4(0.78f, 0.70f, 0.52f, 0.80f));
+	ps->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 	ps->Pause();
 	return ps;
@@ -160,7 +161,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateJumpDust(const Vector3& p
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateLandDust(const Vector3& position)
 {
 	auto ps = ParticleSystem::Create("LandDust",
-		"resources/Effects/Particles/Textures/smoke.dds");
+		"resources/Effects/Particles/Textures/smoke2.png",BlendMode::kBlendModeNormal);
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::LandDust);

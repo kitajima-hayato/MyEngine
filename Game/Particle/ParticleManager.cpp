@@ -275,6 +275,7 @@ void ParticleManager::SetGraphicsPipeline()
 
 void ParticleManager::SetBlendMode(D3D12_BLEND_DESC& desc, BlendMode mode)
 {
+	// 指定したブレンドモードに設定
 	switch (mode)
 	{
 	case kBlendModeNone:
