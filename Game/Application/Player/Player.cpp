@@ -487,6 +487,8 @@ void Player::Initialize(Vector3 position)
 	moveEffect_->SetLoop(true);
 	//moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
 	moveEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+
 	// ダッシュエフェクトの初期化
 	// 足元の煙エフェクト(ダッシュ)
 	dashSmokeEffect_ = ParticlePresets::CreateSmoke(position);
@@ -496,13 +498,17 @@ void Player::Initialize(Vector3 position)
 	dashSmokeEffect_->SetLoop(true);
 	//dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
 	dashSmokeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+
 	// ダッシュ開始時の衝撃波
 	dashStartEffect_ = ParticlePresets::CreateSparks(position);
 	dashStartEffect_->Pause();
 	// 一気に
-	dashStartEffect_->SetEmissionRate(50.0f);
+	dashStartEffect_->SetEmissionRate(20.0f);
 	// 一度の発生のためループはしない
 	dashStartEffect_->SetLoop(false);
+	// 色 / 黄色
+	dashStartEffect_->SetColor(Vector4(1.0f, 1.0f, 0.5f, 1.0f));
 
 	// 踏みつけエフェクトの初期化
 	stompEffect_ = ParticlePresets::CreateSparks(position);
@@ -510,6 +516,7 @@ void Player::Initialize(Vector3 position)
 	stompEffect_->SetEmissionRate(30.0f);
 	stompEffect_->SetLoop(false);
 	stompEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
 
 	// ジャンプの開始と着地のパーティクル
 	jumpEffect_ = ParticlePresets::CreateJumpDust(position);

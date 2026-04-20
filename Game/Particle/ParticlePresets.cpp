@@ -39,15 +39,17 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateSmoke(const Vector3& posi
 std::unique_ptr<ParticleSystem> ParticlePresets::CreateSparks(const Vector3& position)
 {
 	auto particleSystem = ParticleSystem::Create(
-		"Sparks", "resources/Effects/Particles/Textures/star.dds",BlendMode::kBlendModeAdd);
+		"Sparks", "resources/Effects/Particles/Textures/star.png",BlendMode::kBlendModeNormal);
 	// 位置の設定
 	particleSystem->SetTranslate(position);
 	// エミッション設定 / 描画される粒子の数
-	particleSystem->SetEmissionRate(50.0f);
+	particleSystem->SetEmissionRate(1.0f);
 	// メイン設定 / ループ再生の有無、寿命など
 	particleSystem->SetLoop(false);
 	particleSystem->GetMainModule().duration = 0.15f;
 	particleSystem->GetMainModule().startLifetime = 0.25f;
+	// 白デフォルト
+	particleSystem->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 	// スパークタイプを設定
 	particleSystem->SetEffectType(ParticleManager::EffectType::Spark);
@@ -104,7 +106,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateComplexMagicCircle(const 
 	params.radius = 6.0f;
 	params.particleCount = 40;
 	params.rotationSpeed = 0.5f;
-	params.multiLayer = true;  // ← 多重円
+	params.multiLayer = true;
 	ps->SetMagicCircleParams(params);
 
 	ps->SetLoop(true);

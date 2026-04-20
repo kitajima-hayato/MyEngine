@@ -396,10 +396,9 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 	particleGroup.materialData.textureFilePath = textureFilePath;
 	// テクスチャの読み込み
 	TextureManager::GetInstance()->LoadTexture(particleGroup.materialData.textureFilePath);
-
+	// テクスチャのSRVインデックスを保存
 	particleGroup.textureSrvIndex = TextureManager::GetInstance()->GetSrvIndex(particleGroup.materialData.textureFilePath);
-
-
+	// インスタンシング用のリソースを作成
 	particleGroup.instancingResource = dxCommon->CreateBufferResource(sizeof(ParticleForGPU) * kMaxParticle);
 
 	// インスタンシング用のリソースを作成
@@ -408,7 +407,7 @@ void ParticleManager::CreateParticleGroup(const std::string& name, const std::st
 	particleGroup.instancingResource->Map(0, nullptr, reinterpret_cast<void**>(&particleGroup.instancingData));
 
 
-
+	// SRVの作成
 	srvManager->CreateSRVforStructuredBuffer(
 		particleGroup.instancingSrvIndex,
 		particleGroup.instancingResource.Get(),
@@ -741,12 +740,8 @@ Particle ParticleManager::MakeSparkParticle(std::mt19937& randomEngine, const Ve
 
 	// スパークらしい色（明るい黄色・オレンジ・白)
 	std::uniform_real_distribution<float> distColor(0.8f, 1.0f);
-	particle.color = {
-		1.0f,                        // 赤は最大
-		distColor(randomEngine),     // 緑はランダム（黄色っぽく）
-		distColor(randomEngine) * 0.2f, // 青は少なめ
-		1.0f
-	};
+	// 白
+	particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 
 	particle.lifeTime = distLifetime(randomEngine);
 	particle.currentTime = 0.0f;
