@@ -516,7 +516,7 @@ void Player::Initialize(Vector3 position)
 	stompEffect_->SetEmissionRate(30.0f);
 	stompEffect_->SetLoop(false);
 	stompEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-
+ 
 
 	// ジャンプの開始と着地のパーティクル
 	jumpEffect_ = ParticlePresets::CreateJumpDust(position);
