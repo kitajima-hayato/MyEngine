@@ -28,15 +28,15 @@ bool PauseSystem::Update()
 			
 			case PauseUI::Action::Retry:
 				// リトライ処理
-				SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);
+				SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
 				break;
 			case PauseUI::Action::StageSelect:
 				// ステージセレクトへ
-				SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
+				SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
 				break;
 			case PauseUI::Action::Title:
 				// タイトルへ
-				SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Normal);
+				SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Start);
 				break;
 		}
 

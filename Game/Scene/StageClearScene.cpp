@@ -83,10 +83,6 @@ void StageClearScene::Initialize(DirectXCommon* dxCommon)
 	keyIcon_D->SetPosition({ 80.0f, 635.0f });
 	keyIcon_D->SetSize({ 50.0f, 50.0f });
 
-	keyIcon_Enter = std::make_unique<Sprite>();
-	keyIcon_Enter->Initialize("resources/_Common/UI/Texture/inputhints/Enter.dds");
-	keyIcon_Enter->SetPosition({ 55.0f, 565.0f });
-	keyIcon_Enter->SetSize({ 50.0f, 50.0f });
 }
 
 void StageClearScene::Update()
@@ -132,7 +128,7 @@ void StageClearScene::Update()
 					constexpr int kMaxStage = 8;
 					if (stage >= kMaxStage) {
 						// もう次が無いので、ステージセレクトに戻す
-						SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
+						SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
 						break;
 					}
 					// "1-1" -> "1-2"
@@ -146,14 +142,14 @@ void StageClearScene::Update()
 			}
 
 
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
 			break;
 		}
 		case ClearMenuItem::OneMore:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
+			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
 			break;
 		case ClearMenuItem::Select:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
 			break;
 		default:
 			break;
@@ -198,19 +194,13 @@ void StageClearScene::Update()
 		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
 	}
 
+	// 各オブジェクトの更新
 	playerObject_->Update();
-
 	backGround_->Update();
-
+	// 各スプライトの更新
 	clearTextSprite->Update();
-
-
 	keyIcon_A->Update();
-
 	keyIcon_D->Update();
-	keyIcon_Enter->Update();
-
-	
 	oneMore_->Update();
 	select_->Update();
 	next_->Update();
@@ -228,7 +218,6 @@ void StageClearScene::Draw()
 	keyIcon_A->Draw();
 
 	keyIcon_D->Draw();
-	keyIcon_Enter->Draw();
 	oneMore_->Draw();
 	select_->Draw();
 	next_->Draw();

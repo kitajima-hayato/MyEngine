@@ -42,8 +42,8 @@ private:
 	/// <summary>
 	/// スタンプの生成
 	/// </summary>
-	/// <param name="position"></param>
-	/// <param name="isUpper"></param>
+	/// <param name="position">スタンプの位置</param>
+	/// <param name="isUpper">上側のスタンプかどうか</param>
 	void CreateStamp(const Vector2& position, bool isUpper);
 
 	/// <summary>
@@ -60,6 +60,12 @@ private:
 	/// カラフルな色を取得
 	/// </summary>
 	Vector4 GetColorForStamp(int index);
+
+	/// <summary>
+	/// 全てのスタンプが完全に成長したか
+	/// </summary>
+	/// <returns>成長が済んでいるか</returns>
+	bool AreAllStampsFullyGrown() const;
 
 	// カラフルな色パレット（コロンワールド風）
 	static const std::vector<Vector4> COLOR_PALETTE;
@@ -83,6 +89,8 @@ private:
 	float coverCompleteTime_;
 	// カバー解除開始時間
 	float uncoverStartTime_;
+	// ロード開始時間
+	float loadStartTime_;
 
 	// 演出のフェーズ
 	enum class Phase {

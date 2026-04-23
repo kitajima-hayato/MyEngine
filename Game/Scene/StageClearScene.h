@@ -87,8 +87,5 @@ private:
 	std::unique_ptr<Sprite> keyIcon_A;
 	std::unique_ptr<Sprite> keyIcon_D;
 
-	// enter
-	std::unique_ptr<Sprite> keyIcon_Enter;
-	Vector2 keyIcon_Enter_Pos = { 200.0f,650.0f };
 };
 

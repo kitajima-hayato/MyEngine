@@ -70,7 +70,7 @@ public:
 	/// </summary>
 	/// <param name="sceneName">変更するシーンの名前</param>
 	/// <param name="transitionType">遷移のタイプ</param>
-	void ChangeSceneWithTransition(const std::string& sceneName, TransitionType transitionType = TransitionType::Normal);
+	void ChangeSceneWithTransition(const std::string& sceneName, TransitionType transitionType = TransitionType::Start);
 	/// <summary>
 	/// 遷移マネージャーの取得
 	/// </summary>

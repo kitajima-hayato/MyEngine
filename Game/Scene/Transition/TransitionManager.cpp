@@ -9,11 +9,14 @@ void TransitionManager::Initialize()
 
 void TransitionManager::Update(float deltaTime)
 {
-	// 遷移エフェクトが無い / 遷移フェーズがNoneの場合早期リターン
-	if (!transitionEffect_ || phase_ == TransitionPhase::None)return;
+	if (!transitionEffect_ || phase_ == TransitionPhase::None) {
+		return;
+	}
 
-	// 遷移演出の開始
-	transitionEffect_->Update(deltaTime);
+	// Loading中は演出を進めない
+	if (phase_ != TransitionPhase::Loading) {
+		transitionEffect_->Update(deltaTime);
+	}
 
 	// フェーズの遷移処理
 	switch (phase_)
