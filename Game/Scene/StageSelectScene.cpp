@@ -542,7 +542,7 @@ void StageSelectScene::Update()
 	// Escキーでタイトルへ
 	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
 		// タイトルシーンへ切り替え
-		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE",TransitionType::Normal);
+		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE",TransitionType::Start);
 	}
 	cameraTransform.translate = { 0.0f,20.0f,0.0f };
 	cameraTransform.rotate = { 0.35f,0.0f,0.0f };

@@ -132,7 +132,7 @@ void StageClearScene::Update()
 					constexpr int kMaxStage = 8;
 					if (stage >= kMaxStage) {
 						// もう次が無いので、ステージセレクトに戻す
-						SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
+						SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
 						break;
 					}
 					// "1-1" -> "1-2"
@@ -146,14 +146,14 @@ void StageClearScene::Update()
 			}
 
 
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
 			break;
 		}
 		case ClearMenuItem::OneMore:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
+			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
 			break;
 		case ClearMenuItem::Select:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
 			break;
 		default:
 			break;

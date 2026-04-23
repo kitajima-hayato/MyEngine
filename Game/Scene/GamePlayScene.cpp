@@ -240,7 +240,7 @@ void GamePlayScene::Update()
 
 	if (isGoal) {
 		// ゴールしたら操作を受け付けない
-		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Normal);
+		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Start);
 	}
 
 	// スプライトの更新

@@ -49,16 +49,21 @@ BallWipeTransition::BallWipeTransition(bool isStartTransition)
 		ballAppearTime_ = 0.0f;
 
 		rollStartTime_ = 0.08f;
-		rollEndTime_ = 0.40f;
-		coverCompleteTime_ = 0.44f;
-		uncoverStartTime_ = 0.7f;
-		loadStartTime_ = 0.45f;
+		rollEndTime_ = 0.42f;
+		coverCompleteTime_ = 0.50f;
+
+		// 覆い切って少し見せてからロード
+		loadStartTime_ = 0.56f;
+
+		// ロード後、少し間を置いてから開く
+		uncoverStartTime_ = 0.71f;
 
 		// スタンプ密度
-		stampInterval_ = 150.0f;       
+		stampInterval_ = 150.0f;
 
-		stampGrowDuration_ = 0.5f;
-		stampShrinkDuration_ = 0.24f;
+		// 成長・縮小
+		stampGrowDuration_ = 0.42f;
+		stampShrinkDuration_ = 0.22f;
 	}
 }
 
