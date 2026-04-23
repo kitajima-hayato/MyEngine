@@ -26,7 +26,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	Audio::GetInstance().Initialize();
 	soundData = Audio::GetInstance().LoadWave("resources/_Common/Audio/debug/mokugyo.wav");
 	xaudio2_ = Audio::GetInstance().GetXAudio2();
-	Audio::GetInstance().SoundPlayWave(xaudio2_, soundData);
+	//Audio::GetInstance().SoundPlayWave(xaudio2_, soundData);
 
 	// カメラクラスの生成
 	camera = Framework::GetMainCamera();
