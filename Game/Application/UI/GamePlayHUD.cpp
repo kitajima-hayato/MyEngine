@@ -111,8 +111,8 @@ void GamePlayHUD::UpdatePauseIcon()
 
 void GamePlayHUD::Draw(bool isPaused, bool showControls)
 {
-	// ポーズ中はポーズアイコンを表示
-	if (isPaused) {
+	// ポーズアイコンを表示
+	if (!isPaused) {
 		pauseSprite_->Draw();
 	}
 	

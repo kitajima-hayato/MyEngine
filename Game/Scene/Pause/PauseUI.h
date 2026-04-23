@@ -126,8 +126,8 @@ private:
 
 	Slot prevSelectedSlot_ = Slot::Continue;
 	// バウンス用
-	float bounceT_ = 1.0f;        // 0→1（1なら終了）
-	float bounceDuration_ = 0.10f; // 秒（0.08〜0.12推奨）
+	float bounceT_ = 1.0f;       
+	float bounceDuration_ = 0.10f; 
 
 	
 
