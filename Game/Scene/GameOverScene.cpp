@@ -119,13 +119,13 @@ void GameOverScene::Update()
 	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
 		switch (selectedItem_) {
 		case ClearMenuItem::OneMore:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Normal);     // もう一回 = 今のステージをやり直すなら GAMEPLAY
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);    
 			break;
 		case ClearMenuItem::Select:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Normal);
+			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
 			break;
 		case ClearMenuItem::Title:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Normal);
+			SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Start);
 			break;
 		default:
 			break;

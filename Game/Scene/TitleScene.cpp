@@ -228,7 +228,7 @@ void TitleScene::Update()
 	// カメラが一定距離まで来たらタイトルシーンをリセット
 	Vector3 cameraPos = camera->GetTranslate();
 	if (cameraPos.x >= resetDistance_) {
-		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Normal);
+		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE", TransitionType::Start);
 	}
 }
 
