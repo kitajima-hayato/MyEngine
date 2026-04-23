@@ -35,6 +35,8 @@ BallWipeTransition::BallWipeTransition(bool isStartTransition)
 		coverCompleteTime_ = 0.825f;
 		// 覆いを解除開始
 		uncoverStartTime_ = 0.975f;
+		// ロード開始時間
+		loadStartTime_ = 0.84f;
 		// スタンプを押す間隔 / 小さければ密度が高まる
 		stampInterval_ = 100.0f;
 		// スタンプが成長する時間 / 小さければ成長が速くなり、密度が高まる
@@ -43,13 +45,14 @@ BallWipeTransition::BallWipeTransition(bool isStartTransition)
 		stampShrinkDuration_ = 0.45f;
 	} else {
 		// ノーマル版
-		totalDuration_ = 0.8f;
+		totalDuration_ = 1.0f;
 		ballAppearTime_ = 0.0f;
 
 		rollStartTime_ = 0.08f;
 		rollEndTime_ = 0.40f;
 		coverCompleteTime_ = 0.44f;
-		uncoverStartTime_ = 0.52f;
+		uncoverStartTime_ = 0.7f;
+		loadStartTime_ = 0.45f;
 
 		// スタンプ密度
 		stampInterval_ = 150.0f;       
@@ -168,11 +171,11 @@ void BallWipeTransition::UpdateBalls(float deltaTime)
 		// ★等間隔でスタンプ生成（Xを固定）
 		while (ball.position.x >= ball.nextStampX) {
 			Vector2 stampPos = ball.position;
-			stampPos.x = ball.nextStampX;          // ← ここでXをグリッドに固定
+			stampPos.x = ball.nextStampX;          
 			CreateStamp(stampPos, ball.isUpper);
 
 			ball.lastStampX = ball.nextStampX;
-			ball.nextStampX += stampInterval_;     // 次のグリッドへ
+			ball.nextStampX += stampInterval_;     
 		}
 
 		ball.sprite->SetPosition(ball.position);
@@ -184,6 +187,7 @@ void BallWipeTransition::UpdateBalls(float deltaTime)
 
 void BallWipeTransition::CreateStamp(const Vector2& position, bool /*isUpper*/)
 {
+	// スタンプの基本情報の設定
 	Stamp stamp;
 	stamp.sprite = std::make_unique<Sprite>();
 	stamp.sprite->Initialize(stampSpriteFilePath_);
@@ -191,27 +195,29 @@ void BallWipeTransition::CreateStamp(const Vector2& position, bool /*isUpper*/)
 	stamp.currentSize = 0.0f;
 	stamp.sizeBeforeShrink = 0.0f;
 
-	// サイズ：ランダムをやめて一定（必要なら固定テーブルで変化させる）
-	stamp.targetSize = 800.0f;
+	// スタンプの大きさ
+	stamp.targetSize = 1300.0f;
 
 	stamp.age = 0.0f;
 
 	// 3ラインを順番に回す（必ず下段も出る)
 	const float lineY[3] = {
-		SCREEN_HEIGHT * (1.0f / 6.0f), // Top (120)
-		SCREEN_HEIGHT * (3.0f / 6.0f), // Middle (360)
-		SCREEN_HEIGHT * (5.0f / 6.0f)  // Bottom (600)
+		// Top (120)
+		SCREEN_HEIGHT * (1.0f / 6.0f), 
+		// Middle (360)
+		SCREEN_HEIGHT * (3.0f / 6.0f),
+		// Bottom (600)
+		SCREEN_HEIGHT * (5.0f / 6.0f)  
 	};
 
 	const uint32_t i = stampSpawnCount_++;
 	stamp.position.y = lineY[i % 3];
 
-	// ジッターもランダムをやめて固定パターン（任意）
 	const float yJitterTable[3] = { -12.0f, 0.0f, 12.0f };
 	stamp.position.y += yJitterTable[i % 3];
-	// ===== ここまで =====
 
-	// 色はパレット順でOK（これは毎回同じ）
+
+	// 色はパレット順
 	stamp.color = GetColorForStamp(stampColorIndex_);
 	stampColorIndex_ = (stampColorIndex_ + 1) % COLOR_PALETTE.size();
 
@@ -222,44 +228,29 @@ void BallWipeTransition::CreateStamp(const Vector2& position, bool /*isUpper*/)
 void BallWipeTransition::UpdateStamps(float deltaTime)
 {
 	for (auto& stamp : stamps_) {
-		stamp.age += deltaTime;
 
-		// Uncoveringフェーズならスタンプを縮小
+		// Coveredに入るまでは成長
+		if (currentPhase_ == Phase::BallAppear ||
+			currentPhase_ == Phase::Rolling ||
+			currentPhase_ == Phase::Covering) {
+			stamp.age += deltaTime;
+		}
+
 		if (currentPhase_ == Phase::Uncovering) {
 			float shrinkTime = currentTime_ - uncoverStartTime_;
 			float shrinkProgress = shrinkTime / stampShrinkDuration_;
 			shrinkProgress = (std::min)(1.0f, shrinkProgress);
 
-			// 縮小アニメーション（イーズイン：加速しながら縮む）
 			float shrinkEase = shrinkProgress * shrinkProgress;
-			// 保存したサイズから0へ
 			stamp.currentSize = stamp.sizeBeforeShrink * (1.0f - shrinkEase);
-
 		} else {
-			// 通常の成長アニメーション
 			float growProgress = stamp.age / stampGrowDuration_;
-			float eased;
-			if (growProgress < 1.0f) {
-				eased = 1.0f - (1.0f - growProgress) * (1.0f - growProgress);
-			} else {
-				// targetSize到達後は、上限倍率に“漸近”させて成長を緩やかにする（案B）
-				float extraTime = growProgress - 1.0f;
+			growProgress = (std::min)(1.0f, growProgress);
 
-				// 追加成長の上限倍率（現状の上限と合わせるなら 3.5f）
-				const float maxMul = 3.5f;
-
-				// 上限に近づく速さ（小さいほどゆっくり、均等に見えやすい）
-				// まずは 1.2f がおすすめ。さらに緩やかにしたいなら 0.8f ～ 1.0f。
-				const float k = 1.2f;
-
-				// 1.0 → maxMul に指数的に近づく（時間が経つほど増分が小さくなる）
-				eased = 1.0f + (maxMul - 1.0f) * (1.0f - std::exp(-k * extraTime));
-			}
+			float eased = 1.0f - (1.0f - growProgress) * (1.0f - growProgress);
 			stamp.currentSize = stamp.targetSize * eased;
 		}
 
-
-		// スプライトに反映
 		stamp.sprite->SetPosition(stamp.position);
 		stamp.sprite->SetSize({ stamp.currentSize, stamp.currentSize });
 		stamp.sprite->SetColor(stamp.color);
@@ -277,6 +268,20 @@ Vector4 BallWipeTransition::GetColorForStamp(int index)
 	return COLOR_PALETTE[index % COLOR_PALETTE.size()];
 }
 
+bool BallWipeTransition::AreAllStampsFullyGrown() const
+{
+	// スタンプがまだ無いなら false
+	if (stamps_.empty()) {
+		return false;
+	}
+
+	for (const auto& stamp : stamps_) {
+		if (stamp.age < stampGrowDuration_) {
+			return false;
+		}
+	}
+	return true;
+}
 void BallWipeTransition::Draw()
 {
 	// スタンプの描画
@@ -298,8 +303,8 @@ void BallWipeTransition::Draw()
 
 bool BallWipeTransition::IsHalfway()
 {
-	// 画面が完全に覆われたらロード開始
-	return currentPhase_ >= Phase::Covering;
+	// 画面が完全に覆われてスタンプがすべて成長しきっているか
+	return currentTime_ >= loadStartTime_;
 }
 
 bool BallWipeTransition::IsComplete()
