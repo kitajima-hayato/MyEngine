@@ -114,6 +114,7 @@ void GamePlayScene::Update()
 	// 背景の更新
 	backGround->Update();
 
+	// スタートカメラの演出中か
 	const bool wasStatCamRunning = startCam_->IsRunning();
 	// スタートカメラの更新
 	startCam_->Update(dt);
