@@ -17,7 +17,7 @@ private:
 	/// <summary>
 	/// モデル名の取得 
 	/// </summary>
-	const char* GetModelName() const override { return "GamePlay/Enemies/tentativeenemy"; }
+	const char* GetModelName() const override { return "GamePlay/Enemies/dropenemy/timed"; }
 
 private:
 	// 落下開始までの計測タイマー

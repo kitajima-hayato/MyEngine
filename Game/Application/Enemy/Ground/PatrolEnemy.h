@@ -45,6 +45,12 @@ class PatrolEnemy : public EnemyBase
 	}
 
 private:
+
+	// ボディーのモデル
+	std::unique_ptr<Object3D> bodyModel;
+	// ボディーモデルのトランスフォーム
+	Transform bodyTransform;
+
 	// 初期位置 / 巡回の基準点
 	float StartX_ = 0.0f;
 	// 往復する範囲
