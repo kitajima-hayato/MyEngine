@@ -17,7 +17,7 @@ private:
 	/// <summary>
 	/// モデル名の取得 
 	/// </summary>
-	const char* GetModelName() const override { return "GamePlay/Enemies/tentativeenemy"; }
+	const char* GetModelName() const override { return "GamePlay/Enemies/dropenemy/reactive"; }
 
 private:
 	// 攻撃を開始するためのプレイヤーとの距離

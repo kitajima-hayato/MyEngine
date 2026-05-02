@@ -19,8 +19,16 @@ void PatrolEnemy::Initialize()
 	// モデルの初期化
 	model = std::make_unique<Object3D>();
 	model->Initialize();
-	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	model->SetModel("GamePlay/Enemies/patrolenemy/hat");
+	stats.transform.scale = { 0.5f, 0.5f, 0.5f };
 	model->SetTransform(stats.transform);
+
+	bodyModel = std::make_unique<Object3D>();
+	bodyModel->Initialize();
+	bodyModel->SetModel("GamePlay/Enemies/patrolenemy/body");
+	bodyTransform = stats.transform;
+	bodyModel->SetTransform(bodyTransform);
+
 	// 巡回の初期設定
 	direction_ = 1;
 }
@@ -38,6 +46,10 @@ void PatrolEnemy::Update()
 	// モデルのトランスフォームをステータスに合わせて更新
 	model->SetTransform(stats.transform);
 	model->Update();
+
+	bodyTransform = stats.transform;
+	bodyModel->SetTransform(bodyTransform);
+	bodyModel->Update();
 }
 
 
@@ -46,6 +58,7 @@ void PatrolEnemy::Draw()
 	// 生存している場合のみ描画
 	if (stats.isAlive) {
 		model->Draw();
+		bodyModel->Draw();
 	}
 }
 

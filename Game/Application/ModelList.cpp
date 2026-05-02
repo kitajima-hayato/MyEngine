@@ -44,6 +44,11 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_off_off");
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/dropenemy/reactive");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/dropenemy/timed");
+
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/patrolenemy/hat");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/patrolenemy/body");
 
 
 	// GameOverScene
