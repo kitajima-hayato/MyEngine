@@ -1417,7 +1417,7 @@ private:
 	/// <summary>
 	/// モデル名の取得 
 	/// </summary>
-	const char* GetModelName() const override { return "GamePlay/Enemies/tentativeenemy"; }
+	const char* GetModelName() const override { return "GamePlay/Enemies/dropenemy/reactive"; }
 
 private:
 	// 攻撃を開始するためのプレイヤーとの距離
@@ -1470,7 +1470,7 @@ private:
 	/// <summary>
 	/// モデル名の取得 
 	/// </summary>
-	const char* GetModelName() const override { return "GamePlay/Enemies/tentativeenemy"; }
+	const char* GetModelName() const override { return "GamePlay/Enemies/dropenemy/timed"; }
 
 private:
 	// 落下開始までの計測タイマー
@@ -2518,8 +2518,16 @@ void PatrolEnemy::Initialize()
 	// モデルの初期化
 	model = std::make_unique<Object3D>();
 	model->Initialize();
-	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	model->SetModel("GamePlay/Enemies/patrolenemy/hat");
+	stats.transform.scale = { 0.5f, 0.5f, 0.5f };
 	model->SetTransform(stats.transform);
+
+	bodyModel = std::make_unique<Object3D>();
+	bodyModel->Initialize();
+	bodyModel->SetModel("GamePlay/Enemies/patrolenemy/body");
+	bodyTransform = stats.transform;
+	bodyModel->SetTransform(bodyTransform);
+
 	// 巡回の初期設定
 	direction_ = 1;
 }
@@ -2537,6 +2545,10 @@ void PatrolEnemy::Update()
 	// モデルのトランスフォームをステータスに合わせて更新
 	model->SetTransform(stats.transform);
 	model->Update();
+
+	bodyTransform = stats.transform;
+	bodyModel->SetTransform(bodyTransform);
+	bodyModel->Update();
 }
 
 
@@ -2545,6 +2557,7 @@ void PatrolEnemy::Draw()
 	// 生存している場合のみ描画
 	if (stats.isAlive) {
 		model->Draw();
+		bodyModel->Draw();
 	}
 }
 
@@ -2636,6 +2649,12 @@ class PatrolEnemy : public EnemyBase
 	}
 
 private:
+
+	// ボディーのモデル
+	std::unique_ptr<Object3D> bodyModel;
+	// ボディーモデルのトランスフォーム
+	Transform bodyTransform;
+
 	// 初期位置 / 巡回の基準点
 	float StartX_ = 0.0f;
 	// 往復する範囲
@@ -4289,6 +4308,11 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_off_off");
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/dropenemy/reactive");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/dropenemy/timed");
+
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/patrolenemy/hat");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/patrolenemy/body");
 
 
 	// GameOverScene
