@@ -44,6 +44,10 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_off_off");
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
+
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/flyingenemy/head");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/flyingenemy/oralarm");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/normalenemy");
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/dropenemy/reactive");
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/dropenemy/timed");
 

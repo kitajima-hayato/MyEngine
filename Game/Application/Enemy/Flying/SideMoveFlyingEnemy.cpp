@@ -25,10 +25,16 @@ void SideMoveFlyingEnemy::Initialize()
 	// Object3Dの初期化
 	model = std::make_unique<Object3D>();
 	model->Initialize();
-	// モデルの設定
-	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	// 頭モデル
+	model->SetModel("GamePlay/Enemies/flyingenemy/head");
 	// トランスフォームの設定
 	model->SetTransform(stats.transform);
+
+	// 脚パーツモデル
+	bodyModel = std::make_unique<Object3D>();
+	bodyModel->Initialize();
+	bodyModel->SetModel("GamePlay/Enemies/flyingenemy/oralarm");
+	bodyModel->SetTransform(stats.transform);
 	// baseYの設定
 	baseY = stats.transform.translate.y;
 
@@ -40,12 +46,33 @@ void SideMoveFlyingEnemy::Update()
 	if (stats.isAlive) {
 		// 挙動処理
 		Move();
+
 		// 攻撃処理
 		Action();
-		// トランスフォームの反映
+
+		// 頭は通常のTransform
 		model->SetTransform(stats.transform);
+
+		// 脚パーツだけ別Transformにする
+		auto legTransform = stats.transform;
+
+		// sinで左右にゆらゆら動かす
+		float swing = std::sin(timer * legSwingSpeed_);
+
+		// 少し左右に振る
+		legTransform.rotate.z += swing * legSwingRot_;
+
+		// 位置も少しだけずらす
+		legTransform.translate.x += swing * legSwingMoveX_;
+
+		// 上下にも少し揺らす
+		legTransform.translate.y -= std::abs(swing) * legSwingMoveY_;
+
+		bodyModel->SetTransform(legTransform);
+
 		// モデルの更新
 		model->Update();
+		bodyModel->Update();
 	}
 }
 
@@ -54,6 +81,7 @@ void SideMoveFlyingEnemy::Draw()
 	// 生存していたら描画する
 	if (stats.isAlive) {
 		model->Draw();
+		bodyModel->Draw();
 	}
 }
 

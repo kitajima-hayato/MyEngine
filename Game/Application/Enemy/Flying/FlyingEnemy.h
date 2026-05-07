@@ -33,5 +33,12 @@ public:
     /// <param name="translate"></param>
     void SetTranslate(const Vector3& translate)override;
 
+private:
+	std::unique_ptr<Object3D> bodyModel;
+    // 脚パーツ用の揺れ設定
+    float legSwingSpeed_ = 6.0f;
+    float legSwingRot_ = 0.25f;
+    float legSwingMoveX_ = 0.03f;
+    float legSwingMoveY_ = 0.04f;
 };
 

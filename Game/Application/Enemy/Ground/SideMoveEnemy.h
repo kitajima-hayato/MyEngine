@@ -28,5 +28,10 @@ class SideMoveEnemy :
 	/// 踏みつけられたら死亡
 	/// </summary>
 	void OnStomped() override;
+
+	/// <summary>
+	/// 移動方向に合わせてモデルの向きを更新する
+	/// </summary>
+	void UpdateFacingDirection();
 };
 
