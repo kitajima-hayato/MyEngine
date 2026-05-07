@@ -14,7 +14,7 @@ void SideMoveEnemy::Initialize()
 		// 生存フラグ
 		true,
 		// 速度
-		{0.1f, 0.1f, 0.0f},
+		{0.03f, 0.1f, 0.0f},
 		// 体力
 		1,
 		// 攻撃力
@@ -25,7 +25,7 @@ void SideMoveEnemy::Initialize()
 	model = std::make_unique<Object3D>();
 	model->Initialize();
 	// モデルの設定
-	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	model->SetModel("GamePlay/Enemies/normalenemy");
 	// トランスフォームの設定
 	model->SetTransform(stats.transform);
 }
@@ -54,24 +54,19 @@ void SideMoveEnemy::Draw()
 
 void SideMoveEnemy::Move()
 {
-	// 横移動の挙動を実装
 	if (!mapQuery) {
-		// マップクエリーが設定されていない場合は、単純に速度分だけ移動する
 		stats.transform.translate.x += stats.velocity.x;
+		UpdateFacingDirection();
 		return;
 	}
 
-	// 移動方向の取得
 	float dir = (stats.velocity.x >= 0.0f) ? 1.0f : -1.0f;
 
-	// 現在位置とスケール
 	const Vector3& pos = stats.transform.translate;
 	const Vector3& scale = stats.transform.scale;
 
-	// 進行方向側を少し先読み
 	float probeX = pos.x + dir * (scale.x * 0.5f + 0.05f);
 
-	// 上下2点をプローブして、どちらかが壁なら方向転換
 	float upperY = pos.y + scale.y * 0.25f;
 	float lowerY = pos.y - scale.y * 0.25f;
 
@@ -80,13 +75,14 @@ void SideMoveEnemy::Move()
 
 	bool hitWall = mapQuery->IsWallAt(upperProbe) || mapQuery->IsWallAt(lowerProbe);
 
-	// 壁に当たっていたら方向転換して終了
 	if (hitWall) {
 		stats.velocity.x *= -1.0f;
+		UpdateFacingDirection();
 		return;
 	}
 
 	stats.transform.translate.x += stats.velocity.x;
+	UpdateFacingDirection();
 }
 
 void SideMoveEnemy::Action()
@@ -98,4 +94,13 @@ void SideMoveEnemy::OnStomped()
 	// 踏みつけられたら死亡
 	stats.isAlive = false;
 	stats.health = 0;
+}
+
+void SideMoveEnemy::UpdateFacingDirection()
+{
+	if (stats.velocity.x >= 0.0f) {
+		stats.transform.rotate.y = 3.14159265f;
+	} else {
+		stats.transform.rotate.y = 0.0f;
+	}
 }

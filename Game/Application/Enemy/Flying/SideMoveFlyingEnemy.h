@@ -41,8 +41,17 @@ class SideMoveFlyingEnemy :
 	void SideMove();
 
 private:
-	// 画面外としての左端の座標
-	float leftBorder_ = -10.0f;
+    // 脚パーツ用モデル
+    std::unique_ptr<Object3D> bodyModel;
+
+    // 脚パーツ用の揺れ設定
+    float legSwingSpeed_ = 5.0f;
+    float legSwingRot_ = 0.18f;
+    float legSwingMoveX_ = 0.02f;
+    float legSwingMoveY_ = 0.03f;
+
+    // 画面外としての左端の座標
+    float leftBorder_ = -10.0f;
 
 };
 

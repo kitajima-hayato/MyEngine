@@ -57,8 +57,8 @@ private:
 	float moveRange_ = 3.0f;
 	// 移動速度
 	float moveSpeed_ = 0.05f;
-	// 進行方向
-	int direction_ = 1; // 1:右, -1:左 
+	// 進行方向 1:右, -1:左 
+	int direction_ = 1; 
 
 };
 
