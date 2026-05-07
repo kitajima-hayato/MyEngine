@@ -2121,7 +2121,7 @@ void FlyingEnemy::Initialize()
 	/// @仮スタッツ
 	stats = {
 		// scale
-		{{1.0f, 1.0f, 1.0f},
+		{{0.5f, 0.5f, 0.5f},
 		// Rotate
 		{0.0f, 0.0f, 0.0f},
 		// Translate
@@ -2144,9 +2144,14 @@ void FlyingEnemy::Initialize()
 	model = std::make_unique<Object3D>();
 	model->Initialize();
 	/// モデルの設定
-	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	model->SetModel("GamePlay/Enemies/flyingenemy/head");
 	/// トランスフォームの設定
 	model->SetTransform(stats.transform);
+
+	bodyModel = std::make_unique<Object3D>();
+	bodyModel->Initialize();
+	bodyModel->SetModel("GamePlay/Enemies/flyingenemy/oralarm");
+	bodyModel->SetTransform(stats.transform);
 
 	baseY = stats.transform.translate.y;
 }
@@ -2160,9 +2165,29 @@ void FlyingEnemy::Update()
 		/// 攻撃処理
 		Action();
 		/// トランスフォームの反映
+		/// トランスフォームの反映
 		model->SetTransform(stats.transform);
+
+		// 脚パーツだけ別Transformにする
+		auto legTransform = stats.transform;
+
+		// sinで左右にゆらゆら動かす
+		float swing = std::sin(timer * legSwingSpeed_);
+
+		// 少し左右に振る
+		legTransform.rotate.z += swing * legSwingRot_;
+
+		// 位置も少しだけずらす
+		legTransform.translate.x += swing * legSwingMoveX_;
+
+		// 上下にも少し揺らす
+		legTransform.translate.y -= std::abs(swing) * legSwingMoveY_;
+
+		bodyModel->SetTransform(legTransform);
+
 		/// モデルの更新
 		model->Update();
+		bodyModel->Update();
 	}
 }
 
@@ -2171,6 +2196,7 @@ void FlyingEnemy::Draw()
 	if (stats.isAlive) {
 		/// モデルの描画
 		model->Draw();
+		bodyModel->Draw();
 	}
 }
 
@@ -2230,6 +2256,13 @@ public:
     /// <param name="translate"></param>
     void SetTranslate(const Vector3& translate)override;
 
+private:
+	std::unique_ptr<Object3D> bodyModel;
+    // 脚パーツ用の揺れ設定
+    float legSwingSpeed_ = 6.0f;
+    float legSwingRot_ = 0.25f;
+    float legSwingMoveX_ = 0.03f;
+    float legSwingMoveY_ = 0.04f;
 };
 
 
@@ -2264,10 +2297,16 @@ void SideMoveFlyingEnemy::Initialize()
 	// Object3Dの初期化
 	model = std::make_unique<Object3D>();
 	model->Initialize();
-	// モデルの設定
-	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	// 頭モデル
+	model->SetModel("GamePlay/Enemies/flyingenemy/head");
 	// トランスフォームの設定
 	model->SetTransform(stats.transform);
+
+	// 脚パーツモデル
+	bodyModel = std::make_unique<Object3D>();
+	bodyModel->Initialize();
+	bodyModel->SetModel("GamePlay/Enemies/flyingenemy/oralarm");
+	bodyModel->SetTransform(stats.transform);
 	// baseYの設定
 	baseY = stats.transform.translate.y;
 
@@ -2279,12 +2318,33 @@ void SideMoveFlyingEnemy::Update()
 	if (stats.isAlive) {
 		// 挙動処理
 		Move();
+
 		// 攻撃処理
 		Action();
-		// トランスフォームの反映
+
+		// 頭は通常のTransform
 		model->SetTransform(stats.transform);
+
+		// 脚パーツだけ別Transformにする
+		auto legTransform = stats.transform;
+
+		// sinで左右にゆらゆら動かす
+		float swing = std::sin(timer * legSwingSpeed_);
+
+		// 少し左右に振る
+		legTransform.rotate.z += swing * legSwingRot_;
+
+		// 位置も少しだけずらす
+		legTransform.translate.x += swing * legSwingMoveX_;
+
+		// 上下にも少し揺らす
+		legTransform.translate.y -= std::abs(swing) * legSwingMoveY_;
+
+		bodyModel->SetTransform(legTransform);
+
 		// モデルの更新
 		model->Update();
+		bodyModel->Update();
 	}
 }
 
@@ -2293,6 +2353,7 @@ void SideMoveFlyingEnemy::Draw()
 	// 生存していたら描画する
 	if (stats.isAlive) {
 		model->Draw();
+		bodyModel->Draw();
 	}
 }
 
@@ -2373,8 +2434,17 @@ class SideMoveFlyingEnemy :
 	void SideMove();
 
 private:
-	// 画面外としての左端の座標
-	float leftBorder_ = -10.0f;
+    // 脚パーツ用モデル
+    std::unique_ptr<Object3D> bodyModel;
+
+    // 脚パーツ用の揺れ設定
+    float legSwingSpeed_ = 5.0f;
+    float legSwingRot_ = 0.18f;
+    float legSwingMoveX_ = 0.02f;
+    float legSwingMoveY_ = 0.03f;
+
+    // 画面外としての左端の座標
+    float leftBorder_ = -10.0f;
 
 };
 
@@ -2410,7 +2480,7 @@ void NormalEnemy::Initialize()
 	model = std::make_unique<Object3D>();
 	model->Initialize();
 	// モデルの設定
-	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	model->SetModel("GamePlay/Enemies/normalenemy");
 	// トランスフォームの設定
 	model->SetTransform(stats.transform);
 }
@@ -2661,8 +2731,8 @@ private:
 	float moveRange_ = 3.0f;
 	// 移動速度
 	float moveSpeed_ = 0.05f;
-	// 進行方向
-	int direction_ = 1; // 1:右, -1:左 
+	// 進行方向 1:右, -1:左 
+	int direction_ = 1; 
 
 };
 
@@ -2687,7 +2757,7 @@ void SideMoveEnemy::Initialize()
 		// 生存フラグ
 		true,
 		// 速度
-		{0.1f, 0.1f, 0.0f},
+		{0.03f, 0.1f, 0.0f},
 		// 体力
 		1,
 		// 攻撃力
@@ -2698,7 +2768,7 @@ void SideMoveEnemy::Initialize()
 	model = std::make_unique<Object3D>();
 	model->Initialize();
 	// モデルの設定
-	model->SetModel("GamePlay/Enemies/tentativeenemy");
+	model->SetModel("GamePlay/Enemies/normalenemy");
 	// トランスフォームの設定
 	model->SetTransform(stats.transform);
 }
@@ -2727,24 +2797,19 @@ void SideMoveEnemy::Draw()
 
 void SideMoveEnemy::Move()
 {
-	// 横移動の挙動を実装
 	if (!mapQuery) {
-		// マップクエリーが設定されていない場合は、単純に速度分だけ移動する
 		stats.transform.translate.x += stats.velocity.x;
+		UpdateFacingDirection();
 		return;
 	}
 
-	// 移動方向の取得
 	float dir = (stats.velocity.x >= 0.0f) ? 1.0f : -1.0f;
 
-	// 現在位置とスケール
 	const Vector3& pos = stats.transform.translate;
 	const Vector3& scale = stats.transform.scale;
 
-	// 進行方向側を少し先読み
 	float probeX = pos.x + dir * (scale.x * 0.5f + 0.05f);
 
-	// 上下2点をプローブして、どちらかが壁なら方向転換
 	float upperY = pos.y + scale.y * 0.25f;
 	float lowerY = pos.y - scale.y * 0.25f;
 
@@ -2753,13 +2818,14 @@ void SideMoveEnemy::Move()
 
 	bool hitWall = mapQuery->IsWallAt(upperProbe) || mapQuery->IsWallAt(lowerProbe);
 
-	// 壁に当たっていたら方向転換して終了
 	if (hitWall) {
 		stats.velocity.x *= -1.0f;
+		UpdateFacingDirection();
 		return;
 	}
 
 	stats.transform.translate.x += stats.velocity.x;
+	UpdateFacingDirection();
 }
 
 void SideMoveEnemy::Action()
@@ -2771,6 +2837,15 @@ void SideMoveEnemy::OnStomped()
 	// 踏みつけられたら死亡
 	stats.isAlive = false;
 	stats.health = 0;
+}
+
+void SideMoveEnemy::UpdateFacingDirection()
+{
+	if (stats.velocity.x >= 0.0f) {
+		stats.transform.rotate.y = 3.14159265f;
+	} else {
+		stats.transform.rotate.y = 0.0f;
+	}
 }
 
 
@@ -2807,6 +2882,11 @@ class SideMoveEnemy :
 	/// 踏みつけられたら死亡
 	/// </summary>
 	void OnStomped() override;
+
+	/// <summary>
+	/// 移動方向に合わせてモデルの向きを更新する
+	/// </summary>
+	void UpdateFacingDirection();
 };
 
 
@@ -4308,6 +4388,10 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Blocks/toggleblock_off_off");
 							   
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/tentativeenemy");
+
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/flyingenemy/head");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/flyingenemy/oralarm");
+	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/normalenemy");
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/dropenemy/reactive");
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/dropenemy/timed");
 
