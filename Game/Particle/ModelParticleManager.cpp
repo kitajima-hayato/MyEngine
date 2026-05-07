@@ -34,6 +34,21 @@ void ModelParticleManager::Initialize()
 
 void ModelParticleManager::EmitBlockDebris(const Vector3& position, const Vector4& color, uint32_t count)
 {
+#ifdef _DEBUG
+    OutputDebugStringA("EmitBlockDebris called\n");
+#endif
+
+    if (!model_) {
+        model_ = ModelManager::GetInstance().FindModel(modelName_);
+    }
+
+    if (!model_ || !instanceMapped_) {
+#ifdef _DEBUG
+        OutputDebugStringA("EmitBlockDebris failed: model_ or instanceMapped_ is null\n");
+#endif
+        return;
+    }
+
     std::uniform_real_distribution<float> distSpeed(1.0f, 3.0f);
     std::uniform_real_distribution<float> distAngle(0.0f, 2.0f * std::numbers::pi_v<float>);
     std::uniform_real_distribution<float> distRotation(-5.0f, 5.0f);
@@ -59,11 +74,27 @@ void ModelParticleManager::EmitBlockDebris(const Vector3& position, const Vector
 
         particles_.push_back(p);
     }
-
+#ifdef _DEBUG
+    char buffer[256];
+    sprintf_s(
+        buffer,
+        "EmitBlockDebris pos=(%.2f, %.2f, %.2f) particles=%zu instance=%u\n",
+        position.x,
+        position.y,
+        position.z,
+        particles_.size(),
+        instanceCount_
+    );
+    OutputDebugStringA(buffer);
+#endif
 }
 
 void ModelParticleManager::Update()
 {
+    if (!instanceMapped_) {
+        instanceCount_ = 0;
+        return;
+    }
     const float dt = 1.0f / 60.0f;
 
     for (auto it = particles_.begin(); it != particles_.end();)
@@ -114,6 +145,12 @@ void ModelParticleManager::Update()
 
 void ModelParticleManager::Draw()
 {
+#ifdef _DEBUG
+    if (instanceCount_ > 0) {
+        OutputDebugStringA("ModelParticleManager Draw instance\n");
+    }
+#endif
+
     if (!model_ || instanceCount_ == 0) { return; }
 
     Object3DInstancingCommon::GetInstance()->DrawSettingCommon();
@@ -122,7 +159,6 @@ void ModelParticleManager::Draw()
     cmd->IASetVertexBuffers(1, 1, &instanceVBV_);
 
     model_->DrawInstanced(instanceCount_);
-
 }
 
 void ModelParticleManager::Finalize()
@@ -136,6 +172,16 @@ void ModelParticleManager::Finalize()
     }
     model_ = nullptr;
     instanceCount_ = 0;
+}
+
+void ModelParticleManager::Reset()
+{
+    particles_.clear();
+    instanceCount_ = 0;
+
+    if (!model_) {
+        model_ = ModelManager::GetInstance().FindModel(modelName_);
+    }
 }
 
 void ModelParticleManager::WarmupDrawOnce()

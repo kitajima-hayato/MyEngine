@@ -86,8 +86,6 @@ void MyGame::Draw()
 		renderTexture->Draw();
 
 
-		ModelParticleManager::GetInstance().Draw();
-
 	} else {
 		dxCommon->PreDraw();
 		srvManager->PreDraw();
@@ -96,7 +94,6 @@ void MyGame::Draw()
 			didInstancingWarmup_ = true;
 		}
 		SceneManager::GetInstance()->Draw();
-		ModelParticleManager::GetInstance().Draw();
 	}
 
 	Framework::Draw();

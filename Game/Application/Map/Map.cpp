@@ -74,6 +74,189 @@ void Map::Update()
 
 #pragma region MapEditor
 #ifdef USE_IMGUI
+	MapEditor();
+#endif // USE_IMGUI
+#pragma endregion MapEditor
+	// 死んだブロックだけ回収
+	for (auto& row : blockArray_) {
+		for (Block*& block : row) {
+			if (block && !block->GetAliveBlock()) {
+				delete block;
+				block = nullptr;
+			}
+		}
+	}
+	// マップデータの変更を検知してブロックを再生成
+	if (isMapDataChanged_) {
+		//GenerateMapBlock();
+		//GenerateHazardObjects();
+		isMapDataChanged_ = false;
+
+	}
+
+}
+
+
+
+void Map::Draw()
+{
+	// マップの描画
+	for (std::vector <Block*>& row : blockArray_) {
+		for (Block* block : row) {
+			if (!block) {
+				continue;
+			}
+			block->Draw();
+		}
+	}
+
+	// ハザードの描画
+	for (auto& row : hazardObjects_) {
+		for (auto& hazard : row) {
+			if (hazard) {
+				hazard->Draw();
+			}
+		}
+	}
+
+}
+
+void Map::Finalize()
+{
+	// マップブロックの解放
+	for (std::vector <Block*>& row : blockArray_) {
+		for (Block* block : row) {
+			if (block) {
+				delete block;
+				block = nullptr;
+			}
+		}
+	}
+}
+
+void Map::GenerateMapBlock()
+{
+	const uint32_t h = GetHeight();
+	const uint32_t w = GetWidth();
+
+	// 既存のブロックを解放
+	for (auto& row : blockArray_) {
+		for (Block*& block : row) {
+			if (block) {
+				delete block;
+				block = nullptr;
+			}
+		}
+	}
+	// ポインタを解放したので配列自体もクリア
+	blockArray_.clear();
+
+	// 新しいサイズで配列を作り直す
+	blockArray_.assign(h, std::vector<Block*>(w, nullptr));
+
+	// マップデータからブロックを生成
+	for (uint32_t y = 0; y < h; ++y) {
+		for (uint32_t x = 0; x < w; ++x) {
+			const BlockType type = mapChipData_.mapData[y][x];
+			if (type == BlockType::Air) {
+				continue;
+			}
+			// ブロックの生成
+			Vector3 pos = GetMapChipPositionByIndex(x, y);
+			pos.x += blockOffset_;
+			pos.y -= blockOffset_;
+			blockArray_[y][x] = Block::CreateBlock(type, pos);
+		}
+	}
+}
+
+void Map::GenerateEnemyLayer()
+{
+	const uint32_t h = GetHeight();
+	const uint32_t w = GetWidth();
+
+	// エネミーデータから敵を生成
+	for (uint32_t y = 0; y < h; y++) {
+		for (uint32_t x = 0; x < w; x++) {
+			const EnemyType type = enemyLayerData_.enemyData[y][x];
+			if (type == EnemyType::None) {
+				continue;
+			}
+			// 敵の生成
+			Vector3 pos = GetMapChipPositionByIndex(x, y);
+			pos.x += blockOffset_;
+			pos.y -= blockOffset_;
+		}
+	}
+}
+
+
+void Map::LoadMapData(const std::string& mapFilePath)
+{
+	// CSVファイルからマップデータを読み込む
+	CsvLoader csvLoader;
+	mapChipData_.mapData = csvLoader.LoadMapBlockType(mapFilePath);
+
+	std::string enemyLayerFilePath = mapFilePath + std::string("_EnemyLayer");
+	// 敵レイヤーデータの読み込み
+	enemyLayerData_.enemyData = csvLoader.LoadMapEnemyType(enemyLayerFilePath);
+	const uint32_t h = GetHeight();
+	const uint32_t w = GetWidth();
+	enemyLayerData_.enemyData.resize(h);
+	for (uint32_t y = 0; y < h; ++y) {
+		enemyLayerData_.enemyData[y].resize(w, EnemyType::None);
+	}
+
+	std::string hazardFilePath = mapFilePath + std::string("_HazardLayer");
+	mapChipData_.hazardData = csvLoader.LoadMapHazardType(hazardFilePath, GetWidth(), GetHeight());
+
+}
+
+void Map::GenerateHazardObjects()
+{
+	// サイズの取得
+	const uint32_t h = GetHeight();
+	const uint32_t w = GetWidth();
+
+	// サイズの確保
+	hazardObjects_.clear();
+	hazardObjects_.resize(h);
+	for (uint32_t y = 0; y < h; ++y) {
+		hazardObjects_[y].resize(w);
+	}
+	// ハザードデータから Object3D を生成
+	for (uint32_t y = 0; y < h; ++y) {
+		for (uint32_t x = 0; x < w; ++x) {
+			const HazardType type = mapChipData_.hazardData[y][x];
+			if (type == HazardType::Spike) {
+				//if (hazardObjects_[y][x]) {
+					// 既にオブジェクトがある場合は再利用
+				hazardObjects_[y][x] = std::make_unique<Object3D>();
+				hazardObjects_[y][x]->Initialize();
+				// モデルの指定
+				hazardObjects_[y][x]->SetModel("GamePlay/Blocks/damageblock");
+				//}
+				// ブロックの座標系に合わせて配置
+				Vector3 pos = GetMapChipPositionByIndex(x, y);
+				pos.x += blockOffset_;
+				pos.y -= blockOffset_;
+				pos.z = 00.0f;
+				hazardObjects_[y][x]->SetTranslate(pos);
+
+			} else {
+				// Noneなら消す
+				hazardObjects_[y][x].reset();
+
+			}
+		}
+	}
+
+
+}
+
+void Map::MapEditor()
+{
+#ifdef USE_IMGUI
 	// ------------------------------------------------------------
 	// Map Tools (ImGui)
 	// ------------------------------------------------------------
@@ -561,182 +744,8 @@ void Map::Update()
 	}
 
 	ImGui::End(); // Map Tools
+
 #endif // USE_IMGUI
-#pragma endregion MapEditor
-	// 末尾に追加：死んだブロックだけ回収
-	for (auto& row : blockArray_) {
-		for (Block*& block : row) {
-			if (block && !block->GetAliveBlock()) {
-				delete block;
-				block = nullptr;
-			}
-		}
-	}
-	// マップデータの変更を検知してブロックを再生成
-	if (isMapDataChanged_) {
-		//GenerateMapBlock();
-		//GenerateHazardObjects();
-		isMapDataChanged_ = false;
-
-	}
-
-}
-
-
-
-void Map::Draw()
-{
-	// マップの描画
-	for (std::vector <Block*>& row : blockArray_) {
-		for (Block* block : row) {
-			if (!block) {
-				continue;
-			}
-			block->Draw();
-		}
-	}
-
-	// ハザードの描画
-	for (auto& row : hazardObjects_) {
-		for (auto& hazard : row) {
-			if (hazard) {
-				hazard->Draw();
-			}
-		}
-	}
-
-}
-
-void Map::Finalize()
-{
-	// マップブロックの解放
-	for (std::vector <Block*>& row : blockArray_) {
-		for (Block* block : row) {
-			if (block) {
-				delete block;
-				block = nullptr;
-			}
-		}
-	}
-}
-
-void Map::GenerateMapBlock()
-{
-	const uint32_t h = GetHeight();
-	const uint32_t w = GetWidth();
-
-	// 既存のブロックを解放
-	for (auto& row : blockArray_) {
-		for (Block*& block : row) {
-			if (block) {
-				delete block;
-				block = nullptr;
-			}
-		}
-	}
-	// ポインタを解放したので配列自体もクリア
-	blockArray_.clear();
-
-	// 新しいサイズで配列を作り直す
-	blockArray_.assign(h, std::vector<Block*>(w, nullptr));
-
-	// マップデータからブロックを生成
-	for (uint32_t y = 0; y < h; ++y) {
-		for (uint32_t x = 0; x < w; ++x) {
-			const BlockType type = mapChipData_.mapData[y][x];
-			if (type == BlockType::Air) {
-				continue;
-			}
-			// ブロックの生成
-			Vector3 pos = GetMapChipPositionByIndex(x, y);
-			pos.x += blockOffset_;
-			pos.y -= blockOffset_;
-			blockArray_[y][x] = Block::CreateBlock(type, pos);
-		}
-	}
-}
-
-void Map::GenerateEnemyLayer()
-{
-	const uint32_t h = GetHeight();
-	const uint32_t w = GetWidth();
-
-	// エネミーデータから敵を生成
-	for (uint32_t y = 0; y < h; y++) {
-		for (uint32_t x = 0; x < w; x++) {
-			const EnemyType type = enemyLayerData_.enemyData[y][x];
-			if (type == EnemyType::None) {
-				continue;
-			}
-			// 敵の生成
-			Vector3 pos = GetMapChipPositionByIndex(x, y);
-			pos.x += blockOffset_;
-			pos.y -= blockOffset_;
-		}
-	}
-}
-
-
-void Map::LoadMapData(const std::string& mapFilePath)
-{
-	// CSVファイルからマップデータを読み込む
-	CsvLoader csvLoader;
-	mapChipData_.mapData = csvLoader.LoadMapBlockType(mapFilePath);
-
-	std::string enemyLayerFilePath = mapFilePath + std::string("_EnemyLayer");
-	// 敵レイヤーデータの読み込み
-	enemyLayerData_.enemyData = csvLoader.LoadMapEnemyType(enemyLayerFilePath);
-	const uint32_t h = GetHeight();
-	const uint32_t w = GetWidth();
-	enemyLayerData_.enemyData.resize(h);
-	for (uint32_t y = 0; y < h; ++y) {
-		enemyLayerData_.enemyData[y].resize(w, EnemyType::None);
-	}
-
-	std::string hazardFilePath = mapFilePath + std::string("_HazardLayer");
-	mapChipData_.hazardData = csvLoader.LoadMapHazardType(hazardFilePath, GetWidth(), GetHeight());
-
-}
-
-void Map::GenerateHazardObjects()
-{
-	// サイズの取得
-	const uint32_t h = GetHeight();
-	const uint32_t w = GetWidth();
-
-	// サイズの確保
-	hazardObjects_.clear();
-	hazardObjects_.resize(h);
-	for (uint32_t y = 0; y < h; ++y) {
-		hazardObjects_[y].resize(w);
-	}
-	// ハザードデータから Object3D を生成
-	for (uint32_t y = 0; y < h; ++y) {
-		for (uint32_t x = 0; x < w; ++x) {
-			const HazardType type = mapChipData_.hazardData[y][x];
-			if (type == HazardType::Spike) {
-				//if (hazardObjects_[y][x]) {
-					// 既にオブジェクトがある場合は再利用
-				hazardObjects_[y][x] = std::make_unique<Object3D>();
-				hazardObjects_[y][x]->Initialize();
-				// モデルの指定
-				hazardObjects_[y][x]->SetModel("GamePlay/Blocks/damageblock");
-				//}
-				// ブロックの座標系に合わせて配置
-				Vector3 pos = GetMapChipPositionByIndex(x, y);
-				pos.x += blockOffset_;
-				pos.y -= blockOffset_;
-				pos.z = 00.0f;
-				hazardObjects_[y][x]->SetTranslate(pos);
-
-			} else {
-				// Noneなら消す
-				hazardObjects_[y][x].reset();
-
-			}
-		}
-	}
-
 
 }
 
@@ -803,37 +812,33 @@ Vector3 Map::GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex)
 
 void Map::BreakBlock(uint32_t xIndex, uint32_t yIndex)
 {
-	// マップ外チェック
 	if (yIndex >= mapChipData_.mapData.size() ||
 		xIndex >= mapChipData_.mapData[yIndex].size()) {
 		return;
 	}
-	// 破壊可能ブロックかチェック
+
 	if (mapChipData_.mapData[yIndex][xIndex] != BlockType::breakBlock) {
 		return;
 	}
 
-	// 該当データの書き換え / Airに変更
+	Vector3 breakPos = GetMapChipPositionByIndex(xIndex, yIndex);
+	breakPos.x += blockOffset_;
+	breakPos.y -= blockOffset_;
 
-	isMapDataChanged_ = true;
+	ModelParticleManager::GetInstance().EmitBlockDebris(
+		breakPos,
+		Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+		15
+	);
 
-	// 実体（描画/更新）をその場で消す（Map全再生成しない）
 	if (yIndex < blockArray_.size() && xIndex < blockArray_[yIndex].size()) {
 		if (blockArray_[yIndex][xIndex]) {
-			// 生存フラグ方式（演出を挟むなら Kill のみにしてもOK）
 			blockArray_[yIndex][xIndex]->SetBroken();
-
-			// 破壊位置の取得
-			Vector3 breakPos = GetMapChipPositionByIndex(xIndex, yIndex);
-			// 破壊時にパーティクルの発生
-			ModelParticleManager::GetInstance().EmitBlockDebris(
-				breakPos,
-				Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-				15);
-			// 該当のBreakBlockをAirに変更
-			mapChipData_.mapData[yIndex][xIndex] = BlockType::Air;
 		}
 	}
+
+	mapChipData_.mapData[yIndex][xIndex] = BlockType::Air;
+	isMapDataChanged_ = true;
 }
 
 HazardType Map::GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const
@@ -858,7 +863,7 @@ bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
 	if (!block) {
 		return false;
 	}
-	// ゴールは判定をとらない / 触れたらisgoalをtrueにするだけ
+	// ゴールは判定をとらない / 触れたらis goalをtrueにするだけ
 	BlockType type = mapChipData_.mapData[yIndex][xIndex];
 	if (type == BlockType::kGoalUp || type == BlockType::kGoalDown) {
 		return false;
