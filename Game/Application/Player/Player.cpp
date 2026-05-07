@@ -62,7 +62,7 @@ void Player::OnCollision(Collider* other)
 		}
 
 		// 踏みつけ判定
-		// 条件: プレイヤーが落下中 && プレイヤーが敵より上にいる
+		// プレイヤーが落下中 && プレイヤーが敵より上にいる
 		if (velocity_.y < 0.0f) {
 			// プレイヤーと敵のAABBを取得
 			AABB playerAABB = GetAABB();
@@ -75,7 +75,7 @@ void Player::OnCollision(Collider* other)
 			float enemyCenter = (enemyAABB.min.y + enemyAABB.max.y) * 0.5f;
 			float playerCenter = (playerAABB.min.y + playerAABB.max.y) * 0.5f;
 
-			// 踏みつけ判定: プレイヤーの中心が敵の中心より上 && プレイヤーの底が敵の上半分にある
+			// プレイヤーの中心が敵の中心より上 && プレイヤーの底が敵の上半分にある
 			if (playerCenter > enemyCenter && playerBottom < enemyTop + 0.2f) {
 				// 踏みつけ成功
 				StompEnemy(other);
@@ -261,6 +261,8 @@ void Player::Respawn(const Vector3& pos)
 	// 状態をリセット
 	isDead_ = false;
 	isDeathByFalling_ = false;
+	isDying_ = false;
+	deathDemoFinished_ = false;
 	onGround_ = true;
 }
 
@@ -635,6 +637,7 @@ void Player::UpdateBehavior()
 		status_.kHealth -= 1;
 		isDead_ = true;
 		isDeathByFalling_ = true;
+		return;
 	}
 
 	// 移動量の反映

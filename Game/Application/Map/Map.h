@@ -97,6 +97,12 @@ public:
 	void GenerateHazardObjects();
 
 
+	/// <summary>
+	/// マップ編集ツール
+	/// </summary>
+	void MapEditor();
+
+
 public:	// Setter / Getter
 	/// <summary>
 	/// 座標からマップチップのインデックスを取得

@@ -199,6 +199,7 @@ void GamePlayScene::Update()
 			isRespawning_ = false;
 			didWarpOnDark_ = false;
 			player->SetControlEnabled(true);
+			isGameOverPending_ = false;
 		}
 
 		return;
@@ -272,6 +273,8 @@ void GamePlayScene::Draw()
 	for (auto& enemy : enemies) {
 		enemy->Draw();
 	}
+
+	ModelParticleManager::GetInstance().Draw();
 
 	ParticleManager::GetInstance()->Draw();
 	
