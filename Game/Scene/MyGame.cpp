@@ -43,7 +43,7 @@ void MyGame::Initialize()
 	sceneFactory_ = make_unique<SceneFactory>();
 	SceneManager::GetInstance()->SetSceneFactory(sceneFactory_.get());
 	// シーンマネージャーに最初のシーンをセット
-	SceneManager::GetInstance()->ChangeScene("TITLE");
+	SceneManager::GetInstance()->ChangeScene("DEBUG");
 
 	//スカイボックス
 	skyBox = make_unique<SkyBox>();

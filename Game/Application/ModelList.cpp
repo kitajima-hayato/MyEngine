@@ -54,6 +54,8 @@ void ModelList::LoadAllModel()
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/patrolenemy/hat");
 	ModelManager::GetInstance().LoadModel("GamePlay/Enemies/patrolenemy/body");
 
+	ModelManager::GetInstance().LoadModel("Scenes/Debug/dice");
+
 
 	// GameOverScene
 	ModelManager::GetInstance().LoadModel("Scenes/GameOver/Models/backblack");
