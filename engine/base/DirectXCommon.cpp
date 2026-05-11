@@ -25,6 +25,13 @@ using namespace Engine;
 DirectXCommon::DirectXCommon()
 {
 }
+Engine::DirectXCommon::~DirectXCommon()
+{
+	if(fenceEvent) {
+		CloseHandle(fenceEvent);
+		fenceEvent = nullptr;
+	}
+}
 void DirectXCommon::Initialize(WinAPI* winAPI)
 {
 	// NULL検出
@@ -224,17 +231,17 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateDepthBuffer(Microsof
 	depthClearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;			// フォーマット。Resourceと合わせる
 
 	// Resourceの生成
-
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthResource = nullptr;
 	HRESULT hr = device->CreateCommittedResource(
 		&heapProperties, // Heapの設定
 		D3D12_HEAP_FLAG_NONE,//Heapの特殊な設定。特になし。
 		&resourceDesc,// Resourceの設定
 		D3D12_RESOURCE_STATE_DEPTH_WRITE,//深度値を書き込む状態にしておく
 		&depthClearValue,// clear最適値
-		IID_PPV_ARGS(&resource));//作成するResourceポインタへのポインタ
+		IID_PPV_ARGS(&depthResource));//作成するResourceポインタへのポインタ
 	assert(SUCCEEDED(hr));
 
-	return resource;
+	return depthResource;
 }
 ComPtr <ID3D12DescriptorHeap>
 DirectXCommon::CreateDescriptorHeap(
@@ -475,11 +482,14 @@ void DirectXCommon::InitDepthStencilView()
 {
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format.基本的にはResourceに合わせる
-	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 
-	Microsoft::WRL::ComPtr <ID3D12Resource> depthStencilResource;
-	depthStencilResource = CreateDepthBuffer(device, WinAPI::kClientWidth, WinAPI::kClientHeight);
+	
+	depthStencilResource = CreateDepthBuffer(
+		device,
+		WinAPI::kClientWidth, 
+		WinAPI::kClientHeight);
 	//DSVの設定									 
 
 	//DSVHeapの先頭にDSVをつくる

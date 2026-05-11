@@ -72,8 +72,7 @@ void ParticleManager::Finalize()
 }
 
 ParticleManager::~ParticleManager()
-{
-}
+{}
 
 void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager, Camera* camera)
 {
@@ -460,16 +459,17 @@ void ParticleManager::UpdateParticle()
 		// 各パーティクルを更新
 		for (auto particleIterator = particleGroup.particles.begin(); particleIterator != particleGroup.particles.end();)
 		{
+
+			// 生存時間を過ぎていたら更新せず描画対象にしない
+			if (particleIterator->lifeTime <= particleIterator->currentTime)
+			{
+				// 消す
+				particleIterator = particleGroup.particles.erase(particleIterator);
+				continue;
+			}
 			// インスタンス数が上限を超えていないならインスタンスデータを書き込む
 			if (particleGroup.kNumInstance < kMaxParticle)
 			{
-				// 生存時間を過ぎていたら更新せず描画対象にしない
-				if (particleIterator->lifeTime <= particleIterator->currentTime)
-				{
-					// 消す
-					particleIterator = particleGroup.particles.erase(particleIterator);
-					continue;
-				}
 				// パーティクル１個ごとの更新
 				particleIterator->transform.translate.x += particleIterator->velocity.x * kDeltaTime;
 				particleIterator->transform.translate.y += particleIterator->velocity.y * kDeltaTime;

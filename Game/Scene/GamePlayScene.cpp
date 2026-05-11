@@ -199,6 +199,7 @@ void GamePlayScene::Update()
 			isRespawning_ = false;
 			didWarpOnDark_ = false;
 			player->SetControlEnabled(true);
+			isGameOverPending_ = false;
 		}
 
 		return;
@@ -272,6 +273,8 @@ void GamePlayScene::Draw()
 	for (auto& enemy : enemies) {
 		enemy->Draw();
 	}
+
+	ModelParticleManager::GetInstance().Draw();
 
 	ParticleManager::GetInstance()->Draw();
 	
@@ -441,7 +444,7 @@ void GamePlayScene::Finalize()
 	/// オーディオの終了処理
 	Audio::GetInstance().SoundUnload(&soundData);
 	// カメラの終了処理
-	camera->Finalize();
+	camera = nullptr;
 
 
 }

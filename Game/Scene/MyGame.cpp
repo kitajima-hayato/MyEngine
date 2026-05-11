@@ -86,8 +86,6 @@ void MyGame::Draw()
 		renderTexture->Draw();
 
 
-		ModelParticleManager::GetInstance().Draw();
-
 	} else {
 		dxCommon->PreDraw();
 		srvManager->PreDraw();
@@ -96,7 +94,6 @@ void MyGame::Draw()
 			didInstancingWarmup_ = true;
 		}
 		SceneManager::GetInstance()->Draw();
-		ModelParticleManager::GetInstance().Draw();
 	}
 
 	Framework::Draw();
@@ -118,12 +115,9 @@ void MyGame::Finalize()
 	// ImGuiの終了処理
 	imGui->Finalize();
 #endif
-	// CloseHandle(fenceEvent);
-	TextureManager::GetInstance()->Finalize();
-	// モデルマネージャの終了処理
-	ModelManager::GetInstance().Finalize();
-	winAPI->Finalize();
-
+	renderTexture.reset();
+	skyBox.reset();
+	sceneFactory_.reset();
 #pragma endregion
 
 	Framework::Finalize();

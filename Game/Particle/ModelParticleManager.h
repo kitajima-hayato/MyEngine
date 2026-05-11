@@ -60,6 +60,11 @@ public:
 	void Finalize();
 
 	/// <summary>
+	/// ゲーム中のリセット
+	/// </summary>
+	void Reset();
+
+	/// <summary>
 	/// インスタンシング描画のウォームアップ（最初の1回は重いので、先に呼んでおく）
 	/// </summary>
 	void WarmupDrawOnce();
