@@ -115,12 +115,9 @@ void MyGame::Finalize()
 	// ImGuiの終了処理
 	imGui->Finalize();
 #endif
-	// CloseHandle(fenceEvent);
-	TextureManager::GetInstance()->Finalize();
-	// モデルマネージャの終了処理
-	ModelManager::GetInstance().Finalize();
-	winAPI->Finalize();
-
+	renderTexture.reset();
+	skyBox.reset();
+	sceneFactory_.reset();
 #pragma endregion
 
 	Framework::Finalize();

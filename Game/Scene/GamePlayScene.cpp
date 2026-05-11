@@ -444,7 +444,7 @@ void GamePlayScene::Finalize()
 	/// オーディオの終了処理
 	Audio::GetInstance().SoundUnload(&soundData);
 	// カメラの終了処理
-	camera->Finalize();
+	camera = nullptr;
 
 
 }

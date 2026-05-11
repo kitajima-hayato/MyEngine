@@ -32,6 +32,11 @@ namespace Engine {
 		/// コンストラクタ
 		/// <summary>
 		DirectXCommon();
+
+		/// <summary>
+		/// デストラクタ
+		/// </summary>
+		~DirectXCommon();
 		/// <summary>
 		///初期化
 		/// <summary>
@@ -248,8 +253,7 @@ namespace Engine {
 		Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
 		// スワップチェインリソース
 		std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> swapChainResources;
-		// リソースの生成
-		Microsoft::WRL::ComPtr <ID3D12Resource> resource;
+
 		// RTVの設定
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
 		// 各ディスクリプターヒープのメンバ変数

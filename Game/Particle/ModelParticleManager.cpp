@@ -35,7 +35,7 @@ void ModelParticleManager::Initialize()
 void ModelParticleManager::EmitBlockDebris(const Vector3& position, const Vector4& color, uint32_t count)
 {
 #ifdef _DEBUG
-    OutputDebugStringA("EmitBlockDebris called\n");
+   // OutputDebugStringA("EmitBlockDebris called\n");
 #endif
 
     if (!model_) {
@@ -44,7 +44,7 @@ void ModelParticleManager::EmitBlockDebris(const Vector3& position, const Vector
 
     if (!model_ || !instanceMapped_) {
 #ifdef _DEBUG
-        OutputDebugStringA("EmitBlockDebris failed: model_ or instanceMapped_ is null\n");
+       // OutputDebugStringA("EmitBlockDebris failed: model_ or instanceMapped_ is null\n");
 #endif
         return;
     }
@@ -147,7 +147,7 @@ void ModelParticleManager::Draw()
 {
 #ifdef _DEBUG
     if (instanceCount_ > 0) {
-        OutputDebugStringA("ModelParticleManager Draw instance\n");
+       // OutputDebugStringA("ModelParticleManager Draw instance\n");
     }
 #endif
 

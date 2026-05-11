@@ -99,21 +99,23 @@ void Framework::Finalize()
 {
 	/// 各種マネージャーの終了処理
 
+	// シーン / ゲームオブジェクトの終了 / 解放処理
 	SceneManager::GetInstance()->Finalize();
 	SceneManager::DestroyInstance();
-
-	ParticleManager::GetInstance()->DeleteInstance();
-
-	Object3DInstancingCommon::GetInstance()->Finalize();
-
+	// パーティクル関連の終了 / 解放処理
 	ModelParticleManager::GetInstance().Finalize();
-
+	ParticleManager::GetInstance()->DeleteInstance();
+	// 描画共通部分の終了 / 解放処理
+	Object3DInstancingCommon::GetInstance()->Finalize();
+	Object3DInstancingCommon::GetInstance()->DeleteInstance();
 	Object3DCommon::GetInstance()->DeleteInstance();
 	SpriteCommon::DeleteInstance();
 
+	// アセット関連の終了 / 解放処理
 	TextureManager::GetInstance()->DeleteInstance();
 	ModelManager::GetInstance().Finalize();
 
+	// その他
 	Audio::GetInstance().DeleteInstance();
 	Input::GetInstance()->DeleteInstance();
 	

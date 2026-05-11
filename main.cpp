@@ -1,6 +1,5 @@
 // メモリリーク検出チェック
 #define _CRTDBG_MAP_ALLOC
-#include <stdlib.h>
 #include <crtdbg.h>
 #include "Game/Scene//MyGame.h"
 //ウィンドウズアプリでのエントリーポイント(main関数)
@@ -12,7 +11,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	// リーク番号を指定してブレークを発生させる
-	//_CrtSetBreakAlloc();
+	//_CrtSetBreakAlloc(367743);
 
 	D3DResourceLeakChecker leakChecker;
 #endif
