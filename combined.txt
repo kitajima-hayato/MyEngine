@@ -3313,6 +3313,189 @@ void Map::Update()
 
 #pragma region MapEditor
 #ifdef USE_IMGUI
+	MapEditor();
+#endif // USE_IMGUI
+#pragma endregion MapEditor
+	// 死んだブロックだけ回収
+	for (auto& row : blockArray_) {
+		for (Block*& block : row) {
+			if (block && !block->GetAliveBlock()) {
+				delete block;
+				block = nullptr;
+			}
+		}
+	}
+	// マップデータの変更を検知してブロックを再生成
+	if (isMapDataChanged_) {
+		//GenerateMapBlock();
+		//GenerateHazardObjects();
+		isMapDataChanged_ = false;
+
+	}
+
+}
+
+
+
+void Map::Draw()
+{
+	// マップの描画
+	for (std::vector <Block*>& row : blockArray_) {
+		for (Block* block : row) {
+			if (!block) {
+				continue;
+			}
+			block->Draw();
+		}
+	}
+
+	// ハザードの描画
+	for (auto& row : hazardObjects_) {
+		for (auto& hazard : row) {
+			if (hazard) {
+				hazard->Draw();
+			}
+		}
+	}
+
+}
+
+void Map::Finalize()
+{
+	// マップブロックの解放
+	for (std::vector <Block*>& row : blockArray_) {
+		for (Block* block : row) {
+			if (block) {
+				delete block;
+				block = nullptr;
+			}
+		}
+	}
+}
+
+void Map::GenerateMapBlock()
+{
+	const uint32_t h = GetHeight();
+	const uint32_t w = GetWidth();
+
+	// 既存のブロックを解放
+	for (auto& row : blockArray_) {
+		for (Block*& block : row) {
+			if (block) {
+				delete block;
+				block = nullptr;
+			}
+		}
+	}
+	// ポインタを解放したので配列自体もクリア
+	blockArray_.clear();
+
+	// 新しいサイズで配列を作り直す
+	blockArray_.assign(h, std::vector<Block*>(w, nullptr));
+
+	// マップデータからブロックを生成
+	for (uint32_t y = 0; y < h; ++y) {
+		for (uint32_t x = 0; x < w; ++x) {
+			const BlockType type = mapChipData_.mapData[y][x];
+			if (type == BlockType::Air) {
+				continue;
+			}
+			// ブロックの生成
+			Vector3 pos = GetMapChipPositionByIndex(x, y);
+			pos.x += blockOffset_;
+			pos.y -= blockOffset_;
+			blockArray_[y][x] = Block::CreateBlock(type, pos);
+		}
+	}
+}
+
+void Map::GenerateEnemyLayer()
+{
+	const uint32_t h = GetHeight();
+	const uint32_t w = GetWidth();
+
+	// エネミーデータから敵を生成
+	for (uint32_t y = 0; y < h; y++) {
+		for (uint32_t x = 0; x < w; x++) {
+			const EnemyType type = enemyLayerData_.enemyData[y][x];
+			if (type == EnemyType::None) {
+				continue;
+			}
+			// 敵の生成
+			Vector3 pos = GetMapChipPositionByIndex(x, y);
+			pos.x += blockOffset_;
+			pos.y -= blockOffset_;
+		}
+	}
+}
+
+
+void Map::LoadMapData(const std::string& mapFilePath)
+{
+	// CSVファイルからマップデータを読み込む
+	CsvLoader csvLoader;
+	mapChipData_.mapData = csvLoader.LoadMapBlockType(mapFilePath);
+
+	std::string enemyLayerFilePath = mapFilePath + std::string("_EnemyLayer");
+	// 敵レイヤーデータの読み込み
+	enemyLayerData_.enemyData = csvLoader.LoadMapEnemyType(enemyLayerFilePath);
+	const uint32_t h = GetHeight();
+	const uint32_t w = GetWidth();
+	enemyLayerData_.enemyData.resize(h);
+	for (uint32_t y = 0; y < h; ++y) {
+		enemyLayerData_.enemyData[y].resize(w, EnemyType::None);
+	}
+
+	std::string hazardFilePath = mapFilePath + std::string("_HazardLayer");
+	mapChipData_.hazardData = csvLoader.LoadMapHazardType(hazardFilePath, GetWidth(), GetHeight());
+
+}
+
+void Map::GenerateHazardObjects()
+{
+	// サイズの取得
+	const uint32_t h = GetHeight();
+	const uint32_t w = GetWidth();
+
+	// サイズの確保
+	hazardObjects_.clear();
+	hazardObjects_.resize(h);
+	for (uint32_t y = 0; y < h; ++y) {
+		hazardObjects_[y].resize(w);
+	}
+	// ハザードデータから Object3D を生成
+	for (uint32_t y = 0; y < h; ++y) {
+		for (uint32_t x = 0; x < w; ++x) {
+			const HazardType type = mapChipData_.hazardData[y][x];
+			if (type == HazardType::Spike) {
+				//if (hazardObjects_[y][x]) {
+					// 既にオブジェクトがある場合は再利用
+				hazardObjects_[y][x] = std::make_unique<Object3D>();
+				hazardObjects_[y][x]->Initialize();
+				// モデルの指定
+				hazardObjects_[y][x]->SetModel("GamePlay/Blocks/damageblock");
+				//}
+				// ブロックの座標系に合わせて配置
+				Vector3 pos = GetMapChipPositionByIndex(x, y);
+				pos.x += blockOffset_;
+				pos.y -= blockOffset_;
+				pos.z = 00.0f;
+				hazardObjects_[y][x]->SetTranslate(pos);
+
+			} else {
+				// Noneなら消す
+				hazardObjects_[y][x].reset();
+
+			}
+		}
+	}
+
+
+}
+
+void Map::MapEditor()
+{
+#ifdef USE_IMGUI
 	// ------------------------------------------------------------
 	// Map Tools (ImGui)
 	// ------------------------------------------------------------
@@ -3800,182 +3983,8 @@ void Map::Update()
 	}
 
 	ImGui::End(); // Map Tools
+
 #endif // USE_IMGUI
-#pragma endregion MapEditor
-	// 末尾に追加：死んだブロックだけ回収
-	for (auto& row : blockArray_) {
-		for (Block*& block : row) {
-			if (block && !block->GetAliveBlock()) {
-				delete block;
-				block = nullptr;
-			}
-		}
-	}
-	// マップデータの変更を検知してブロックを再生成
-	if (isMapDataChanged_) {
-		//GenerateMapBlock();
-		//GenerateHazardObjects();
-		isMapDataChanged_ = false;
-
-	}
-
-}
-
-
-
-void Map::Draw()
-{
-	// マップの描画
-	for (std::vector <Block*>& row : blockArray_) {
-		for (Block* block : row) {
-			if (!block) {
-				continue;
-			}
-			block->Draw();
-		}
-	}
-
-	// ハザードの描画
-	for (auto& row : hazardObjects_) {
-		for (auto& hazard : row) {
-			if (hazard) {
-				hazard->Draw();
-			}
-		}
-	}
-
-}
-
-void Map::Finalize()
-{
-	// マップブロックの解放
-	for (std::vector <Block*>& row : blockArray_) {
-		for (Block* block : row) {
-			if (block) {
-				delete block;
-				block = nullptr;
-			}
-		}
-	}
-}
-
-void Map::GenerateMapBlock()
-{
-	const uint32_t h = GetHeight();
-	const uint32_t w = GetWidth();
-
-	// 既存のブロックを解放
-	for (auto& row : blockArray_) {
-		for (Block*& block : row) {
-			if (block) {
-				delete block;
-				block = nullptr;
-			}
-		}
-	}
-	// ポインタを解放したので配列自体もクリア
-	blockArray_.clear();
-
-	// 新しいサイズで配列を作り直す
-	blockArray_.assign(h, std::vector<Block*>(w, nullptr));
-
-	// マップデータからブロックを生成
-	for (uint32_t y = 0; y < h; ++y) {
-		for (uint32_t x = 0; x < w; ++x) {
-			const BlockType type = mapChipData_.mapData[y][x];
-			if (type == BlockType::Air) {
-				continue;
-			}
-			// ブロックの生成
-			Vector3 pos = GetMapChipPositionByIndex(x, y);
-			pos.x += blockOffset_;
-			pos.y -= blockOffset_;
-			blockArray_[y][x] = Block::CreateBlock(type, pos);
-		}
-	}
-}
-
-void Map::GenerateEnemyLayer()
-{
-	const uint32_t h = GetHeight();
-	const uint32_t w = GetWidth();
-
-	// エネミーデータから敵を生成
-	for (uint32_t y = 0; y < h; y++) {
-		for (uint32_t x = 0; x < w; x++) {
-			const EnemyType type = enemyLayerData_.enemyData[y][x];
-			if (type == EnemyType::None) {
-				continue;
-			}
-			// 敵の生成
-			Vector3 pos = GetMapChipPositionByIndex(x, y);
-			pos.x += blockOffset_;
-			pos.y -= blockOffset_;
-		}
-	}
-}
-
-
-void Map::LoadMapData(const std::string& mapFilePath)
-{
-	// CSVファイルからマップデータを読み込む
-	CsvLoader csvLoader;
-	mapChipData_.mapData = csvLoader.LoadMapBlockType(mapFilePath);
-
-	std::string enemyLayerFilePath = mapFilePath + std::string("_EnemyLayer");
-	// 敵レイヤーデータの読み込み
-	enemyLayerData_.enemyData = csvLoader.LoadMapEnemyType(enemyLayerFilePath);
-	const uint32_t h = GetHeight();
-	const uint32_t w = GetWidth();
-	enemyLayerData_.enemyData.resize(h);
-	for (uint32_t y = 0; y < h; ++y) {
-		enemyLayerData_.enemyData[y].resize(w, EnemyType::None);
-	}
-
-	std::string hazardFilePath = mapFilePath + std::string("_HazardLayer");
-	mapChipData_.hazardData = csvLoader.LoadMapHazardType(hazardFilePath, GetWidth(), GetHeight());
-
-}
-
-void Map::GenerateHazardObjects()
-{
-	// サイズの取得
-	const uint32_t h = GetHeight();
-	const uint32_t w = GetWidth();
-
-	// サイズの確保
-	hazardObjects_.clear();
-	hazardObjects_.resize(h);
-	for (uint32_t y = 0; y < h; ++y) {
-		hazardObjects_[y].resize(w);
-	}
-	// ハザードデータから Object3D を生成
-	for (uint32_t y = 0; y < h; ++y) {
-		for (uint32_t x = 0; x < w; ++x) {
-			const HazardType type = mapChipData_.hazardData[y][x];
-			if (type == HazardType::Spike) {
-				//if (hazardObjects_[y][x]) {
-					// 既にオブジェクトがある場合は再利用
-				hazardObjects_[y][x] = std::make_unique<Object3D>();
-				hazardObjects_[y][x]->Initialize();
-				// モデルの指定
-				hazardObjects_[y][x]->SetModel("GamePlay/Blocks/damageblock");
-				//}
-				// ブロックの座標系に合わせて配置
-				Vector3 pos = GetMapChipPositionByIndex(x, y);
-				pos.x += blockOffset_;
-				pos.y -= blockOffset_;
-				pos.z = 00.0f;
-				hazardObjects_[y][x]->SetTranslate(pos);
-
-			} else {
-				// Noneなら消す
-				hazardObjects_[y][x].reset();
-
-			}
-		}
-	}
-
 
 }
 
@@ -4042,37 +4051,33 @@ Vector3 Map::GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex)
 
 void Map::BreakBlock(uint32_t xIndex, uint32_t yIndex)
 {
-	// マップ外チェック
 	if (yIndex >= mapChipData_.mapData.size() ||
 		xIndex >= mapChipData_.mapData[yIndex].size()) {
 		return;
 	}
-	// 破壊可能ブロックかチェック
+
 	if (mapChipData_.mapData[yIndex][xIndex] != BlockType::breakBlock) {
 		return;
 	}
 
-	// 該当データの書き換え / Airに変更
+	Vector3 breakPos = GetMapChipPositionByIndex(xIndex, yIndex);
+	breakPos.x += blockOffset_;
+	breakPos.y -= blockOffset_;
 
-	isMapDataChanged_ = true;
+	ModelParticleManager::GetInstance().EmitBlockDebris(
+		breakPos,
+		Vector4(1.0f, 1.0f, 1.0f, 1.0f),
+		15
+	);
 
-	// 実体（描画/更新）をその場で消す（Map全再生成しない）
 	if (yIndex < blockArray_.size() && xIndex < blockArray_[yIndex].size()) {
 		if (blockArray_[yIndex][xIndex]) {
-			// 生存フラグ方式（演出を挟むなら Kill のみにしてもOK）
 			blockArray_[yIndex][xIndex]->SetBroken();
-
-			// 破壊位置の取得
-			Vector3 breakPos = GetMapChipPositionByIndex(xIndex, yIndex);
-			// 破壊時にパーティクルの発生
-			ModelParticleManager::GetInstance().EmitBlockDebris(
-				breakPos,
-				Vector4(1.0f, 1.0f, 1.0f, 1.0f),
-				15);
-			// 該当のBreakBlockをAirに変更
-			mapChipData_.mapData[yIndex][xIndex] = BlockType::Air;
 		}
 	}
+
+	mapChipData_.mapData[yIndex][xIndex] = BlockType::Air;
+	isMapDataChanged_ = true;
 }
 
 HazardType Map::GetHazardTypeByIndex(uint32_t xIndex, uint32_t yIndex) const
@@ -4097,7 +4102,7 @@ bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
 	if (!block) {
 		return false;
 	}
-	// ゴールは判定をとらない / 触れたらisgoalをtrueにするだけ
+	// ゴールは判定をとらない / 触れたらis goalをtrueにするだけ
 	BlockType type = mapChipData_.mapData[yIndex][xIndex];
 	if (type == BlockType::kGoalUp || type == BlockType::kGoalDown) {
 		return false;
@@ -4207,6 +4212,12 @@ public:
 	/// ハザードブロックの生成
 	/// </summary>
 	void GenerateHazardObjects();
+
+
+	/// <summary>
+	/// マップ編集ツール
+	/// </summary>
+	void MapEditor();
 
 
 public:	// Setter / Getter
@@ -4547,7 +4558,7 @@ void Player::OnCollision(Collider* other)
 		}
 
 		// 踏みつけ判定
-		// 条件: プレイヤーが落下中 && プレイヤーが敵より上にいる
+		// プレイヤーが落下中 && プレイヤーが敵より上にいる
 		if (velocity_.y < 0.0f) {
 			// プレイヤーと敵のAABBを取得
 			AABB playerAABB = GetAABB();
@@ -4560,7 +4571,7 @@ void Player::OnCollision(Collider* other)
 			float enemyCenter = (enemyAABB.min.y + enemyAABB.max.y) * 0.5f;
 			float playerCenter = (playerAABB.min.y + playerAABB.max.y) * 0.5f;
 
-			// 踏みつけ判定: プレイヤーの中心が敵の中心より上 && プレイヤーの底が敵の上半分にある
+			// プレイヤーの中心が敵の中心より上 && プレイヤーの底が敵の上半分にある
 			if (playerCenter > enemyCenter && playerBottom < enemyTop + 0.2f) {
 				// 踏みつけ成功
 				StompEnemy(other);
@@ -4746,6 +4757,8 @@ void Player::Respawn(const Vector3& pos)
 	// 状態をリセット
 	isDead_ = false;
 	isDeathByFalling_ = false;
+	isDying_ = false;
+	deathDemoFinished_ = false;
 	onGround_ = true;
 }
 
@@ -5120,6 +5133,7 @@ void Player::UpdateBehavior()
 		status_.kHealth -= 1;
 		isDead_ = true;
 		isDeathByFalling_ = true;
+		return;
 	}
 
 	// 移動量の反映
@@ -8235,6 +8249,21 @@ void ModelParticleManager::Initialize()
 
 void ModelParticleManager::EmitBlockDebris(const Vector3& position, const Vector4& color, uint32_t count)
 {
+#ifdef _DEBUG
+   // OutputDebugStringA("EmitBlockDebris called\n");
+#endif
+
+    if (!model_) {
+        model_ = ModelManager::GetInstance().FindModel(modelName_);
+    }
+
+    if (!model_ || !instanceMapped_) {
+#ifdef _DEBUG
+       // OutputDebugStringA("EmitBlockDebris failed: model_ or instanceMapped_ is null\n");
+#endif
+        return;
+    }
+
     std::uniform_real_distribution<float> distSpeed(1.0f, 3.0f);
     std::uniform_real_distribution<float> distAngle(0.0f, 2.0f * std::numbers::pi_v<float>);
     std::uniform_real_distribution<float> distRotation(-5.0f, 5.0f);
@@ -8260,11 +8289,27 @@ void ModelParticleManager::EmitBlockDebris(const Vector3& position, const Vector
 
         particles_.push_back(p);
     }
-
+#ifdef _DEBUG
+    char buffer[256];
+    sprintf_s(
+        buffer,
+        "EmitBlockDebris pos=(%.2f, %.2f, %.2f) particles=%zu instance=%u\n",
+        position.x,
+        position.y,
+        position.z,
+        particles_.size(),
+        instanceCount_
+    );
+    OutputDebugStringA(buffer);
+#endif
 }
 
 void ModelParticleManager::Update()
 {
+    if (!instanceMapped_) {
+        instanceCount_ = 0;
+        return;
+    }
     const float dt = 1.0f / 60.0f;
 
     for (auto it = particles_.begin(); it != particles_.end();)
@@ -8315,6 +8360,12 @@ void ModelParticleManager::Update()
 
 void ModelParticleManager::Draw()
 {
+#ifdef _DEBUG
+    if (instanceCount_ > 0) {
+       // OutputDebugStringA("ModelParticleManager Draw instance\n");
+    }
+#endif
+
     if (!model_ || instanceCount_ == 0) { return; }
 
     Object3DInstancingCommon::GetInstance()->DrawSettingCommon();
@@ -8323,7 +8374,6 @@ void ModelParticleManager::Draw()
     cmd->IASetVertexBuffers(1, 1, &instanceVBV_);
 
     model_->DrawInstanced(instanceCount_);
-
 }
 
 void ModelParticleManager::Finalize()
@@ -8337,6 +8387,16 @@ void ModelParticleManager::Finalize()
     }
     model_ = nullptr;
     instanceCount_ = 0;
+}
+
+void ModelParticleManager::Reset()
+{
+    particles_.clear();
+    instanceCount_ = 0;
+
+    if (!model_) {
+        model_ = ModelManager::GetInstance().FindModel(modelName_);
+    }
 }
 
 void ModelParticleManager::WarmupDrawOnce()
@@ -8440,6 +8500,11 @@ public:
 	/// 終了処理
 	/// </summary>
 	void Finalize();
+
+	/// <summary>
+	/// ゲーム中のリセット
+	/// </summary>
+	void Reset();
 
 	/// <summary>
 	/// インスタンシング描画のウォームアップ（最初の1回は重いので、先に呼んでおく）
@@ -8553,8 +8618,7 @@ void ParticleManager::Finalize()
 }
 
 ParticleManager::~ParticleManager()
-{
-}
+{}
 
 void ParticleManager::Initialize(DirectXCommon* dxCommon, SrvManager* srvManager, Camera* camera)
 {
@@ -8941,16 +9005,17 @@ void ParticleManager::UpdateParticle()
 		// 各パーティクルを更新
 		for (auto particleIterator = particleGroup.particles.begin(); particleIterator != particleGroup.particles.end();)
 		{
+
+			// 生存時間を過ぎていたら更新せず描画対象にしない
+			if (particleIterator->lifeTime <= particleIterator->currentTime)
+			{
+				// 消す
+				particleIterator = particleGroup.particles.erase(particleIterator);
+				continue;
+			}
 			// インスタンス数が上限を超えていないならインスタンスデータを書き込む
 			if (particleGroup.kNumInstance < kMaxParticle)
 			{
-				// 生存時間を過ぎていたら更新せず描画対象にしない
-				if (particleIterator->lifeTime <= particleIterator->currentTime)
-				{
-					// 消す
-					particleIterator = particleGroup.particles.erase(particleIterator);
-					continue;
-				}
 				// パーティクル１個ごとの更新
 				particleIterator->transform.translate.x += particleIterator->velocity.x * kDeltaTime;
 				particleIterator->transform.translate.y += particleIterator->velocity.y * kDeltaTime;
@@ -12197,6 +12262,7 @@ void GamePlayScene::Update()
 			isRespawning_ = false;
 			didWarpOnDark_ = false;
 			player->SetControlEnabled(true);
+			isGameOverPending_ = false;
 		}
 
 		return;
@@ -12270,6 +12336,8 @@ void GamePlayScene::Draw()
 	for (auto& enemy : enemies) {
 		enemy->Draw();
 	}
+
+	ModelParticleManager::GetInstance().Draw();
 
 	ParticleManager::GetInstance()->Draw();
 	
@@ -12439,7 +12507,7 @@ void GamePlayScene::Finalize()
 	/// オーディオの終了処理
 	Audio::GetInstance().SoundUnload(&soundData);
 	// カメラの終了処理
-	camera->Finalize();
+	camera = nullptr;
 
 
 }
@@ -12776,8 +12844,6 @@ void MyGame::Draw()
 		renderTexture->Draw();
 
 
-		ModelParticleManager::GetInstance().Draw();
-
 	} else {
 		dxCommon->PreDraw();
 		srvManager->PreDraw();
@@ -12786,7 +12852,6 @@ void MyGame::Draw()
 			didInstancingWarmup_ = true;
 		}
 		SceneManager::GetInstance()->Draw();
-		ModelParticleManager::GetInstance().Draw();
 	}
 
 	Framework::Draw();
@@ -12808,12 +12873,9 @@ void MyGame::Finalize()
 	// ImGuiの終了処理
 	imGui->Finalize();
 #endif
-	// CloseHandle(fenceEvent);
-	TextureManager::GetInstance()->Finalize();
-	// モデルマネージャの終了処理
-	ModelManager::GetInstance().Finalize();
-	winAPI->Finalize();
-
+	renderTexture.reset();
+	skyBox.reset();
+	sceneFactory_.reset();
 #pragma endregion
 
 	Framework::Finalize();
@@ -21387,21 +21449,23 @@ void Framework::Finalize()
 {
 	/// 各種マネージャーの終了処理
 
+	// シーン / ゲームオブジェクトの終了 / 解放処理
 	SceneManager::GetInstance()->Finalize();
 	SceneManager::DestroyInstance();
-
-	ParticleManager::GetInstance()->DeleteInstance();
-
-	Object3DInstancingCommon::GetInstance()->Finalize();
-
+	// パーティクル関連の終了 / 解放処理
 	ModelParticleManager::GetInstance().Finalize();
-
+	ParticleManager::GetInstance()->DeleteInstance();
+	// 描画共通部分の終了 / 解放処理
+	Object3DInstancingCommon::GetInstance()->Finalize();
+	Object3DInstancingCommon::GetInstance()->DeleteInstance();
 	Object3DCommon::GetInstance()->DeleteInstance();
 	SpriteCommon::DeleteInstance();
 
+	// アセット関連の終了 / 解放処理
 	TextureManager::GetInstance()->DeleteInstance();
 	ModelManager::GetInstance().Finalize();
 
+	// その他
 	Audio::GetInstance().DeleteInstance();
 	Input::GetInstance()->DeleteInstance();
 	
@@ -21905,8 +21969,8 @@ D3DResourceLeakChecker::~D3DResourceLeakChecker() {
 	//リソースリークチェック
 	Microsoft::WRL::ComPtr<IDXGIDebug1> debug;
 	if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&debug)))) {
-		//debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
-		//debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
+		debug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_ALL);
+		debug->ReportLiveObjects(DXGI_DEBUG_APP, DXGI_DEBUG_RLO_ALL);
 		debug->ReportLiveObjects(DXGI_DEBUG_D3D12, DXGI_DEBUG_RLO_ALL);
 	}
 }
@@ -21965,6 +22029,13 @@ using namespace Engine;
 
 DirectXCommon::DirectXCommon()
 {
+}
+Engine::DirectXCommon::~DirectXCommon()
+{
+	if(fenceEvent) {
+		CloseHandle(fenceEvent);
+		fenceEvent = nullptr;
+	}
 }
 void DirectXCommon::Initialize(WinAPI* winAPI)
 {
@@ -22165,17 +22236,17 @@ Microsoft::WRL::ComPtr<ID3D12Resource> DirectXCommon::CreateDepthBuffer(Microsof
 	depthClearValue.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;			// フォーマット。Resourceと合わせる
 
 	// Resourceの生成
-
+	Microsoft::WRL::ComPtr<ID3D12Resource> depthResource = nullptr;
 	HRESULT hr = device->CreateCommittedResource(
 		&heapProperties, // Heapの設定
 		D3D12_HEAP_FLAG_NONE,//Heapの特殊な設定。特になし。
 		&resourceDesc,// Resourceの設定
 		D3D12_RESOURCE_STATE_DEPTH_WRITE,//深度値を書き込む状態にしておく
 		&depthClearValue,// clear最適値
-		IID_PPV_ARGS(&resource));//作成するResourceポインタへのポインタ
+		IID_PPV_ARGS(&depthResource));//作成するResourceポインタへのポインタ
 	assert(SUCCEEDED(hr));
 
-	return resource;
+	return depthResource;
 }
 ComPtr <ID3D12DescriptorHeap>
 DirectXCommon::CreateDescriptorHeap(
@@ -22416,11 +22487,14 @@ void DirectXCommon::InitDepthStencilView()
 {
 
 	D3D12_DEPTH_STENCIL_VIEW_DESC dsvDesc{};
-	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;//Format.基本的にはResourceに合わせる
-	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;//2dTexture
+	dsvDesc.Format = DXGI_FORMAT_D24_UNORM_S8_UINT;
+	dsvDesc.ViewDimension = D3D12_DSV_DIMENSION_TEXTURE2D;
 
-	Microsoft::WRL::ComPtr <ID3D12Resource> depthStencilResource;
-	depthStencilResource = CreateDepthBuffer(device, WinAPI::kClientWidth, WinAPI::kClientHeight);
+	
+	depthStencilResource = CreateDepthBuffer(
+		device,
+		WinAPI::kClientWidth, 
+		WinAPI::kClientHeight);
 	//DSVの設定									 
 
 	//DSVHeapの先頭にDSVをつくる
@@ -22724,6 +22798,11 @@ namespace Engine {
 		/// コンストラクタ
 		/// <summary>
 		DirectXCommon();
+
+		/// <summary>
+		/// デストラクタ
+		/// </summary>
+		~DirectXCommon();
 		/// <summary>
 		///初期化
 		/// <summary>
@@ -22940,8 +23019,7 @@ namespace Engine {
 		Microsoft::WRL::ComPtr<IDXGISwapChain4> swapChain;
 		// スワップチェインリソース
 		std::array<Microsoft::WRL::ComPtr<ID3D12Resource>, 2> swapChainResources;
-		// リソースの生成
-		Microsoft::WRL::ComPtr <ID3D12Resource> resource;
+
 		// RTVの設定
 		D3D12_RENDER_TARGET_VIEW_DESC rtvDesc{};
 		// 各ディスクリプターヒープのメンバ変数
@@ -24818,7 +24896,6 @@ File Path: main.cpp
 ============================================================
 // メモリリーク検出チェック
 #define _CRTDBG_MAP_ALLOC
-#include <stdlib.h>
 #include <crtdbg.h>
 #include "Game/Scene//MyGame.h"
 //ウィンドウズアプリでのエントリーポイント(main関数)
@@ -24830,7 +24907,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	// リーク番号を指定してブレークを発生させる
-	//_CrtSetBreakAlloc();
+	//_CrtSetBreakAlloc(367743);
 
 	D3DResourceLeakChecker leakChecker;
 #endif
