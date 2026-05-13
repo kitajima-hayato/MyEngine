@@ -108,6 +108,7 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="engine\Input\Controller.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
@@ -135,7 +136,7 @@
     <ClCompile Include="Game\Camera\Camera.cpp" />
     <ClCompile Include="engine\base\D3DResourceLeakChecker.cpp" />
     <ClCompile Include="engine\base\DirectXCommon.cpp" />
-    <ClCompile Include="engine\base\Input.cpp" />
+    <ClCompile Include="engine\Input\Input.cpp" />
     <ClCompile Include="engine\base\Logger.cpp" />
     <ClCompile Include="engine\InsideScene\Framework.cpp" />
     <ClCompile Include="Game\Scene\GamePlayScene.cpp" />
@@ -187,6 +188,8 @@
     <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="engine\Input\Controller.h" />
+    <ClInclude Include="engine\Input\InputData.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
@@ -219,7 +222,7 @@
     <ClInclude Include="Game\Camera\Camera.h" />
     <ClInclude Include="engine\base\D3DResourceLeakChecker.h" />
     <ClInclude Include="engine\base\DirectXCommon.h" />
-    <ClInclude Include="engine\base\Input.h" />
+    <ClInclude Include="engine\Input\Input.h" />
     <ClInclude Include="engine\base\Logger.h" />
     <ClInclude Include="engine\math\MakeMatrix.h" />
     <ClInclude Include="engine\math\MyMath.h" />

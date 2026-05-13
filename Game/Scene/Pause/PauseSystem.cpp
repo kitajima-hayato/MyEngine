@@ -1,5 +1,5 @@
 #include "PauseSystem.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 
 #include "engine/InsideScene/SceneManager.h"
 
