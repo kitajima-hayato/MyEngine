@@ -1,13 +1,69 @@
 #include "Player.h"
 #include <algorithm>
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "Game/Particle/ParticlePresets.h"
 #include "Game/Application/Enemy/EnemyBase/EnemyBase.h"
 #ifdef USE_IMGUI
 #include "engine/base/ImGuiManager.h"
 #endif
 
+namespace
+{
+	constexpr int kControllerNo = 0;
+	constexpr float kStickMoveThreshold = 0.25f;
+	constexpr float kStickDashThreshold = 0.75f;
 
+	bool IsControllerRightHold(Input* input)
+	{
+		const StickState leftStick = input->GetLeftStickState(kControllerNo);
+
+		return
+			leftStick.x > kStickMoveThreshold ||
+			input->PushButton(kControllerNo, ControllerButtonType::DPadRIGHT);
+	}
+
+	bool IsControllerLeftHold(Input* input)
+	{
+		const StickState leftStick = input->GetLeftStickState(kControllerNo);
+
+		return
+			leftStick.x < -kStickMoveThreshold ||
+			input->PushButton(kControllerNo, ControllerButtonType::DPadLEFT);
+	}
+
+	bool IsControllerRightTrigger(Input* input)
+	{
+		const StickState leftStick = input->GetLeftStickState(kControllerNo);
+		const StickState prevLeftStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+		const bool stickFlickRight =
+			prevLeftStick.x <= kStickMoveThreshold &&
+			leftStick.x > kStickDashThreshold;
+
+		return
+			input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+			stickFlickRight;
+	}
+
+	bool IsControllerLeftTrigger(Input* input)
+	{
+		const StickState leftStick = input->GetLeftStickState(kControllerNo);
+		const StickState prevLeftStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+		const bool stickFlickLeft =
+			prevLeftStick.x >= -kStickMoveThreshold &&
+			leftStick.x < -kStickDashThreshold;
+
+		return
+			input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+			stickFlickLeft;
+	}
+
+	bool IsControllerJumpTrigger(Input* input)
+	{
+		return input->PushButton(kControllerNo, ControllerButtonType::A);
+	}
+}
 
 Collider::Type Player::GetType() const
 {
@@ -378,52 +434,48 @@ void Player::PlayerTurn()
 
 void Player::UpdateDashEffect()
 {
-	// 現在のダッシュ状態を取得
-	const bool movingRight = Input::GetInstance()->PushKey(DIK_D) && !Input::GetInstance()->PushKey(DIK_A);
-	const bool movingLeft = Input::GetInstance()->PushKey(DIK_A) && !Input::GetInstance()->PushKey(DIK_D);
-	// ダッシュ状態の判定
+	auto* input = Input::GetInstance();
+
+	const bool movingRight =
+		(input->PushKey(DIK_D) || IsControllerRightHold(input)) &&
+		!(input->PushKey(DIK_A) || IsControllerLeftHold(input));
+
+	const bool movingLeft =
+		(input->PushKey(DIK_A) || IsControllerLeftHold(input)) &&
+		!(input->PushKey(DIK_D) || IsControllerRightHold(input));
+
 	const bool dashActiveRight = isDash_ && (dashDirection_ == +1) && movingRight;
 	const bool dashActiveLeft = isDash_ && (dashDirection_ == -1) && movingLeft;
 	const bool dashActive = dashActiveRight || dashActiveLeft;
 
-	// 地面に接地しているか
 	const bool canShowEffect = dashActive && onGround_;
-	// プレイヤーの現在地を取得
+
 	Vector3 playerPos = playerModel_->GetTranslate();
 
-	// ダッシュ開始時の衝撃波エフェクト
 	if (!wasDashing_ && canShowEffect) {
 		dashStartEffect_->SetTranslate(playerPos);
-		// 発生
 		dashStartEffect_->Play();
 	}
 
-	// ダッシュ中の継続エフェクト
 	if (canShowEffect) {
-		// 足元の位置を計算
 		Vector3 smokePos = playerPos;
-		// 発生位置を足元らへんに
 		smokePos.y -= particleSpawnPosOffset_;
 
-		// 進行方向とは逆方向に
 		if (dashDirection_ == +1) {
 			smokePos.x -= particleSpawnPosOffset_;
 		} else if (dashDirection_ == -1) {
 			smokePos.x += particleSpawnPosOffset_;
 		}
 
-		// エフェクトの位置更新
 		dashSmokeEffect_->SetTranslate(smokePos);
 
-		// 発生
 		if (!wasDashing_) {
 			dashSmokeEffect_->Play();
 		}
 	} else {
-		// ダッシュしていないときは煙のエフェクトを停止
 		dashSmokeEffect_->Stop();
 	}
-	// 前フレームの状態を保持
+
 	wasDashing_ = canShowEffect;
 }
 
@@ -431,27 +483,28 @@ void Player::UpdateMoveEffect()
 {
 	if (!moveEffect_ || !playerModel_) { return; }
 
-	// 入力状態（Move()と同じ判定に合わせる）
 	auto* input = Input::GetInstance();
-	const bool rightHold = input->PushKey(DIK_D);
-	const bool leftHold = input->PushKey(DIK_A);
 
-	// 左右どちらかだけ押している＝移動中
+	const bool rightHold =
+		input->PushKey(DIK_D) ||
+		IsControllerRightHold(input);
+
+	const bool leftHold =
+		input->PushKey(DIK_A) ||
+		IsControllerLeftHold(input);
+
 	const bool movingRight = rightHold && !leftHold;
 	const bool movingLeft = leftHold && !rightHold;
 	const bool moving = movingRight || movingLeft;
 
-	// 通常移動として扱いたい条件
 	const bool canShowEffect = controlEnabled_ && onGround_ && moving && !isDash_;
 
 	Vector3 playerPos = playerModel_->GetTranslate();
 
 	if (canShowEffect) {
-		// 足元に出す
 		Vector3 smokePos = playerPos;
 		smokePos.y -= particleSpawnPosOffset_;
 
-		// 進行方向とは逆に少しずらす（ダッシュ煙と同じ見た目の思想）
 		if (movingRight) {
 			smokePos.x -= particleSpawnPosOffset_;
 		} else if (movingLeft) {
@@ -459,12 +512,14 @@ void Player::UpdateMoveEffect()
 		}
 
 		moveEffect_->SetTranslate(smokePos);
+
 		if (!wasMoving_) {
 			moveEffect_->Play();
 		}
 	} else {
 		moveEffect_->Pause();
 	}
+
 	wasMoving_ = canShowEffect;
 }
 
@@ -669,7 +724,7 @@ void Player::Move()
 {
 	// 操作ロック中：入力は無視して速度減衰のみ行う
 	if (!controlEnabled_) {
-		// 走り続け防止（キー押しっぱなし解除直後の事故対策）
+		// 走り続け防止
 		velocity_.x *= (1.0f - status_.kAttenuation);
 
 		// ダッシュ状態も解除
@@ -681,30 +736,45 @@ void Player::Move()
 		return;
 	}
 
-
 	auto* input = Input::GetInstance();
 
+	//==================================================
 	// 入力状態
-	const bool rightHold = input->PushKey(DIK_D);
-	const bool leftHold = input->PushKey(DIK_A);
+	// キーボード + コントローラー
+	//==================================================
 
-	const bool rightTrig = input->TriggerKey(DIK_D);
-	const bool leftTrig = input->TriggerKey(DIK_A);
+	const bool keyRightHold = input->PushKey(DIK_D);
+	const bool keyLeftHold = input->PushKey(DIK_A);
 
+	const bool controllerRightHold = IsControllerRightHold(input);
+	const bool controllerLeftHold = IsControllerLeftHold(input);
+
+	const bool rightHold = keyRightHold || controllerRightHold;
+	const bool leftHold = keyLeftHold || controllerLeftHold;
+
+	const bool rightTrig =
+		input->TriggerKey(DIK_D) ||
+		IsControllerRightTrigger(input);
+
+	const bool leftTrig =
+		input->TriggerKey(DIK_A) ||
+		IsControllerLeftTrigger(input);
+
+	//==================================================
 	// ダブルタップ用タイマー更新
+	//==================================================
+
 	if (rightTapTimer_ > 0) { --rightTapTimer_; }
 	if (leftTapTimer_ > 0) { --leftTapTimer_; }
 
 	// 右ダブルタップ判定
 	if (rightTrig) {
-		// 一定時間内に2回目が来たらダッシュ開始
 		if (rightTapTimer_ > 0) {
 			isDash_ = true;
 			dashDirection_ = +1;
 		}
-		// タイマーリセット
+
 		rightTapTimer_ = status_.kDashDoubleTapFrame;
-		// 反対側はリセット
 		leftTapTimer_ = 0;
 	}
 
@@ -714,20 +784,22 @@ void Player::Move()
 			isDash_ = true;
 			dashDirection_ = -1;
 		}
+
 		leftTapTimer_ = status_.kDashDoubleTapFrame;
 		rightTapTimer_ = 0;
 	}
 
+	//==================================================
 	// ダッシュ継続／解除判定
+	//==================================================
+
 	const bool movingRight = rightHold && !leftHold;
 	const bool movingLeft = leftHold && !rightHold;
 
-	// 入力が止まったらダッシュ解除
 	if (!movingRight && !movingLeft) {
 		isDash_ = false;
 		dashDirection_ = 0;
 	} else if (isDash_) {
-		// 逆方向に入力したらダッシュ解除
 		if ((dashDirection_ == +1 && movingLeft) ||
 			(dashDirection_ == -1 && movingRight)) {
 			isDash_ = false;
@@ -735,41 +807,34 @@ void Player::Move()
 		}
 	}
 
+	//==================================================
 	// 実際の速度更新
+	//==================================================
+
 	Vector3 acceleration{};
 
-	// 左右のどちらの方向にダッシュしているか判別
 	const bool dashActiveRight = isDash_ && (dashDirection_ == +1) && movingRight;
 	const bool dashActiveLeft = isDash_ && (dashDirection_ == -1) && movingLeft;
-	// どちらに向いているかを持つ
 	const bool dashActive = dashActiveRight || dashActiveLeft;
 
-
-	// ダッシュ中だけ少し速くする
 	float dashScale = dashActive ? status_.kDashSpeedScale : 1.0f;
 	float maxSpeed = status_.kMaxSpeed * dashScale;
 
-
-	// 横方向速度更新
 	if (movingRight) {
-		// 左に動いていた場合は少し減速
 		if (velocity_.x < 0.0f) {
 			velocity_.x *= (1.0f - status_.kAttenuation);
 		}
-		acceleration.x += status_.kAcceleration * dashScale;
 
-		// 押された方向にディレクションを向ける
+		acceleration.x += status_.kAcceleration * dashScale;
 		direction_ = Direction::kRight;
 	} else if (movingLeft) {
 		if (velocity_.x > 0.0f) {
 			velocity_.x *= (1.0f - status_.kAttenuation);
 		}
-		acceleration.x -= status_.kAcceleration * dashScale;
 
-		// 押された方向にディレクションを向ける
+		acceleration.x -= status_.kAcceleration * dashScale;
 		direction_ = Direction::kLeft;
 	} else {
-		// 入力がないときは減速のみ（ダッシュ倍率はかけない）
 		velocity_.x *= (1.0f - status_.kAttenuation);
 	}
 
@@ -779,15 +844,15 @@ void Player::Move()
 	// 速度に応じて回転
 	Vector3 rotate = playerModel_->GetRotate();
 	rotate -= {0.0f, 0.0f, velocity_.x};
-	// 回転が規定値であるplayerTurnAround_が6.3fになったら回転の値をリセットする
-	if (-playerTurnAround_ >= rotate.z && movingRight ||
-		playerTurnAround_ <= rotate.z && movingLeft) {
+
+	if ((-playerTurnAround_ >= rotate.z && movingRight) ||
+		(playerTurnAround_ <= rotate.z && movingLeft)) {
 		rotate.z = 0.0f;
 	}
-	// プレイヤーの回転
+
 	playerModel_->SetRotate(rotate);
 
-	// 最大速度をダッシュ状態に応じて変える
+	// 最大速度制限
 	velocity_.x = std::clamp(velocity_.x, -maxSpeed, maxSpeed);
 }
 
@@ -796,7 +861,7 @@ void Player::Jump()
 {
 	// 操作ロック中：ジャンプ入力は無視
 	if (!controlEnabled_) {
-		// 重力だけは通常通り掛ける（空中で停止しないように）
+		// 重力だけは通常通り掛ける
 		if (!onGround_) {
 			velocity_.y += -status_.kGravity;
 			velocity_.y = (std::max)(velocity_.y, -status_.kMaxFallSpeed);
@@ -804,26 +869,30 @@ void Player::Jump()
 		return;
 	}
 
+	auto* input = Input::GetInstance();
+
+	const bool jumpTrigger =
+		input->TriggerKey(DIK_SPACE) ||
+		input->PushKey(DIK_W) ||
+		IsControllerJumpTrigger(input);
+
 	// 地面にいる場合
 	if (onGround_) {
-		// ジャンプキーが押されたら
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+		if (jumpTrigger) {
 			// ジャンプスイッチの切り替え
 			map_->ToggleJumpSwitch();
 
-			// ジャンプの開始エフェクトの発生
+			// ジャンプの開始エフェクト
 			EmitJumpParticle();
-			
+
 			// ジャンプブロックの上にいたら高く跳ねる
 			if (IsOnJumpBlock()) {
 				velocity_.y = status_.kJumpBlockPower;
-			} 
-			// 通常のジャンプ
-			else {
+			} else {
 				velocity_.y = status_.kJumpPower;
 			}
 
-			// 空中にいる状態にする
+			// 空中状態にする
 			onGround_ = false;
 		}
 	} else {
@@ -831,7 +900,6 @@ void Player::Jump()
 		velocity_.y += -status_.kGravity;
 		velocity_.y = (std::max)(velocity_.y, -status_.kMaxFallSpeed);
 	}
-
 }
 
 

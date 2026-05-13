@@ -1,7 +1,7 @@
 #include "StageClearScene.h"
 #include "Game/Camera/Camera.h"
 #include "engine/InsideScene/Framework.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "ImGuiManager.h"
 #include "Game/Application/PlayContext.h"
 #include <algorithm>
