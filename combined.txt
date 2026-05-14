@@ -161,6 +161,12 @@
 └── ├── Audio/
 └── └── ├── Audio.cpp
 └── └── └── Audio.h
+└── ├── Input/
+└── └── ├── Controller.cpp
+└── └── ├── Controller.h
+└── └── ├── Input.cpp
+└── └── ├── Input.h
+└── └── └── InputData.h
 └── ├── InsideScene/
 └── └── ├── AbstractSceneFactory.cpp
 └── └── ├── AbstractSceneFactory.h
@@ -4496,14 +4502,70 @@ File Path: Game/Application/Player/Player.cpp
 ============================================================
 #include "Player.h"
 #include <algorithm>
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "Game/Particle/ParticlePresets.h"
 #include "Game/Application/Enemy/EnemyBase/EnemyBase.h"
 #ifdef USE_IMGUI
 #include "engine/base/ImGuiManager.h"
 #endif
 
+namespace
+{
+	constexpr int kControllerNo = 0;
+	constexpr float kStickMoveThreshold = 0.25f;
+	constexpr float kStickDashThreshold = 0.75f;
 
+	bool IsControllerRightHold(Input* input)
+	{
+		const StickState leftStick = input->GetLeftStickState(kControllerNo);
+
+		return
+			leftStick.x > kStickMoveThreshold ||
+			input->PushButton(kControllerNo, ControllerButtonType::DPadRIGHT);
+	}
+
+	bool IsControllerLeftHold(Input* input)
+	{
+		const StickState leftStick = input->GetLeftStickState(kControllerNo);
+
+		return
+			leftStick.x < -kStickMoveThreshold ||
+			input->PushButton(kControllerNo, ControllerButtonType::DPadLEFT);
+	}
+
+	bool IsControllerRightTrigger(Input* input)
+	{
+		const StickState leftStick = input->GetLeftStickState(kControllerNo);
+		const StickState prevLeftStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+		const bool stickFlickRight =
+			prevLeftStick.x <= kStickMoveThreshold &&
+			leftStick.x > kStickDashThreshold;
+
+		return
+			input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+			stickFlickRight;
+	}
+
+	bool IsControllerLeftTrigger(Input* input)
+	{
+		const StickState leftStick = input->GetLeftStickState(kControllerNo);
+		const StickState prevLeftStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+		const bool stickFlickLeft =
+			prevLeftStick.x >= -kStickMoveThreshold &&
+			leftStick.x < -kStickDashThreshold;
+
+		return
+			input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+			stickFlickLeft;
+	}
+
+	bool IsControllerJumpTrigger(Input* input)
+	{
+		return input->PushButton(kControllerNo, ControllerButtonType::A);
+	}
+}
 
 Collider::Type Player::GetType() const
 {
@@ -4874,52 +4936,48 @@ void Player::PlayerTurn()
 
 void Player::UpdateDashEffect()
 {
-	// 現在のダッシュ状態を取得
-	const bool movingRight = Input::GetInstance()->PushKey(DIK_D) && !Input::GetInstance()->PushKey(DIK_A);
-	const bool movingLeft = Input::GetInstance()->PushKey(DIK_A) && !Input::GetInstance()->PushKey(DIK_D);
-	// ダッシュ状態の判定
+	auto* input = Input::GetInstance();
+
+	const bool movingRight =
+		(input->PushKey(DIK_D) || IsControllerRightHold(input)) &&
+		!(input->PushKey(DIK_A) || IsControllerLeftHold(input));
+
+	const bool movingLeft =
+		(input->PushKey(DIK_A) || IsControllerLeftHold(input)) &&
+		!(input->PushKey(DIK_D) || IsControllerRightHold(input));
+
 	const bool dashActiveRight = isDash_ && (dashDirection_ == +1) && movingRight;
 	const bool dashActiveLeft = isDash_ && (dashDirection_ == -1) && movingLeft;
 	const bool dashActive = dashActiveRight || dashActiveLeft;
 
-	// 地面に接地しているか
 	const bool canShowEffect = dashActive && onGround_;
-	// プレイヤーの現在地を取得
+
 	Vector3 playerPos = playerModel_->GetTranslate();
 
-	// ダッシュ開始時の衝撃波エフェクト
 	if (!wasDashing_ && canShowEffect) {
 		dashStartEffect_->SetTranslate(playerPos);
-		// 発生
 		dashStartEffect_->Play();
 	}
 
-	// ダッシュ中の継続エフェクト
 	if (canShowEffect) {
-		// 足元の位置を計算
 		Vector3 smokePos = playerPos;
-		// 発生位置を足元らへんに
 		smokePos.y -= particleSpawnPosOffset_;
 
-		// 進行方向とは逆方向に
 		if (dashDirection_ == +1) {
 			smokePos.x -= particleSpawnPosOffset_;
 		} else if (dashDirection_ == -1) {
 			smokePos.x += particleSpawnPosOffset_;
 		}
 
-		// エフェクトの位置更新
 		dashSmokeEffect_->SetTranslate(smokePos);
 
-		// 発生
 		if (!wasDashing_) {
 			dashSmokeEffect_->Play();
 		}
 	} else {
-		// ダッシュしていないときは煙のエフェクトを停止
 		dashSmokeEffect_->Stop();
 	}
-	// 前フレームの状態を保持
+
 	wasDashing_ = canShowEffect;
 }
 
@@ -4927,27 +4985,28 @@ void Player::UpdateMoveEffect()
 {
 	if (!moveEffect_ || !playerModel_) { return; }
 
-	// 入力状態（Move()と同じ判定に合わせる）
 	auto* input = Input::GetInstance();
-	const bool rightHold = input->PushKey(DIK_D);
-	const bool leftHold = input->PushKey(DIK_A);
 
-	// 左右どちらかだけ押している＝移動中
+	const bool rightHold =
+		input->PushKey(DIK_D) ||
+		IsControllerRightHold(input);
+
+	const bool leftHold =
+		input->PushKey(DIK_A) ||
+		IsControllerLeftHold(input);
+
 	const bool movingRight = rightHold && !leftHold;
 	const bool movingLeft = leftHold && !rightHold;
 	const bool moving = movingRight || movingLeft;
 
-	// 通常移動として扱いたい条件
 	const bool canShowEffect = controlEnabled_ && onGround_ && moving && !isDash_;
 
 	Vector3 playerPos = playerModel_->GetTranslate();
 
 	if (canShowEffect) {
-		// 足元に出す
 		Vector3 smokePos = playerPos;
 		smokePos.y -= particleSpawnPosOffset_;
 
-		// 進行方向とは逆に少しずらす（ダッシュ煙と同じ見た目の思想）
 		if (movingRight) {
 			smokePos.x -= particleSpawnPosOffset_;
 		} else if (movingLeft) {
@@ -4955,12 +5014,14 @@ void Player::UpdateMoveEffect()
 		}
 
 		moveEffect_->SetTranslate(smokePos);
+
 		if (!wasMoving_) {
 			moveEffect_->Play();
 		}
 	} else {
 		moveEffect_->Pause();
 	}
+
 	wasMoving_ = canShowEffect;
 }
 
@@ -5165,7 +5226,7 @@ void Player::Move()
 {
 	// 操作ロック中：入力は無視して速度減衰のみ行う
 	if (!controlEnabled_) {
-		// 走り続け防止（キー押しっぱなし解除直後の事故対策）
+		// 走り続け防止
 		velocity_.x *= (1.0f - status_.kAttenuation);
 
 		// ダッシュ状態も解除
@@ -5177,30 +5238,45 @@ void Player::Move()
 		return;
 	}
 
-
 	auto* input = Input::GetInstance();
 
+	//==================================================
 	// 入力状態
-	const bool rightHold = input->PushKey(DIK_D);
-	const bool leftHold = input->PushKey(DIK_A);
+	// キーボード + コントローラー
+	//==================================================
 
-	const bool rightTrig = input->TriggerKey(DIK_D);
-	const bool leftTrig = input->TriggerKey(DIK_A);
+	const bool keyRightHold = input->PushKey(DIK_D);
+	const bool keyLeftHold = input->PushKey(DIK_A);
 
+	const bool controllerRightHold = IsControllerRightHold(input);
+	const bool controllerLeftHold = IsControllerLeftHold(input);
+
+	const bool rightHold = keyRightHold || controllerRightHold;
+	const bool leftHold = keyLeftHold || controllerLeftHold;
+
+	const bool rightTrig =
+		input->TriggerKey(DIK_D) ||
+		IsControllerRightTrigger(input);
+
+	const bool leftTrig =
+		input->TriggerKey(DIK_A) ||
+		IsControllerLeftTrigger(input);
+
+	//==================================================
 	// ダブルタップ用タイマー更新
+	//==================================================
+
 	if (rightTapTimer_ > 0) { --rightTapTimer_; }
 	if (leftTapTimer_ > 0) { --leftTapTimer_; }
 
 	// 右ダブルタップ判定
 	if (rightTrig) {
-		// 一定時間内に2回目が来たらダッシュ開始
 		if (rightTapTimer_ > 0) {
 			isDash_ = true;
 			dashDirection_ = +1;
 		}
-		// タイマーリセット
+
 		rightTapTimer_ = status_.kDashDoubleTapFrame;
-		// 反対側はリセット
 		leftTapTimer_ = 0;
 	}
 
@@ -5210,20 +5286,22 @@ void Player::Move()
 			isDash_ = true;
 			dashDirection_ = -1;
 		}
+
 		leftTapTimer_ = status_.kDashDoubleTapFrame;
 		rightTapTimer_ = 0;
 	}
 
+	//==================================================
 	// ダッシュ継続／解除判定
+	//==================================================
+
 	const bool movingRight = rightHold && !leftHold;
 	const bool movingLeft = leftHold && !rightHold;
 
-	// 入力が止まったらダッシュ解除
 	if (!movingRight && !movingLeft) {
 		isDash_ = false;
 		dashDirection_ = 0;
 	} else if (isDash_) {
-		// 逆方向に入力したらダッシュ解除
 		if ((dashDirection_ == +1 && movingLeft) ||
 			(dashDirection_ == -1 && movingRight)) {
 			isDash_ = false;
@@ -5231,41 +5309,34 @@ void Player::Move()
 		}
 	}
 
+	//==================================================
 	// 実際の速度更新
+	//==================================================
+
 	Vector3 acceleration{};
 
-	// 左右のどちらの方向にダッシュしているか判別
 	const bool dashActiveRight = isDash_ && (dashDirection_ == +1) && movingRight;
 	const bool dashActiveLeft = isDash_ && (dashDirection_ == -1) && movingLeft;
-	// どちらに向いているかを持つ
 	const bool dashActive = dashActiveRight || dashActiveLeft;
 
-
-	// ダッシュ中だけ少し速くする
 	float dashScale = dashActive ? status_.kDashSpeedScale : 1.0f;
 	float maxSpeed = status_.kMaxSpeed * dashScale;
 
-
-	// 横方向速度更新
 	if (movingRight) {
-		// 左に動いていた場合は少し減速
 		if (velocity_.x < 0.0f) {
 			velocity_.x *= (1.0f - status_.kAttenuation);
 		}
-		acceleration.x += status_.kAcceleration * dashScale;
 
-		// 押された方向にディレクションを向ける
+		acceleration.x += status_.kAcceleration * dashScale;
 		direction_ = Direction::kRight;
 	} else if (movingLeft) {
 		if (velocity_.x > 0.0f) {
 			velocity_.x *= (1.0f - status_.kAttenuation);
 		}
-		acceleration.x -= status_.kAcceleration * dashScale;
 
-		// 押された方向にディレクションを向ける
+		acceleration.x -= status_.kAcceleration * dashScale;
 		direction_ = Direction::kLeft;
 	} else {
-		// 入力がないときは減速のみ（ダッシュ倍率はかけない）
 		velocity_.x *= (1.0f - status_.kAttenuation);
 	}
 
@@ -5275,15 +5346,15 @@ void Player::Move()
 	// 速度に応じて回転
 	Vector3 rotate = playerModel_->GetRotate();
 	rotate -= {0.0f, 0.0f, velocity_.x};
-	// 回転が規定値であるplayerTurnAround_が6.3fになったら回転の値をリセットする
-	if (-playerTurnAround_ >= rotate.z && movingRight ||
-		playerTurnAround_ <= rotate.z && movingLeft) {
+
+	if ((-playerTurnAround_ >= rotate.z && movingRight) ||
+		(playerTurnAround_ <= rotate.z && movingLeft)) {
 		rotate.z = 0.0f;
 	}
-	// プレイヤーの回転
+
 	playerModel_->SetRotate(rotate);
 
-	// 最大速度をダッシュ状態に応じて変える
+	// 最大速度制限
 	velocity_.x = std::clamp(velocity_.x, -maxSpeed, maxSpeed);
 }
 
@@ -5292,7 +5363,7 @@ void Player::Jump()
 {
 	// 操作ロック中：ジャンプ入力は無視
 	if (!controlEnabled_) {
-		// 重力だけは通常通り掛ける（空中で停止しないように）
+		// 重力だけは通常通り掛ける
 		if (!onGround_) {
 			velocity_.y += -status_.kGravity;
 			velocity_.y = (std::max)(velocity_.y, -status_.kMaxFallSpeed);
@@ -5300,26 +5371,30 @@ void Player::Jump()
 		return;
 	}
 
+	auto* input = Input::GetInstance();
+
+	const bool jumpTrigger =
+		input->TriggerKey(DIK_SPACE) ||
+		input->PushKey(DIK_W) ||
+		IsControllerJumpTrigger(input);
+
 	// 地面にいる場合
 	if (onGround_) {
-		// ジャンプキーが押されたら
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE) || Input::GetInstance()->PushKey(DIK_W)) {
+		if (jumpTrigger) {
 			// ジャンプスイッチの切り替え
 			map_->ToggleJumpSwitch();
 
-			// ジャンプの開始エフェクトの発生
+			// ジャンプの開始エフェクト
 			EmitJumpParticle();
-			
+
 			// ジャンプブロックの上にいたら高く跳ねる
 			if (IsOnJumpBlock()) {
 				velocity_.y = status_.kJumpBlockPower;
-			} 
-			// 通常のジャンプ
-			else {
+			} else {
 				velocity_.y = status_.kJumpPower;
 			}
 
-			// 空中にいる状態にする
+			// 空中状態にする
 			onGround_ = false;
 		}
 	} else {
@@ -5327,7 +5402,6 @@ void Player::Jump()
 		velocity_.y += -status_.kGravity;
 		velocity_.y = (std::max)(velocity_.y, -status_.kMaxFallSpeed);
 	}
-
 }
 
 
@@ -6781,7 +6855,8 @@ private:
 File Path: Game/Application/UI/GamePlayHUD.cpp
 ============================================================
 #include "GamePlayHUD.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
+
 #include "ImGuiManager.h"
 #include "Game/Application/Player/Player.h"
 
@@ -7398,7 +7473,7 @@ private:
 File Path: Game/Camera/StartCamPhase.cpp
 ============================================================
 #include "StartCamPhase.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include <cassert>
 #include "Sprite.h"
 
@@ -7480,10 +7555,15 @@ void StartCamPhase::Update(float dt)
 	const Vector3 leftPos = { introLeftX_,introFixedY_,introFixedZ_ };
 	const Vector3 rightPos = { introRightX_,introFixedY_,introFixedZ_ };
 	const Vector3 startPos = { camTargetPos_.x,introFixedY_,introFixedZ_ };
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
 
 #pragma region 各カメラの動き
 	switch (phase_)
 	{
+		
+
 	case StartCamPhase::Phase::None:
 		break;
 	case StartCamPhase::Phase::MoveToLeft:
@@ -7496,8 +7576,12 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = leftPos;
 		}
-		// スペースキーでスキップ
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		
+
+		// Space / コントローラーStartボタンでスキップ
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 			Skip();
 		}
 	}
@@ -7512,8 +7596,10 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = rightPos;
 		}
-		// スペースキーでスキップ
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		// Space / コントローラーStartボタンでスキップ
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 			Skip();
 		}
 	}
@@ -7527,8 +7613,10 @@ void StartCamPhase::Update(float dt)
 			phase_ = Phase::ReturnToStart;
 			timer_ = 0.0f;
 		}
-		// スペースキーでスキップ
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		// Space / コントローラーStartボタンでスキップ
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 			Skip();
 		}
 	}
@@ -7550,8 +7638,10 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = startPos;
 		}
-		// スペースキーでスキップ
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		// Space / コントローラーStartボタンでスキップ
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 			Skip();
 		}
 	}
@@ -11468,23 +11558,54 @@ void GameOverScene::Update()
 {
 	// カメラの更新
 	camera->Update();
-	if (Input::GetInstance()->TriggerKey(DIK_A) || Input::GetInstance()->TriggerKey(DIK_LEFT)) {
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+	constexpr float kStickThreshold = 0.6f;
+
+	// カメラの更新
+	camera->Update();
+
+	// 左スティックを倒した瞬間だけ反応させる
+	StickState stick = input->GetLeftStickState(kControllerNo);
+	StickState prevStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+	const bool stickLeft =
+		prevStick.x >= -kStickThreshold &&
+		stick.x < -kStickThreshold;
+
+	const bool stickRight =
+		prevStick.x <= kStickThreshold &&
+		stick.x > kStickThreshold;
+
+	// 左へ（A or ← or 十字キー左 or 左スティック左）
+	if (input->TriggerKey(DIK_A) ||
+		input->TriggerKey(DIK_LEFT) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+		stickLeft) {
+
 		int idx = static_cast<int>(selectedItem_);
 		idx = (idx - 1 + static_cast<int>(ClearMenuItem::Count)) % static_cast<int>(ClearMenuItem::Count);
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
-	// 右へ（D or →）
-	else if (Input::GetInstance()->TriggerKey(DIK_D) || Input::GetInstance()->TriggerKey(DIK_RIGHT)) {
+	// 右へ（D or → or 十字キー右 or 左スティック右）
+	else if (input->TriggerKey(DIK_D) ||
+		input->TriggerKey(DIK_RIGHT) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+		stickRight) {
+
 		int idx = static_cast<int>(selectedItem_);
 		idx = (idx + 1) % static_cast<int>(ClearMenuItem::Count);
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
 
-	// 決定（Enter / Space）
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+	// 決定（Enter / Space / Aボタン）
+	if (input->TriggerKey(DIK_SPACE) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::A)) {
+
 		switch (selectedItem_) {
 		case ClearMenuItem::OneMore:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);    
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
 			break;
 		case ClearMenuItem::Select:
 			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
@@ -12167,48 +12288,73 @@ void GamePlayScene::CheckPlayerAlive()
 
 void GamePlayScene::Update()
 {
-	// ポーズ中はポーズシステムの更新のみ行う / ポーズ以外入力不可
-	if (pauseSystem_->Update()) {
+	//==================================================
+	// カメラ・背景更新
+	//==================================================
+
+	camera->Update();
+	backGround->Update();
+
+	//==================================================
+	// スタートカメラ演出更新
+	//==================================================
+
+	const bool wasStartCamRunning = startCam_->IsRunning();
+
+	// この中で Space / Start によるスキップを処理する
+	startCam_->Update(dt);
+
+	// このフレームで開始演出が終わったか
+	skipJustFinishedThisFrame_ =
+		wasStartCamRunning && !startCam_->IsRunning();
+
+	// 現在、開始演出中か
+	stageStartEventFlag_ = startCam_->IsRunning();
+
+	bool isGoal = player->GetIsGoal();
+
+	//==================================================
+	// ポーズ更新
+	//==================================================
+	// 開始演出中、またはスキップ直後のフレームは
+	// Startボタンをポーズとして扱わない
+
+	const bool canPause =
+		!stageStartEventFlag_ &&
+		!skipJustFinishedThisFrame_;
+
+	if (canPause && pauseSystem_->Update()) {
 		return;
 	}
 
-	// カメラの更新
-	camera->Update();
-	// 背景の更新
-	backGround->Update();
+	//==================================================
+	// プレイヤー操作ロック
+	//==================================================
 
-	// スタートカメラの演出中か
-	const bool wasStatCamRunning = startCam_->IsRunning();
-	// スタートカメラの更新
-	startCam_->Update(dt);
-	// このフレームで開始演出が終了したか
-	skipJustFinishedThisFrame_ = wasStatCamRunning && !startCam_->IsRunning();
-	bool isGoal = player->GetIsGoal();
-	stageStartEventFlag_ = startCam_->IsRunning();
+	isPlayerControlLocked_ =
+		stageStartEventFlag_ ||
+		isGoal ||
+		skipJustFinishedThisFrame_;
 
-	// ステージ開始演出中  ゴールしていたらプレイヤーの操作を受け付けない
-	isPlayerControlLocked_ = stageStartEventFlag_ || isGoal || skipJustFinishedThisFrame_;
 	player->SetControlEnabled(!isPlayerControlLocked_);
 
-	// マップの更新
+	//==================================================
+	// マップ・プレイヤー更新
+	//==================================================
+
 	map->Update();
-	// プレイヤーの更新
 	player->Update();
 
-
-
-
-	// エネミーレイヤーが変更されたらエネミーを再生成 
-	// @TODO　エネミーの生成をクラス化
+	// エネミーレイヤーが変更されたらエネミーを再生成
 	if (map->ConsumeEnemyLayerDirtyFlag()) {
 		GenerateEnemy();
 	}
 
-
-
+	//==================================================
 	// フォローカメラ
-	if (!startCam_->IsRunning())
-	{
+	//==================================================
+
+	if (!startCam_->IsRunning()) {
 		// baseCamPos_ を入力として使う（前フレームのシェイクを混ぜない）
 		cameraController_->SetCameraPosition(baseCameraPos_);
 		cameraController_->SetTargetPosition(player->GetTranslate());
@@ -12216,22 +12362,26 @@ void GamePlayScene::Update()
 
 		// フォロー結果を「基準」として保存
 		baseCameraPos_ = cameraController_->GetCameraPosition();
-
 	} else {
 		// 開始演出中は基準位置もカメラ位置も開始演出の位置にする
 		baseCameraPos_ = cameraTransform.translate;
-
 	}
+
 	cameraTransform.translate = baseCameraPos_;
 	camera->SetTranslate(baseCameraPos_);
 
 	damageFeedBack_->SetBaseCameraPos(baseCameraPos_);
 	damageFeedBack_->Update(dt);
 
+	//==================================================
+	// 敵更新
+	//==================================================
 
-	// 敵の更新
 	for (auto& enemy : enemies) {
-		if (!enemy) continue;
+		if (!enemy) {
+			continue;
+		}
+
 		enemy->Update();
 	}
 
@@ -12241,9 +12391,12 @@ void GamePlayScene::Update()
 	// 当たり判定
 	CheckCollision();
 
+	//==================================================
+	// プレイヤー生存・復帰処理
+	//==================================================
 
-	// プレイヤーの生存確認
 	CheckPlayerAlive();
+
 	if (isRespawning_) {
 		// 復帰演出中は入力を止める
 		player->SetControlEnabled(false);
@@ -12276,7 +12429,7 @@ void GamePlayScene::Update()
 			// 失敗感のシェイク
 			damageFeedBack_->StartShake(0.7f, 0.75f, false);
 
-			// 死亡演出（こちら向いて少し上にジャンプして落ちる）
+			// 死亡演出
 			player->BeginDeathDemo(camera->GetTranslate());
 		}
 
@@ -12287,6 +12440,7 @@ void GamePlayScene::Update()
 
 		return;
 	}
+
 	// 落下フラグを消費して、復帰演出を開始する（HPが残っている場合）
 	if (!isRespawning_ && player->ConsumeDeathByFalling()) {
 		if (player->IsAlive()) {
@@ -12300,21 +12454,25 @@ void GamePlayScene::Update()
 		}
 	}
 
-	
-	// プレイヤーがゴールに触れていたらシーン遷移
+	//==================================================
+	// ゴール処理
+	//==================================================
 
 	if (isGoal) {
-		// ゴールしたら操作を受け付けない
-		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Start);
+		sceneManager->ChangeSceneWithTransition(
+			"STAGECLEAR",
+			TransitionType::Start
+		);
+		return;
 	}
 
-	// スプライトの更新
+	//==================================================
+	// HUD / ImGui更新
+	//==================================================
+
 	gamePlayHUD_->Update();
 
-
-	// ImGuiの描画
 	DrawImgui();
-
 }
 
 void GamePlayScene::Draw()
@@ -12931,7 +13089,7 @@ private:	// メンバ変数
 File Path: Game/Scene/Pause/PauseSystem.cpp
 ============================================================
 #include "PauseSystem.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 
 #include "engine/InsideScene/SceneManager.h"
 
@@ -12944,7 +13102,14 @@ void PauseSystem::Initialize()
 
 bool PauseSystem::Update()
 {
-	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+
+	// Escキー / コントローラーStartボタンでポーズの切り替え
+	if (input->TriggerKey(DIK_ESCAPE)|| 
+		input->TriggerButton(kControllerNo,ControllerButtonType::Start)) 
+	{
 		isPause_ = !isPause_;
 	}
 	if (isPause_) {
@@ -13053,7 +13218,7 @@ private:
 File Path: Game/Scene/Pause/PauseUI.cpp
 ============================================================
 #include "PauseUI.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "ImGuiManager.h"
 
 
@@ -13347,8 +13512,15 @@ bool PauseUI::PauseReleaseRequested()
 
 void PauseUI::HandleDecideInput()
 {
-	// スペースキーが押されていなければ抜ける
-	if (!Input::GetInstance()->TriggerKey(DIK_SPACE)) return;
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+
+	// スペースキー / コントローラーAボタン が押されていなければ抜ける
+	if (!input->TriggerKey(DIK_SPACE) &&
+		!input->TriggerButton(kControllerNo, ControllerButtonType::A)) {
+		return;
+	}
 
 	// 選択中のスロットに応じた処理
 	switch (selectedSlot_)
@@ -13375,14 +13547,53 @@ void PauseUI::HandleDecideInput()
 
 void PauseUI::HandleDirectionInput()
 {
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+	constexpr float kStickThreshold = 0.6f;
+
+	StickState stick = input->GetLeftStickState(kControllerNo);
+	StickState prevStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+	const bool stickUp =
+		prevStick.y <= kStickThreshold &&
+		stick.y > kStickThreshold;
+
+	const bool stickDown =
+		prevStick.y >= -kStickThreshold &&
+		stick.y < -kStickThreshold;
+
+	const bool stickLeft =
+		prevStick.x >= -kStickThreshold &&
+		stick.x < -kStickThreshold;
+
+	const bool stickRight =
+		prevStick.x <= kStickThreshold &&
+		stick.x > kStickThreshold;
+
 	// 入力によって選択スロットを変更
-	if (Input::GetInstance()->TriggerKey(DIK_W)) {
+	if (input->TriggerKey(DIK_W) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadUP) ||
+		stickUp) {
+
 		selectedSlot_ = Slot::Continue;
-	} else if (Input::GetInstance()->TriggerKey(DIK_D)) {
+
+	} else if (input->TriggerKey(DIK_D) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+		stickRight) {
+
 		selectedSlot_ = Slot::Retry;
-	} else if (Input::GetInstance()->TriggerKey(DIK_A)) {
+
+	} else if (input->TriggerKey(DIK_A) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+		stickLeft) {
+
 		selectedSlot_ = Slot::StageSelect;
-	} else if (Input::GetInstance()->TriggerKey(DIK_S)) {
+
+	} else if (input->TriggerKey(DIK_S) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadDOWN) ||
+		stickDown) {
+
 		selectedSlot_ = Slot::Title;
 	}
 }
@@ -14079,7 +14290,7 @@ File Path: Game/Scene/StageClearScene.cpp
 #include "StageClearScene.h"
 #include "Game/Camera/Camera.h"
 #include "engine/InsideScene/Framework.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "ImGuiManager.h"
 #include "Game/Application/PlayContext.h"
 #include <algorithm>
@@ -14165,125 +14376,191 @@ void StageClearScene::Initialize(DirectXCommon* dxCommon)
 
 void StageClearScene::Update()
 {
-	// カメラの更新
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+	constexpr float kStickThreshold = 0.6f;
+
 	camera->Update();
-	// 左
-	if(Input::GetInstance()->TriggerKey(DIK_D) || Input::GetInstance()->TriggerKey(DIK_LEFT)) {
-		int idx = static_cast<int>(selectedItem_);
-		idx = (idx - 1 + static_cast<int>(ClearMenuItem::Count)) % static_cast<int>(ClearMenuItem::Count);
-		selectedItem_ = static_cast<ClearMenuItem>(idx);
+
+	//==================================================
+	// 左右入力
+	//==================================================
+
+	const StickState stick = input->GetLeftStickState(kControllerNo);
+	const StickState prevStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+	const bool stickLeft =
+		prevStick.x >= -kStickThreshold &&
+		stick.x < -kStickThreshold;
+
+	const bool stickRight =
+		prevStick.x <= kStickThreshold &&
+		stick.x > kStickThreshold;
+
+	const bool inputLeft =
+		input->TriggerKey(DIK_A) ||
+		input->TriggerKey(DIK_LEFT) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+		stickLeft;
+
+	const bool inputRight =
+		input->TriggerKey(DIK_D) ||
+		input->TriggerKey(DIK_RIGHT) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+		stickRight;
+
+	// 左 = 前の項目、右 = 次の項目
+	int move = 0;
+	if (inputLeft) {
+		move = -1;
+	} else if (inputRight) {
+		move = +1;
 	}
-	// 右
-	else if (Input::GetInstance()->TriggerKey(DIK_A) || Input::GetInstance()->TriggerKey(DIK_RIGHT)) {
+
+	if (move != 0) {
+		const int count = static_cast<int>(ClearMenuItem::Count);
 		int idx = static_cast<int>(selectedItem_);
-		idx = (idx + 1) % static_cast<int>(ClearMenuItem::Count);
+		idx = (idx + move + count) % count;
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
 
-	//  決定（Enter / Space） 
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE) ) {
+	//==================================================
+	// 決定
+	//==================================================
+
+	const bool decide =
+		input->TriggerKey(DIK_SPACE) ||
+		input->TriggerKey(DIK_RETURN) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::A);
+
+	if (decide) {
 		switch (selectedItem_) {
 		case ClearMenuItem::NextStage:
 		{
-			const std::string& nextStageName = PlayContext::GetInstance().GetSelectedStageKey();
-			const size_t dash = nextStageName.find('-');
+			// 左の「次のステージ」
+			const std::string& currentStageKey =
+				PlayContext::GetInstance().GetSelectedStageKey();
+
+			const size_t dash = currentStageKey.find('-');
+
 			if (dash != std::string::npos) {
-				const std::string left = nextStageName.substr(0, dash);
-				const std::string right = nextStageName.substr(dash + 1);
+				const std::string left = currentStageKey.substr(0, dash);
+				const std::string right = currentStageKey.substr(dash + 1);
 
 				auto isAllDigits = [](const std::string& s) {
 					return !s.empty() &&
-						std::all_of(s.begin(), s.end(),
-							[](unsigned char c) { return std::isdigit(c) != 0; });
+						std::all_of(
+							s.begin(),
+							s.end(),
+							[](unsigned char c) {
+								return std::isdigit(c) != 0;
+							}
+						);
 					};
 
 				if (isAllDigits(left) && isAllDigits(right)) {
-
 					const int world = std::atoi(left.c_str());
 					const int stage = std::atoi(right.c_str());
 
-
 					constexpr int kMaxStage = 8;
+
 					if (stage >= kMaxStage) {
-						// もう次が無いので、ステージセレクトに戻す
-						SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
-						break;
+						SceneManager::GetInstance()->ChangeSceneWithTransition(
+							"STAGESELECT",
+							TransitionType::Start
+						);
+						return;
 					}
-					// "1-1" -> "1-2"
+
 					const std::string nextStageKey =
 						std::to_string(world) + "-" + std::to_string(stage + 1);
 
 					PlayContext::GetInstance().SetSelectedStage(
 						PlayContext::GetInstance().GetSelectedStageId(),
-						nextStageKey);
+						nextStageKey
+					);
 				}
 			}
 
-
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
-			break;
+			SceneManager::GetInstance()->ChangeSceneWithTransition(
+				"GAMEPLAY",
+				TransitionType::Start
+			);
+			return;
 		}
+
 		case ClearMenuItem::OneMore:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
-			break;
+			// 中央の「もう一度」
+			SceneManager::GetInstance()->ChangeSceneWithTransition(
+				"GAMEPLAY",
+				TransitionType::Start
+			);
+			return;
+
 		case ClearMenuItem::Select:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
-			break;
+			// 右の「セレクト画面」
+			SceneManager::GetInstance()->ChangeSceneWithTransition(
+				"STAGESELECT",
+				TransitionType::Start
+			);
+			return;
+
 		default:
 			break;
 		}
-		return; // シーン遷移したら以降の更新を止めたい場合
 	}
+
+	//==================================================
+	// 選択中UI
+	//==================================================
+
 	oneMore_->SetSize(oneMoreBaseSize_);
-	select_->SetSize(selectBaseSize_);
 	next_->SetSize(nextBaseSize_);
-	
-	// 回転させる
+	select_->SetSize(selectBaseSize_);
+
+	auto Scale = [](const Vector2& v, float s) {
+		return Vector2{ v.x * s, v.y * s };
+		};
+
+	switch (selectedItem_) {
+	case ClearMenuItem::NextStage:
+		// 左の「次のステージ」
+		oneMore_->SetSize(Scale(oneMoreBaseSize_, selectScale_));
+		break;
+
+	case ClearMenuItem::OneMore:
+		// 中央の「もう一度」
+		next_->SetSize(Scale(nextBaseSize_, selectScale_));
+		break;
+
+	case ClearMenuItem::Select:
+		// 右の「セレクト画面」
+		select_->SetSize(Scale(selectBaseSize_, selectScale_));
+		break;
+
+	default:
+		break;
+	}
+
+	//==================================================
+	// 通常更新
+	//==================================================
+
 	Vector3 rotate = playerObject_->GetRotate();
 	rotate.z += -0.1f;
 	playerObject_->SetRotate(rotate);
 
-	// 選択中だけ少し大きく
-	auto Scale = [](const Vector2& v, float s) { return Vector2{ v.x * s, v.y * s }; };
-
-	switch (selectedItem_) {
-	case ClearMenuItem::NextStage:
-		oneMore_->SetSize(Scale(oneMoreBaseSize_, selectScale_));
-		break;
-	case ClearMenuItem::OneMore:
-		select_->SetSize(Scale(selectBaseSize_, selectScale_));
-		break;
-	case ClearMenuItem::Select:
-		next_->SetSize(Scale(nextBaseSize_, selectScale_));
-		break;
-	default:
-		break;
-	}
-	// タイトルへ戻る (1)
-	if (Input::GetInstance()->TriggerKey(DIK_1)) {
-		SceneManager::GetInstance()->ChangeScene("TITLE");
-	}
-	// ステージセレクトへ戻る (2)
-	else if (Input::GetInstance()->TriggerKey(DIK_2)) {
-		SceneManager::GetInstance()->ChangeScene("STAGESELECT");
-	}
-	// ゲームプレイへ戻る (3)
-	else if (Input::GetInstance()->TriggerKey(DIK_3)) {
-		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
-	}
-
-	// 各オブジェクトの更新
 	playerObject_->Update();
 	backGround_->Update();
-	// 各スプライトの更新
+
 	clearTextSprite->Update();
 	keyIcon_A->Update();
 	keyIcon_D->Update();
 	oneMore_->Update();
-	select_->Update();
 	next_->Update();
+	select_->Update();
 
-	// ImGuiの描画
 	DrawImgui();
 }
 
@@ -14675,14 +14952,53 @@ void StageSelectScene::HandleSelectInput()
 	// 現在のノードIDを保存
 	uint32_t next = currentNodeId;
 
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+	constexpr float kStickThreshold = 0.6f;
+
+	StickState stick = input->GetLeftStickState(kControllerNo);
+	StickState prevStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+	const bool stickUp =
+		prevStick.y <= kStickThreshold &&
+		stick.y > kStickThreshold;
+
+	const bool stickDown =
+		prevStick.y >= -kStickThreshold &&
+		stick.y < -kStickThreshold;
+
+	const bool stickLeft =
+		prevStick.x >= -kStickThreshold &&
+		stick.x < -kStickThreshold;
+
+	const bool stickRight =
+		prevStick.x <= kStickThreshold &&
+		stick.x > kStickThreshold;
+
 	// 入力した方向に移動できるノードがあれば移動
-	if (Input::GetInstance()->TriggerKey(DIK_W)) {
+	if (input->TriggerKey(DIK_W) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadUP) ||
+		stickUp) {
+
 		next = stageSelectGraph->Move(currentNodeId, Direction::Up);
-	} else if (Input::GetInstance()->TriggerKey(DIK_S)) {
+
+	} else if (input->TriggerKey(DIK_S) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadDOWN) ||
+		stickDown) {
+
 		next = stageSelectGraph->Move(currentNodeId, Direction::Down);
-	} else if (Input::GetInstance()->TriggerKey(DIK_A)) {
+
+	} else if (input->TriggerKey(DIK_A) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+		stickLeft) {
+
 		next = stageSelectGraph->Move(currentNodeId, Direction::Left);
-	} else if (Input::GetInstance()->TriggerKey(DIK_D)) {
+
+	} else if (input->TriggerKey(DIK_D) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+		stickRight) {
+
 		next = stageSelectGraph->Move(currentNodeId, Direction::Right);
 	}
 
@@ -14958,12 +15274,19 @@ void StageSelectScene::Update()
 	// 一定時間経過するまで操作ができないようにする
 	if (inputLockTime_ >= inputLockDuration_) {
 		// Spaceが押されたらステージを開始する
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		Input* input = Input::GetInstance();
+
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(0, ControllerButtonType::A)) {
+
 			const StageNode& node = stageSelectGraph->GetNode(currentNodeId);
 			PlayContext::GetInstance().SetSelectedStage(node.stageId, node.stageKey);
 
 			// ステージシーンへ切り替え
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
+			SceneManager::GetInstance()->ChangeSceneWithTransition(
+				"GAMEPLAY",
+				TransitionType::Start
+			);
 		}
 	} else {
 		// 入力ロック時間を進める
@@ -14971,10 +15294,19 @@ void StageSelectScene::Update()
 	}
 	
 
-	// Escキーでタイトルへ
-	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+
+	// Escキー / コントローラーStartボタンでタイトルへ
+	if (input->TriggerKey(DIK_ESCAPE) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 		// タイトルシーンへ切り替え
-		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE",TransitionType::Start);
+		SceneManager::GetInstance()->ChangeSceneWithTransition(
+			"TITLE",
+			TransitionType::Start
+		);
 	}
 	cameraTransform.translate = { 0.0f,20.0f,0.0f };
 	cameraTransform.rotate = { 0.35f,0.0f,0.0f };
@@ -15914,7 +16246,7 @@ File Path: Game/Scene/TitleScene.cpp
 ============================================================
 #include <thread>
 #include "TitleScene.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "Object3D.h"
 #include "Game/Camera/Camera.h"
 #include "Game/Particle/ParticleManager.h"
@@ -15997,7 +16329,7 @@ void TitleScene::Initialize(DirectXCommon* dxCommon)
 	titleSmoke_->SetEmissionRate(15.0f);
 	// 砂煙っぽい色（Player.cppのdashSmokeEffect_と同系）
 	titleSmoke_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
-	titleSmoke_->Play(); // 重要：Playはここで1回だけ（毎フレームしない）
+	titleSmoke_->Play(); 
 
 	// ジャンプ開始スパーク（単発）
 	titleJumpSpark_ = ParticlePresets::CreateSparks(playerTransform.translate);
@@ -16055,14 +16387,7 @@ void TitleScene::Update()
 	playerObject->SetTransform(playerTransform);
 	playerObject->Update();
 
-	// ENTERキーが押されたら ゲームプレイシーンへ（デバッグ用）
-#ifdef _DEBUG
-	if (Input::GetInstance()->TriggerKey(DIK_RETURN))
-	{
-		SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY",TransitionType::Start);
-	}
-#endif
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE))
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE)|| Input::GetInstance()->TriggerButton(0, ControllerButtonType::A))
 	{
 		SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT",TransitionType::Start);
 	}
@@ -17182,6 +17507,7 @@ File Path: MyEngine.vcxproj
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="engine\Input\Controller.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationFactory.cpp" />
@@ -17209,7 +17535,7 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="Game\Camera\Camera.cpp" />
     <ClCompile Include="engine\base\D3DResourceLeakChecker.cpp" />
     <ClCompile Include="engine\base\DirectXCommon.cpp" />
-    <ClCompile Include="engine\base\Input.cpp" />
+    <ClCompile Include="engine\Input\Input.cpp" />
     <ClCompile Include="engine\base\Logger.cpp" />
     <ClCompile Include="engine\InsideScene\Framework.cpp" />
     <ClCompile Include="Game\Scene\GamePlayScene.cpp" />
@@ -17261,6 +17587,8 @@ File Path: MyEngine.vcxproj
     <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="engine\Input\Controller.h" />
+    <ClInclude Include="engine\Input\InputData.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationField.h" />
     <ClInclude Include="Game\Application\BackGround\Decoration\DecorationFactory.h" />
@@ -17293,7 +17621,7 @@ File Path: MyEngine.vcxproj
     <ClInclude Include="Game\Camera\Camera.h" />
     <ClInclude Include="engine\base\D3DResourceLeakChecker.h" />
     <ClInclude Include="engine\base\DirectXCommon.h" />
-    <ClInclude Include="engine\base\Input.h" />
+    <ClInclude Include="engine\Input\Input.h" />
     <ClInclude Include="engine\base\Logger.h" />
     <ClInclude Include="engine\math\MakeMatrix.h" />
     <ClInclude Include="engine\math\MyMath.h" />
@@ -17454,7 +17782,7 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="engine\base\ImGuiManager.cpp">
       <Filter>engine\base</Filter>
     </ClCompile>
-    <ClCompile Include="engine\base\Input.cpp">
+    <ClCompile Include="engine\Input\Input.cpp">
       <Filter>engine\base</Filter>
     </ClCompile>
     <ClCompile Include="engine\base\Logger.cpp">
@@ -17579,6 +17907,7 @@ File Path: MyEngine.vcxproj.filters
     <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
     <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
     <ClCompile Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.cpp" />
+    <ClCompile Include="engine\Input\Controller.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -17654,7 +17983,7 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="engine\base\ImGuiManager.h">
       <Filter>engine\base</Filter>
     </ClInclude>
-    <ClInclude Include="engine\base\Input.h">
+    <ClInclude Include="engine\Input\Input.h">
       <Filter>engine\base</Filter>
     </ClInclude>
     <ClInclude Include="engine\base\Logger.h">
@@ -17789,6 +18118,8 @@ File Path: MyEngine.vcxproj.filters
     <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />
     <ClInclude Include="Game\Application\Enemy\Drop\TimedDropEnemy.h" />
     <ClInclude Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.h" />
+    <ClInclude Include="engine\Input\Controller.h" />
+    <ClInclude Include="engine\Input\InputData.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">
@@ -21262,6 +21593,783 @@ private:
 
 
 ============================================================
+File Path: engine/Input/Controller.cpp
+============================================================
+#include "Controller.h"
+
+#include <algorithm>
+#include <cmath>
+
+void Controller::Initialize()
+{
+	ZeroMemory(currentState_, sizeof(currentState_));
+	ZeroMemory(previousState_, sizeof(previousState_));
+	ZeroMemory(currentDIState_, sizeof(currentDIState_));
+	ZeroMemory(previousDIState_, sizeof(previousDIState_));
+
+	buttonMapping_ = {
+		{ ControllerButtonType::A,          { static_cast<WORD>(XINPUT_GAMEPAD_A),              0  } },
+		{ ControllerButtonType::B,          { static_cast<WORD>(XINPUT_GAMEPAD_B),              1  } },
+		{ ControllerButtonType::X,          { static_cast<WORD>(XINPUT_GAMEPAD_X),              2  } },
+		{ ControllerButtonType::Y,          { static_cast<WORD>(XINPUT_GAMEPAD_Y),              3  } },
+		{ ControllerButtonType::LB,         { static_cast<WORD>(XINPUT_GAMEPAD_LEFT_SHOULDER),  4  } },
+		{ ControllerButtonType::RB,         { static_cast<WORD>(XINPUT_GAMEPAD_RIGHT_SHOULDER), 5  } },
+		{ ControllerButtonType::LeftStick,  { static_cast<WORD>(XINPUT_GAMEPAD_LEFT_THUMB),     6  } },
+		{ ControllerButtonType::RightStick, { static_cast<WORD>(XINPUT_GAMEPAD_RIGHT_THUMB),    7  } },
+		{ ControllerButtonType::Select,     { static_cast<WORD>(XINPUT_GAMEPAD_BACK),           8  } },
+		{ ControllerButtonType::Start,      { static_cast<WORD>(XINPUT_GAMEPAD_START),          9  } },
+		{ ControllerButtonType::DPadUP,     { static_cast<WORD>(XINPUT_GAMEPAD_DPAD_UP),        10 } },
+		{ ControllerButtonType::DPadRIGHT,  { static_cast<WORD>(XINPUT_GAMEPAD_DPAD_RIGHT),     11 } },
+		{ ControllerButtonType::DPadDOWN,   { static_cast<WORD>(XINPUT_GAMEPAD_DPAD_DOWN),      12 } },
+		{ ControllerButtonType::DPadLEFT,   { static_cast<WORD>(XINPUT_GAMEPAD_DPAD_LEFT),      13 } },
+		{ ControllerButtonType::LT,         { 0, -1 } },
+		{ ControllerButtonType::RT,         { 0, -1 } },
+	};
+}
+
+void Controller::Update()
+{
+	for (int i = 0; i < XUSER_MAX_COUNT; ++i) {
+		previousState_[i] = currentState_[i];
+
+		ZeroMemory(&currentState_[i], sizeof(XINPUT_STATE));
+
+		DWORD result = XInputGetState(i, &currentState_[i]);
+
+		if (result != ERROR_SUCCESS) {
+			ZeroMemory(&currentState_[i], sizeof(XINPUT_STATE));
+		}
+
+		previousDIState_[i] = currentDIState_[i];
+		ZeroMemory(&currentDIState_[i], sizeof(DIJOYSTATE2));
+	}
+}
+
+bool Controller::GetJoystickState(int stickNo, XINPUT_STATE& out) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	out = currentState_[stickNo];
+	return true;
+}
+
+bool Controller::GetJoystickStatePrevious(int stickNo, XINPUT_STATE& out) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	out = previousState_[stickNo];
+	return true;
+}
+
+bool Controller::GetJoystickState(int stickNo, DIJOYSTATE2& out) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	out = currentDIState_[stickNo];
+	return true;
+}
+
+bool Controller::GetJoystickStatePrevious(int stickNo, DIJOYSTATE2& out) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	out = previousDIState_[stickNo];
+	return true;
+}
+
+bool Controller::PushButton(int stickNo, ControllerButtonType button) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	if (button == ControllerButtonType::LT) {
+		return currentState_[stickNo].Gamepad.bLeftTrigger > TRIGGER_THRESHOLD;
+	}
+
+	if (button == ControllerButtonType::RT) {
+		return currentState_[stickNo].Gamepad.bRightTrigger > TRIGGER_THRESHOLD;
+	}
+
+	auto [xInputButton, dInputButton] = ConvertToButton(button);
+
+	if (xInputButton != 0) {
+		return (currentState_[stickNo].Gamepad.wButtons & xInputButton) != 0;
+	}
+
+	return false;
+}
+
+bool Controller::TriggerButton(int stickNo, ControllerButtonType button) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	if (button == ControllerButtonType::LT) {
+		return currentState_[stickNo].Gamepad.bLeftTrigger > TRIGGER_THRESHOLD &&
+			previousState_[stickNo].Gamepad.bLeftTrigger <= TRIGGER_THRESHOLD;
+	}
+
+	if (button == ControllerButtonType::RT) {
+		return currentState_[stickNo].Gamepad.bRightTrigger > TRIGGER_THRESHOLD &&
+			previousState_[stickNo].Gamepad.bRightTrigger <= TRIGGER_THRESHOLD;
+	}
+
+	auto [xInputButton, dInputButton] = ConvertToButton(button);
+
+	if (xInputButton != 0) {
+		return (currentState_[stickNo].Gamepad.wButtons & xInputButton) != 0 &&
+			(previousState_[stickNo].Gamepad.wButtons & xInputButton) == 0;
+	}
+
+	return false;
+}
+
+bool Controller::ReleaseButton(int stickNo, ControllerButtonType button) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	if (button == ControllerButtonType::LT) {
+		return currentState_[stickNo].Gamepad.bLeftTrigger <= TRIGGER_THRESHOLD &&
+			previousState_[stickNo].Gamepad.bLeftTrigger > TRIGGER_THRESHOLD;
+	}
+
+	if (button == ControllerButtonType::RT) {
+		return currentState_[stickNo].Gamepad.bRightTrigger <= TRIGGER_THRESHOLD &&
+			previousState_[stickNo].Gamepad.bRightTrigger > TRIGGER_THRESHOLD;
+	}
+
+	auto [xInputButton, dInputButton] = ConvertToButton(button);
+
+	if (xInputButton != 0) {
+		return (currentState_[stickNo].Gamepad.wButtons & xInputButton) == 0 &&
+			(previousState_[stickNo].Gamepad.wButtons & xInputButton) != 0;
+	}
+
+	return false;
+}
+
+float Controller::GetTriggerValue(int stickNo, ControllerButtonType button) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return 0.0f;
+	}
+
+	switch (button) {
+	case ControllerButtonType::LT:
+		return static_cast<float>(currentState_[stickNo].Gamepad.bLeftTrigger) / 255.0f;
+
+	case ControllerButtonType::RT:
+		return static_cast<float>(currentState_[stickNo].Gamepad.bRightTrigger) / 255.0f;
+
+	case ControllerButtonType::LB:
+		return PushButton(stickNo, ControllerButtonType::LB) ? 1.0f : 0.0f;
+
+	case ControllerButtonType::RB:
+		return PushButton(stickNo, ControllerButtonType::RB) ? 1.0f : 0.0f;
+
+	default:
+		return 0.0f;
+	}
+}
+
+StickState Controller::GetLeftStickState(int stickNo) const
+{
+	StickState state{ 0.0f, 0.0f };
+
+	if (!IsValidStickNo(stickNo)) {
+		return state;
+	}
+
+	state.x = ApplyDeadZone(NormalizeStickValue(currentState_[stickNo].Gamepad.sThumbLX));
+	state.y = ApplyDeadZone(NormalizeStickValue(currentState_[stickNo].Gamepad.sThumbLY));
+
+	return state;
+}
+
+StickState Controller::GetRightStickState(int stickNo) const
+{
+	StickState state{ 0.0f, 0.0f };
+
+	if (!IsValidStickNo(stickNo)) {
+		return state;
+	}
+
+	state.x = ApplyDeadZone(NormalizeStickValue(currentState_[stickNo].Gamepad.sThumbRX));
+	state.y = ApplyDeadZone(NormalizeStickValue(currentState_[stickNo].Gamepad.sThumbRY));
+
+	return state;
+}
+
+float Controller::GetStickValue(int stickNo, ControllerValueType valueType) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return 0.0f;
+	}
+
+	switch (valueType) {
+	case ControllerValueType::LX:
+		return ApplyDeadZone(NormalizeStickValue(currentState_[stickNo].Gamepad.sThumbLX));
+
+	case ControllerValueType::LY:
+		return ApplyDeadZone(NormalizeStickValue(currentState_[stickNo].Gamepad.sThumbLY));
+
+	case ControllerValueType::RX:
+		return ApplyDeadZone(NormalizeStickValue(currentState_[stickNo].Gamepad.sThumbRX));
+
+	case ControllerValueType::RY:
+		return ApplyDeadZone(NormalizeStickValue(currentState_[stickNo].Gamepad.sThumbRY));
+
+	default:
+		return 0.0f;
+	}
+}
+
+StickState Controller::GetLeftStickStatePrevious(int stickNo) const
+{
+	StickState state{ 0.0f, 0.0f };
+
+	if (!IsValidStickNo(stickNo)) {
+		return state;
+	}
+
+	state.x = ApplyDeadZone(NormalizeStickValue(previousState_[stickNo].Gamepad.sThumbLX));
+	state.y = ApplyDeadZone(NormalizeStickValue(previousState_[stickNo].Gamepad.sThumbLY));
+
+	return state;
+}
+
+StickState Controller::GetRightStickStatePrevious(int stickNo) const
+{
+	StickState state{ 0.0f, 0.0f };
+
+	if (!IsValidStickNo(stickNo)) {
+		return state;
+	}
+
+	state.x = ApplyDeadZone(NormalizeStickValue(previousState_[stickNo].Gamepad.sThumbRX));
+	state.y = ApplyDeadZone(NormalizeStickValue(previousState_[stickNo].Gamepad.sThumbRY));
+
+	return state;
+}
+
+bool Controller::FlickLeftStick(int stickNo, float threshold) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	StickState prev = GetLeftStickStatePrevious(stickNo);
+	StickState curr = GetLeftStickState(stickNo);
+
+	float prevLen = std::sqrt(prev.x * prev.x + prev.y * prev.y);
+	float currLen = std::sqrt(curr.x * curr.x + curr.y * curr.y);
+
+	return prevLen < DEADZONE && currLen >= threshold;
+}
+
+bool Controller::FlickRightStick(int stickNo, float threshold) const
+{
+	if (!IsValidStickNo(stickNo)) {
+		return false;
+	}
+
+	StickState prev = GetRightStickStatePrevious(stickNo);
+	StickState curr = GetRightStickState(stickNo);
+
+	float prevLen = std::sqrt(prev.x * prev.x + prev.y * prev.y);
+	float currLen = std::sqrt(curr.x * curr.x + curr.y * curr.y);
+
+	return prevLen < DEADZONE && currLen >= threshold;
+}
+
+bool Controller::IsValidStickNo(int stickNo) const
+{
+	return stickNo >= 0 && stickNo < XUSER_MAX_COUNT;
+}
+
+std::pair<WORD, int> Controller::ConvertToButton(ControllerButtonType button) const
+{
+	auto it = buttonMapping_.find(button);
+
+	if (it != buttonMapping_.end()) {
+		return it->second;
+	}
+
+	return { 0, -1 };
+}
+
+float Controller::NormalizeStickValue(SHORT value) const
+{
+	float result = static_cast<float>(value) / NORMALIZE_RANGE;
+	return std::clamp(result, -1.0f, 1.0f);
+}
+
+float Controller::ApplyDeadZone(float value) const
+{
+	if (std::abs(value) < DEADZONE) {
+		return 0.0f;
+	}
+
+	return value;
+}
+
+============================================================
+File Path: engine/Input/Controller.h
+============================================================
+#pragma once
+
+#include "InputData.h"
+
+#include <cstdint>
+#include <map>
+#include <utility>
+
+class Controller {
+public:
+	Controller() = default;
+	~Controller() = default;
+
+	void Initialize();
+	void Update();
+
+	bool GetJoystickState(int stickNo, XINPUT_STATE& out) const;
+	bool GetJoystickStatePrevious(int stickNo, XINPUT_STATE& out) const;
+
+	bool GetJoystickState(int stickNo, DIJOYSTATE2& out) const;
+	bool GetJoystickStatePrevious(int stickNo, DIJOYSTATE2& out) const;
+
+	bool PushButton(int stickNo, ControllerButtonType button) const;
+	bool TriggerButton(int stickNo, ControllerButtonType button) const;
+	bool ReleaseButton(int stickNo, ControllerButtonType button) const;
+
+	float GetTriggerValue(int stickNo, ControllerButtonType button) const;
+
+	StickState GetLeftStickState(int stickNo) const;
+	StickState GetRightStickState(int stickNo) const;
+
+	float GetStickValue(int stickNo, ControllerValueType valueType) const;
+
+	StickState GetLeftStickStatePrevious(int stickNo) const;
+	StickState GetRightStickStatePrevious(int stickNo) const;
+
+	bool FlickLeftStick(int stickNo, float threshold = 0.7f) const;
+	bool FlickRightStick(int stickNo, float threshold = 0.7f) const;
+
+private:
+	static constexpr float NORMALIZE_RANGE = 32768.0f;
+	static constexpr float TRIGGER_THRESHOLD = 128.0f;
+	static constexpr float DEADZONE = 0.15f;
+
+private:
+	XINPUT_STATE currentState_[XUSER_MAX_COUNT]{};
+	XINPUT_STATE previousState_[XUSER_MAX_COUNT]{};
+
+	DIJOYSTATE2 currentDIState_[XUSER_MAX_COUNT]{};
+	DIJOYSTATE2 previousDIState_[XUSER_MAX_COUNT]{};
+
+	std::map<ControllerButtonType, std::pair<WORD, int>> buttonMapping_;
+
+private:
+	bool IsValidStickNo(int stickNo) const;
+	std::pair<WORD, int> ConvertToButton(ControllerButtonType button) const;
+
+	float NormalizeStickValue(SHORT value) const;
+	float ApplyDeadZone(float value) const;
+};
+
+============================================================
+File Path: engine/Input/Input.cpp
+============================================================
+#include "Input.h"
+
+#include <cassert>
+#include <cstring>
+
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "xinput.lib")
+
+Input* Input::instance = nullptr;
+
+Input* Input::GetInstance()
+{
+	if (instance == nullptr) {
+		instance = new Input();
+	}
+
+	return instance;
+}
+
+void Input::DeleteInstance()
+{
+	delete instance;
+	instance = nullptr;
+}
+
+void Input::Initialize(WinAPI* winAPI)
+{
+	this->winAPI = winAPI;
+
+	HRESULT result;
+
+	result = DirectInput8Create(
+		winAPI->GetHInstance(),
+		DIRECTINPUT_VERSION,
+		IID_IDirectInput8,
+		reinterpret_cast<void**>(directInput.GetAddressOf()),
+		nullptr
+	);
+	assert(SUCCEEDED(result));
+
+	//==================================================
+	// キーボード
+	//==================================================
+
+	result = directInput->CreateDevice(
+		GUID_SysKeyboard,
+		keyboard.GetAddressOf(),
+		nullptr
+	);
+	assert(SUCCEEDED(result));
+
+	result = keyboard->SetDataFormat(&c_dfDIKeyboard);
+	assert(SUCCEEDED(result));
+
+	result = keyboard->SetCooperativeLevel(
+		winAPI->GetHwnd(),
+		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE | DISCL_NOWINKEY
+	);
+	assert(SUCCEEDED(result));
+
+	//==================================================
+	// マウス
+	//==================================================
+
+	result = directInput->CreateDevice(
+		GUID_SysMouse,
+		mouse.GetAddressOf(),
+		nullptr
+	);
+	assert(SUCCEEDED(result));
+
+	result = mouse->SetDataFormat(&c_dfDIMouse);
+	assert(SUCCEEDED(result));
+
+	result = mouse->SetCooperativeLevel(
+		winAPI->GetHwnd(),
+		DISCL_FOREGROUND | DISCL_NONEXCLUSIVE
+	);
+	assert(SUCCEEDED(result));
+
+	//==================================================
+	// コントローラー
+	//==================================================
+
+	controller_.Initialize();
+}
+
+void Input::Update()
+{
+	//==================================================
+	// 前フレーム状態を保存
+	//==================================================
+
+	std::memcpy(keyPre, key, sizeof(key));
+	mousePreState = mouseState;
+
+	//==================================================
+	// キーボード更新
+	//==================================================
+
+	if (keyboard) {
+		HRESULT result = keyboard->Acquire();
+		result = keyboard->GetDeviceState(sizeof(key), key);
+
+		if (FAILED(result)) {
+			keyboard->Acquire();
+			result = keyboard->GetDeviceState(sizeof(key), key);
+
+			if (FAILED(result)) {
+				ZeroMemory(key, sizeof(key));
+			}
+		}
+	}
+
+	//==================================================
+	// マウス更新
+	//==================================================
+
+	if (mouse) {
+		HRESULT result = mouse->Acquire();
+		result = mouse->GetDeviceState(sizeof(DIMOUSESTATE), &mouseState);
+
+		if (FAILED(result)) {
+			mouse->Acquire();
+			result = mouse->GetDeviceState(sizeof(DIMOUSESTATE), &mouseState);
+
+			if (FAILED(result)) {
+				ZeroMemory(&mouseState, sizeof(DIMOUSESTATE));
+			}
+		}
+	}
+
+	//==================================================
+	// コントローラー更新
+	//==================================================
+
+	controller_.Update();
+}
+
+//==================================================
+// キーボード
+//==================================================
+
+bool Input::PushKey(BYTE keyNumber)
+{
+	return key[keyNumber] != 0;
+}
+
+bool Input::TriggerKey(BYTE keyNumber)
+{
+	return key[keyNumber] != 0 && keyPre[keyNumber] == 0;
+}
+
+bool Input::ReriseKey(BYTE keyNumber)
+{
+	return key[keyNumber] == 0 && keyPre[keyNumber] != 0;
+}
+
+//==================================================
+// マウス
+//==================================================
+
+bool Input::PushMouse(int button)
+{
+	if (button < 0 || button >= 4) {
+		return false;
+	}
+
+	return (mouseState.rgbButtons[button] & 0x80) != 0;
+}
+
+bool Input::TriggerMouse(int button)
+{
+	if (button < 0 || button >= 4) {
+		return false;
+	}
+
+	return (mouseState.rgbButtons[button] & 0x80) != 0 &&
+		(mousePreState.rgbButtons[button] & 0x80) == 0;
+}
+
+bool Input::ReleaseMouse(int button)
+{
+	if (button < 0 || button >= 4) {
+		return false;
+	}
+
+	return (mouseState.rgbButtons[button] & 0x80) == 0 &&
+		(mousePreState.rgbButtons[button] & 0x80) != 0;
+}
+
+//==================================================
+// コントローラー
+//==================================================
+
+bool Input::PushButton(int stickNo, ControllerButtonType button)
+{
+	return controller_.PushButton(stickNo, button);
+}
+
+bool Input::TriggerButton(int stickNo, ControllerButtonType button)
+{
+	return controller_.TriggerButton(stickNo, button);
+}
+
+bool Input::ReleaseButton(int stickNo, ControllerButtonType button)
+{
+	return controller_.ReleaseButton(stickNo, button);
+}
+
+float Input::GetTriggerValue(int stickNo, ControllerButtonType button)
+{
+	return controller_.GetTriggerValue(stickNo, button);
+}
+
+StickState Input::GetLeftStickState(int stickNo)
+{
+	return controller_.GetLeftStickState(stickNo);
+}
+
+StickState Input::GetRightStickState(int stickNo)
+{
+	return controller_.GetRightStickState(stickNo);
+}
+
+float Input::GetStickValue(int stickNo, ControllerValueType valueType)
+{
+	return controller_.GetStickValue(stickNo, valueType);
+}
+
+============================================================
+File Path: engine/Input/Input.h
+============================================================
+#pragma once
+
+#define DIRECTINPUT_VERSION 0x0800
+
+#include <Windows.h>
+#include <dinput.h>
+#include <wrl.h>
+
+#include "WinAPI.h"
+#include "Controller.h"
+
+class Input
+{
+public:
+	static Input* GetInstance();
+	static void DeleteInstance();
+
+private:
+	static Input* instance;
+
+	Input() = default;
+	~Input() = default;
+
+	Input(const Input&) = delete;
+	Input& operator=(const Input&) = delete;
+
+public:
+	void Initialize(WinAPI* winAPI);
+	void Update();
+
+	//==================================================
+	// キーボード
+	//==================================================
+
+	bool PushKey(BYTE keyNumber);
+	bool TriggerKey(BYTE keyNumber);
+	bool ReriseKey(BYTE keyNumber);
+
+	//==================================================
+	// マウス
+	//==================================================
+
+	bool PushMouse(int button);
+	bool TriggerMouse(int button);
+	bool ReleaseMouse(int button);
+
+	LONG GetMouseMoveX() { return mouseState.lX; }
+	LONG GetMouseMoveY() { return mouseState.lY; }
+	LONG GetMouseWheel() { return mouseState.lZ; }
+
+	//==================================================
+	// コントローラー
+	//==================================================
+
+	Controller* GetController() { return &controller_; }
+
+	bool PushButton(int stickNo, ControllerButtonType button);
+	bool TriggerButton(int stickNo, ControllerButtonType button);
+	bool ReleaseButton(int stickNo, ControllerButtonType button);
+
+	float GetTriggerValue(int stickNo, ControllerButtonType button);
+
+	StickState GetLeftStickState(int stickNo);
+	StickState GetRightStickState(int stickNo);
+
+	float GetStickValue(int stickNo, ControllerValueType valueType);
+
+private:
+	template <class T>
+	using ComPtr = Microsoft::WRL::ComPtr<T>;
+
+private:
+	ComPtr<IDirectInput8> directInput = nullptr;
+	ComPtr<IDirectInputDevice8> keyboard = nullptr;
+	ComPtr<IDirectInputDevice8> mouse = nullptr;
+
+	BYTE key[256] = {};
+	BYTE keyPre[256] = {};
+
+	DIMOUSESTATE mouseState = {};
+	DIMOUSESTATE mousePreState = {};
+
+	Controller controller_;
+
+	WinAPI* winAPI = nullptr;
+};
+
+============================================================
+File Path: engine/Input/InputData.h
+============================================================
+#pragma once
+/// ===Include=== ///
+#define DIRECTINPUT_VERSION   0x0800   // DirectInputのバージョン指定
+#include <dinput.h>
+#include <XInput.h>
+#include <Windows.h>
+
+#pragma comment(lib, "dinput8.lib")
+#pragma comment(lib, "dxguid.lib")
+#pragma comment(lib, "xinput.lib")
+
+/// ===マウスのキーを指定する為の列挙型=== ///
+enum class MouseButtonType {
+	Left,       // 左クリック
+	Right,      // 右クリック
+	Scroll,     // スクロールボタン
+	Button1,    // ボタン1
+};
+
+/// ===コントローラーのキーを指定するための列挙型=== ///
+enum class ControllerButtonType {
+	A,          // Aボタン
+	B,          // Bボタン
+	X,          // Xボタン
+	Y,          // Yボタン
+	RB,         // RBボタン
+	RT,         // RTボタン
+	LB,         // LBボタン
+	LT,         // LTボタン
+	LeftStick,  // LeftStick押し込み
+	RightStick, // RightStick押し込み
+	DPadUP,     // 十字キー上 
+	DPadDOWN,   // 十字キー下
+	DPadLEFT,   // 十字キー左
+	DPadRIGHT,  // 十字キー右
+	Select,     // セレクトボタン
+	Start,      // スタートボタン
+};
+
+/// ===コントローラーのスティックの状況をえるための列挙型=== ///
+enum class ControllerValueType {
+	LX, // 左スティックX軸
+	LY, // 左スティックY軸
+	RX, // 右スティックX軸
+	RY, // 右スティックY軸
+};
+
+/// ===コントローラーの処理を管理するための構造体=== ///
+struct StickState {
+	float x;
+	float y;
+};
+
+============================================================
 File Path: engine/InsideScene/AbstractSceneFactory.cpp
 ============================================================
 #include "AbstractSceneFactory.h"
@@ -21521,7 +22629,7 @@ File Path: engine/InsideScene/Framework.h
 #include "engine/3d/SkyBox/SkyBox.h"
 #include "AbstractSceneFactory.h"
 #include "D3DResourceLeakChecker.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "engine/2d/RenderTexture.h"
 #include "Object3DInstancingCommon.h"
 /// <summary>
