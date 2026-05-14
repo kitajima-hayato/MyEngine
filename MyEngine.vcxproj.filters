@@ -81,7 +81,7 @@
     <ClCompile Include="engine\base\ImGuiManager.cpp">
       <Filter>engine\base</Filter>
     </ClCompile>
-    <ClCompile Include="engine\base\Input.cpp">
+    <ClCompile Include="engine\Input\Input.cpp">
       <Filter>engine\base</Filter>
     </ClCompile>
     <ClCompile Include="engine\base\Logger.cpp">
@@ -206,6 +206,7 @@
     <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
     <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
     <ClCompile Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.cpp" />
+    <ClCompile Include="engine\Input\Controller.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -281,7 +282,7 @@
     <ClInclude Include="engine\base\ImGuiManager.h">
       <Filter>engine\base</Filter>
     </ClInclude>
-    <ClInclude Include="engine\base\Input.h">
+    <ClInclude Include="engine\Input\Input.h">
       <Filter>engine\base</Filter>
     </ClInclude>
     <ClInclude Include="engine\base\Logger.h">
@@ -416,6 +417,8 @@
     <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />
     <ClInclude Include="Game\Application\Enemy\Drop\TimedDropEnemy.h" />
     <ClInclude Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.h" />
+    <ClInclude Include="engine\Input\Controller.h" />
+    <ClInclude Include="engine\Input\InputData.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">

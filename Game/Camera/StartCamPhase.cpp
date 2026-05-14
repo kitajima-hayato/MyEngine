@@ -1,5 +1,5 @@
 #include "StartCamPhase.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include <cassert>
 #include "Sprite.h"
 
@@ -81,10 +81,15 @@ void StartCamPhase::Update(float dt)
 	const Vector3 leftPos = { introLeftX_,introFixedY_,introFixedZ_ };
 	const Vector3 rightPos = { introRightX_,introFixedY_,introFixedZ_ };
 	const Vector3 startPos = { camTargetPos_.x,introFixedY_,introFixedZ_ };
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
 
 #pragma region 各カメラの動き
 	switch (phase_)
 	{
+		
+
 	case StartCamPhase::Phase::None:
 		break;
 	case StartCamPhase::Phase::MoveToLeft:
@@ -97,8 +102,12 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = leftPos;
 		}
-		// スペースキーでスキップ
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		
+
+		// Space / コントローラーStartボタンでスキップ
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 			Skip();
 		}
 	}
@@ -113,8 +122,10 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = rightPos;
 		}
-		// スペースキーでスキップ
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		// Space / コントローラーStartボタンでスキップ
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 			Skip();
 		}
 	}
@@ -128,8 +139,10 @@ void StartCamPhase::Update(float dt)
 			phase_ = Phase::ReturnToStart;
 			timer_ = 0.0f;
 		}
-		// スペースキーでスキップ
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		// Space / コントローラーStartボタンでスキップ
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 			Skip();
 		}
 	}
@@ -151,8 +164,10 @@ void StartCamPhase::Update(float dt)
 			timer_ = 0.0f;
 			cameraTransform_->translate = startPos;
 		}
-		// スペースキーでスキップ
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		// Space / コントローラーStartボタンでスキップ
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 			Skip();
 		}
 	}

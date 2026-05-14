@@ -1,6 +1,6 @@
 #include <thread>
 #include "TitleScene.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "Object3D.h"
 #include "Game/Camera/Camera.h"
 #include "Game/Particle/ParticleManager.h"
@@ -83,7 +83,7 @@ void TitleScene::Initialize(DirectXCommon* dxCommon)
 	titleSmoke_->SetEmissionRate(15.0f);
 	// 砂煙っぽい色（Player.cppのdashSmokeEffect_と同系）
 	titleSmoke_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
-	titleSmoke_->Play(); // 重要：Playはここで1回だけ（毎フレームしない）
+	titleSmoke_->Play(); 
 
 	// ジャンプ開始スパーク（単発）
 	titleJumpSpark_ = ParticlePresets::CreateSparks(playerTransform.translate);
@@ -141,14 +141,7 @@ void TitleScene::Update()
 	playerObject->SetTransform(playerTransform);
 	playerObject->Update();
 
-	// ENTERキーが押されたら ゲームプレイシーンへ（デバッグ用）
-#ifdef _DEBUG
-	if (Input::GetInstance()->TriggerKey(DIK_RETURN))
-	{
-		SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY",TransitionType::Start);
-	}
-#endif
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE))
+	if (Input::GetInstance()->TriggerKey(DIK_SPACE)|| Input::GetInstance()->TriggerButton(0, ControllerButtonType::A))
 	{
 		SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT",TransitionType::Start);
 	}

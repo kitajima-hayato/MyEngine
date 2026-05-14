@@ -1,7 +1,7 @@
 #include "StageClearScene.h"
 #include "Game/Camera/Camera.h"
 #include "engine/InsideScene/Framework.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "ImGuiManager.h"
 #include "Game/Application/PlayContext.h"
 #include <algorithm>
@@ -87,125 +87,191 @@ void StageClearScene::Initialize(DirectXCommon* dxCommon)
 
 void StageClearScene::Update()
 {
-	// カメラの更新
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+	constexpr float kStickThreshold = 0.6f;
+
 	camera->Update();
-	// 左
-	if(Input::GetInstance()->TriggerKey(DIK_D) || Input::GetInstance()->TriggerKey(DIK_LEFT)) {
-		int idx = static_cast<int>(selectedItem_);
-		idx = (idx - 1 + static_cast<int>(ClearMenuItem::Count)) % static_cast<int>(ClearMenuItem::Count);
-		selectedItem_ = static_cast<ClearMenuItem>(idx);
+
+	//==================================================
+	// 左右入力
+	//==================================================
+
+	const StickState stick = input->GetLeftStickState(kControllerNo);
+	const StickState prevStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+	const bool stickLeft =
+		prevStick.x >= -kStickThreshold &&
+		stick.x < -kStickThreshold;
+
+	const bool stickRight =
+		prevStick.x <= kStickThreshold &&
+		stick.x > kStickThreshold;
+
+	const bool inputLeft =
+		input->TriggerKey(DIK_A) ||
+		input->TriggerKey(DIK_LEFT) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+		stickLeft;
+
+	const bool inputRight =
+		input->TriggerKey(DIK_D) ||
+		input->TriggerKey(DIK_RIGHT) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+		stickRight;
+
+	// 左 = 前の項目、右 = 次の項目
+	int move = 0;
+	if (inputLeft) {
+		move = -1;
+	} else if (inputRight) {
+		move = +1;
 	}
-	// 右
-	else if (Input::GetInstance()->TriggerKey(DIK_A) || Input::GetInstance()->TriggerKey(DIK_RIGHT)) {
+
+	if (move != 0) {
+		const int count = static_cast<int>(ClearMenuItem::Count);
 		int idx = static_cast<int>(selectedItem_);
-		idx = (idx + 1) % static_cast<int>(ClearMenuItem::Count);
+		idx = (idx + move + count) % count;
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
 
-	//  決定（Enter / Space） 
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE) ) {
+	//==================================================
+	// 決定
+	//==================================================
+
+	const bool decide =
+		input->TriggerKey(DIK_SPACE) ||
+		input->TriggerKey(DIK_RETURN) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::A);
+
+	if (decide) {
 		switch (selectedItem_) {
 		case ClearMenuItem::NextStage:
 		{
-			const std::string& nextStageName = PlayContext::GetInstance().GetSelectedStageKey();
-			const size_t dash = nextStageName.find('-');
+			// 左の「次のステージ」
+			const std::string& currentStageKey =
+				PlayContext::GetInstance().GetSelectedStageKey();
+
+			const size_t dash = currentStageKey.find('-');
+
 			if (dash != std::string::npos) {
-				const std::string left = nextStageName.substr(0, dash);
-				const std::string right = nextStageName.substr(dash + 1);
+				const std::string left = currentStageKey.substr(0, dash);
+				const std::string right = currentStageKey.substr(dash + 1);
 
 				auto isAllDigits = [](const std::string& s) {
 					return !s.empty() &&
-						std::all_of(s.begin(), s.end(),
-							[](unsigned char c) { return std::isdigit(c) != 0; });
+						std::all_of(
+							s.begin(),
+							s.end(),
+							[](unsigned char c) {
+								return std::isdigit(c) != 0;
+							}
+						);
 					};
 
 				if (isAllDigits(left) && isAllDigits(right)) {
-
 					const int world = std::atoi(left.c_str());
 					const int stage = std::atoi(right.c_str());
 
-
 					constexpr int kMaxStage = 8;
+
 					if (stage >= kMaxStage) {
-						// もう次が無いので、ステージセレクトに戻す
-						SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
-						break;
+						SceneManager::GetInstance()->ChangeSceneWithTransition(
+							"STAGESELECT",
+							TransitionType::Start
+						);
+						return;
 					}
-					// "1-1" -> "1-2"
+
 					const std::string nextStageKey =
 						std::to_string(world) + "-" + std::to_string(stage + 1);
 
 					PlayContext::GetInstance().SetSelectedStage(
 						PlayContext::GetInstance().GetSelectedStageId(),
-						nextStageKey);
+						nextStageKey
+					);
 				}
 			}
 
-
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
-			break;
+			SceneManager::GetInstance()->ChangeSceneWithTransition(
+				"GAMEPLAY",
+				TransitionType::Start
+			);
+			return;
 		}
+
 		case ClearMenuItem::OneMore:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);
-			break;
+			// 中央の「もう一度」
+			SceneManager::GetInstance()->ChangeSceneWithTransition(
+				"GAMEPLAY",
+				TransitionType::Start
+			);
+			return;
+
 		case ClearMenuItem::Select:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
-			break;
+			// 右の「セレクト画面」
+			SceneManager::GetInstance()->ChangeSceneWithTransition(
+				"STAGESELECT",
+				TransitionType::Start
+			);
+			return;
+
 		default:
 			break;
 		}
-		return; // シーン遷移したら以降の更新を止めたい場合
 	}
+
+	//==================================================
+	// 選択中UI
+	//==================================================
+
 	oneMore_->SetSize(oneMoreBaseSize_);
-	select_->SetSize(selectBaseSize_);
 	next_->SetSize(nextBaseSize_);
-	
-	// 回転させる
+	select_->SetSize(selectBaseSize_);
+
+	auto Scale = [](const Vector2& v, float s) {
+		return Vector2{ v.x * s, v.y * s };
+		};
+
+	switch (selectedItem_) {
+	case ClearMenuItem::NextStage:
+		// 左の「次のステージ」
+		oneMore_->SetSize(Scale(oneMoreBaseSize_, selectScale_));
+		break;
+
+	case ClearMenuItem::OneMore:
+		// 中央の「もう一度」
+		next_->SetSize(Scale(nextBaseSize_, selectScale_));
+		break;
+
+	case ClearMenuItem::Select:
+		// 右の「セレクト画面」
+		select_->SetSize(Scale(selectBaseSize_, selectScale_));
+		break;
+
+	default:
+		break;
+	}
+
+	//==================================================
+	// 通常更新
+	//==================================================
+
 	Vector3 rotate = playerObject_->GetRotate();
 	rotate.z += -0.1f;
 	playerObject_->SetRotate(rotate);
 
-	// 選択中だけ少し大きく
-	auto Scale = [](const Vector2& v, float s) { return Vector2{ v.x * s, v.y * s }; };
-
-	switch (selectedItem_) {
-	case ClearMenuItem::NextStage:
-		oneMore_->SetSize(Scale(oneMoreBaseSize_, selectScale_));
-		break;
-	case ClearMenuItem::OneMore:
-		select_->SetSize(Scale(selectBaseSize_, selectScale_));
-		break;
-	case ClearMenuItem::Select:
-		next_->SetSize(Scale(nextBaseSize_, selectScale_));
-		break;
-	default:
-		break;
-	}
-	// タイトルへ戻る (1)
-	if (Input::GetInstance()->TriggerKey(DIK_1)) {
-		SceneManager::GetInstance()->ChangeScene("TITLE");
-	}
-	// ステージセレクトへ戻る (2)
-	else if (Input::GetInstance()->TriggerKey(DIK_2)) {
-		SceneManager::GetInstance()->ChangeScene("STAGESELECT");
-	}
-	// ゲームプレイへ戻る (3)
-	else if (Input::GetInstance()->TriggerKey(DIK_3)) {
-		SceneManager::GetInstance()->ChangeScene("GAMEPLAY");
-	}
-
-	// 各オブジェクトの更新
 	playerObject_->Update();
 	backGround_->Update();
-	// 各スプライトの更新
+
 	clearTextSprite->Update();
 	keyIcon_A->Update();
 	keyIcon_D->Update();
 	oneMore_->Update();
-	select_->Update();
 	next_->Update();
+	select_->Update();
 
-	// ImGuiの描画
 	DrawImgui();
 }
 

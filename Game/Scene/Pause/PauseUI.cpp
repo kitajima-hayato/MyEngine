@@ -1,5 +1,5 @@
 #include "PauseUI.h"
-#include "Input.h"
+#include "engine/Input/Input.h"
 #include "ImGuiManager.h"
 
 
@@ -293,8 +293,15 @@ bool PauseUI::PauseReleaseRequested()
 
 void PauseUI::HandleDecideInput()
 {
-	// スペースキーが押されていなければ抜ける
-	if (!Input::GetInstance()->TriggerKey(DIK_SPACE)) return;
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+
+	// スペースキー / コントローラーAボタン が押されていなければ抜ける
+	if (!input->TriggerKey(DIK_SPACE) &&
+		!input->TriggerButton(kControllerNo, ControllerButtonType::A)) {
+		return;
+	}
 
 	// 選択中のスロットに応じた処理
 	switch (selectedSlot_)
@@ -321,14 +328,53 @@ void PauseUI::HandleDecideInput()
 
 void PauseUI::HandleDirectionInput()
 {
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+	constexpr float kStickThreshold = 0.6f;
+
+	StickState stick = input->GetLeftStickState(kControllerNo);
+	StickState prevStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+	const bool stickUp =
+		prevStick.y <= kStickThreshold &&
+		stick.y > kStickThreshold;
+
+	const bool stickDown =
+		prevStick.y >= -kStickThreshold &&
+		stick.y < -kStickThreshold;
+
+	const bool stickLeft =
+		prevStick.x >= -kStickThreshold &&
+		stick.x < -kStickThreshold;
+
+	const bool stickRight =
+		prevStick.x <= kStickThreshold &&
+		stick.x > kStickThreshold;
+
 	// 入力によって選択スロットを変更
-	if (Input::GetInstance()->TriggerKey(DIK_W)) {
+	if (input->TriggerKey(DIK_W) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadUP) ||
+		stickUp) {
+
 		selectedSlot_ = Slot::Continue;
-	} else if (Input::GetInstance()->TriggerKey(DIK_D)) {
+
+	} else if (input->TriggerKey(DIK_D) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+		stickRight) {
+
 		selectedSlot_ = Slot::Retry;
-	} else if (Input::GetInstance()->TriggerKey(DIK_A)) {
+
+	} else if (input->TriggerKey(DIK_A) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+		stickLeft) {
+
 		selectedSlot_ = Slot::StageSelect;
-	} else if (Input::GetInstance()->TriggerKey(DIK_S)) {
+
+	} else if (input->TriggerKey(DIK_S) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadDOWN) ||
+		stickDown) {
+
 		selectedSlot_ = Slot::Title;
 	}
 }
