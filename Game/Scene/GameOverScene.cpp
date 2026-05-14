@@ -103,23 +103,54 @@ void GameOverScene::Update()
 {
 	// カメラの更新
 	camera->Update();
-	if (Input::GetInstance()->TriggerKey(DIK_A) || Input::GetInstance()->TriggerKey(DIK_LEFT)) {
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+	constexpr float kStickThreshold = 0.6f;
+
+	// カメラの更新
+	camera->Update();
+
+	// 左スティックを倒した瞬間だけ反応させる
+	StickState stick = input->GetLeftStickState(kControllerNo);
+	StickState prevStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+	const bool stickLeft =
+		prevStick.x >= -kStickThreshold &&
+		stick.x < -kStickThreshold;
+
+	const bool stickRight =
+		prevStick.x <= kStickThreshold &&
+		stick.x > kStickThreshold;
+
+	// 左へ（A or ← or 十字キー左 or 左スティック左）
+	if (input->TriggerKey(DIK_A) ||
+		input->TriggerKey(DIK_LEFT) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+		stickLeft) {
+
 		int idx = static_cast<int>(selectedItem_);
 		idx = (idx - 1 + static_cast<int>(ClearMenuItem::Count)) % static_cast<int>(ClearMenuItem::Count);
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
-	// 右へ（D or →）
-	else if (Input::GetInstance()->TriggerKey(DIK_D) || Input::GetInstance()->TriggerKey(DIK_RIGHT)) {
+	// 右へ（D or → or 十字キー右 or 左スティック右）
+	else if (input->TriggerKey(DIK_D) ||
+		input->TriggerKey(DIK_RIGHT) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+		stickRight) {
+
 		int idx = static_cast<int>(selectedItem_);
 		idx = (idx + 1) % static_cast<int>(ClearMenuItem::Count);
 		selectedItem_ = static_cast<ClearMenuItem>(idx);
 	}
 
-	// 決定（Enter / Space）
-	if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+	// 決定（Enter / Space / Aボタン）
+	if (input->TriggerKey(DIK_SPACE) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::A)) {
+
 		switch (selectedItem_) {
 		case ClearMenuItem::OneMore:
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);    
+			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
 			break;
 		case ClearMenuItem::Select:
 			SceneManager::GetInstance()->ChangeSceneWithTransition("STAGESELECT", TransitionType::Start);

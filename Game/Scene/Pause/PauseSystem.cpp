@@ -12,7 +12,14 @@ void PauseSystem::Initialize()
 
 bool PauseSystem::Update()
 {
-	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+
+	// Escキー / コントローラーStartボタンでポーズの切り替え
+	if (input->TriggerKey(DIK_ESCAPE)|| 
+		input->TriggerButton(kControllerNo,ControllerButtonType::Start)) 
+	{
 		isPause_ = !isPause_;
 	}
 	if (isPause_) {

@@ -104,48 +104,73 @@ void GamePlayScene::CheckPlayerAlive()
 
 void GamePlayScene::Update()
 {
-	// ポーズ中はポーズシステムの更新のみ行う / ポーズ以外入力不可
-	if (pauseSystem_->Update()) {
+	//==================================================
+	// カメラ・背景更新
+	//==================================================
+
+	camera->Update();
+	backGround->Update();
+
+	//==================================================
+	// スタートカメラ演出更新
+	//==================================================
+
+	const bool wasStartCamRunning = startCam_->IsRunning();
+
+	// この中で Space / Start によるスキップを処理する
+	startCam_->Update(dt);
+
+	// このフレームで開始演出が終わったか
+	skipJustFinishedThisFrame_ =
+		wasStartCamRunning && !startCam_->IsRunning();
+
+	// 現在、開始演出中か
+	stageStartEventFlag_ = startCam_->IsRunning();
+
+	bool isGoal = player->GetIsGoal();
+
+	//==================================================
+	// ポーズ更新
+	//==================================================
+	// 開始演出中、またはスキップ直後のフレームは
+	// Startボタンをポーズとして扱わない
+
+	const bool canPause =
+		!stageStartEventFlag_ &&
+		!skipJustFinishedThisFrame_;
+
+	if (canPause && pauseSystem_->Update()) {
 		return;
 	}
 
-	// カメラの更新
-	camera->Update();
-	// 背景の更新
-	backGround->Update();
+	//==================================================
+	// プレイヤー操作ロック
+	//==================================================
 
-	// スタートカメラの演出中か
-	const bool wasStatCamRunning = startCam_->IsRunning();
-	// スタートカメラの更新
-	startCam_->Update(dt);
-	// このフレームで開始演出が終了したか
-	skipJustFinishedThisFrame_ = wasStatCamRunning && !startCam_->IsRunning();
-	bool isGoal = player->GetIsGoal();
-	stageStartEventFlag_ = startCam_->IsRunning();
+	isPlayerControlLocked_ =
+		stageStartEventFlag_ ||
+		isGoal ||
+		skipJustFinishedThisFrame_;
 
-	// ステージ開始演出中  ゴールしていたらプレイヤーの操作を受け付けない
-	isPlayerControlLocked_ = stageStartEventFlag_ || isGoal || skipJustFinishedThisFrame_;
 	player->SetControlEnabled(!isPlayerControlLocked_);
 
-	// マップの更新
+	//==================================================
+	// マップ・プレイヤー更新
+	//==================================================
+
 	map->Update();
-	// プレイヤーの更新
 	player->Update();
 
-
-
-
-	// エネミーレイヤーが変更されたらエネミーを再生成 
-	// @TODO　エネミーの生成をクラス化
+	// エネミーレイヤーが変更されたらエネミーを再生成
 	if (map->ConsumeEnemyLayerDirtyFlag()) {
 		GenerateEnemy();
 	}
 
-
-
+	//==================================================
 	// フォローカメラ
-	if (!startCam_->IsRunning())
-	{
+	//==================================================
+
+	if (!startCam_->IsRunning()) {
 		// baseCamPos_ を入力として使う（前フレームのシェイクを混ぜない）
 		cameraController_->SetCameraPosition(baseCameraPos_);
 		cameraController_->SetTargetPosition(player->GetTranslate());
@@ -153,22 +178,26 @@ void GamePlayScene::Update()
 
 		// フォロー結果を「基準」として保存
 		baseCameraPos_ = cameraController_->GetCameraPosition();
-
 	} else {
 		// 開始演出中は基準位置もカメラ位置も開始演出の位置にする
 		baseCameraPos_ = cameraTransform.translate;
-
 	}
+
 	cameraTransform.translate = baseCameraPos_;
 	camera->SetTranslate(baseCameraPos_);
 
 	damageFeedBack_->SetBaseCameraPos(baseCameraPos_);
 	damageFeedBack_->Update(dt);
 
+	//==================================================
+	// 敵更新
+	//==================================================
 
-	// 敵の更新
 	for (auto& enemy : enemies) {
-		if (!enemy) continue;
+		if (!enemy) {
+			continue;
+		}
+
 		enemy->Update();
 	}
 
@@ -178,9 +207,12 @@ void GamePlayScene::Update()
 	// 当たり判定
 	CheckCollision();
 
+	//==================================================
+	// プレイヤー生存・復帰処理
+	//==================================================
 
-	// プレイヤーの生存確認
 	CheckPlayerAlive();
+
 	if (isRespawning_) {
 		// 復帰演出中は入力を止める
 		player->SetControlEnabled(false);
@@ -213,7 +245,7 @@ void GamePlayScene::Update()
 			// 失敗感のシェイク
 			damageFeedBack_->StartShake(0.7f, 0.75f, false);
 
-			// 死亡演出（こちら向いて少し上にジャンプして落ちる）
+			// 死亡演出
 			player->BeginDeathDemo(camera->GetTranslate());
 		}
 
@@ -224,6 +256,7 @@ void GamePlayScene::Update()
 
 		return;
 	}
+
 	// 落下フラグを消費して、復帰演出を開始する（HPが残っている場合）
 	if (!isRespawning_ && player->ConsumeDeathByFalling()) {
 		if (player->IsAlive()) {
@@ -237,21 +270,25 @@ void GamePlayScene::Update()
 		}
 	}
 
-	
-	// プレイヤーがゴールに触れていたらシーン遷移
+	//==================================================
+	// ゴール処理
+	//==================================================
 
 	if (isGoal) {
-		// ゴールしたら操作を受け付けない
-		sceneManager->ChangeSceneWithTransition("STAGECLEAR", TransitionType::Start);
+		sceneManager->ChangeSceneWithTransition(
+			"STAGECLEAR",
+			TransitionType::Start
+		);
+		return;
 	}
 
-	// スプライトの更新
+	//==================================================
+	// HUD / ImGui更新
+	//==================================================
+
 	gamePlayHUD_->Update();
 
-
-	// ImGuiの描画
 	DrawImgui();
-
 }
 
 void GamePlayScene::Draw()
