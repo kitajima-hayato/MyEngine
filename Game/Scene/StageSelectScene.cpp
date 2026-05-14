@@ -243,14 +243,53 @@ void StageSelectScene::HandleSelectInput()
 	// 現在のノードIDを保存
 	uint32_t next = currentNodeId;
 
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+	constexpr float kStickThreshold = 0.6f;
+
+	StickState stick = input->GetLeftStickState(kControllerNo);
+	StickState prevStick = input->GetController()->GetLeftStickStatePrevious(kControllerNo);
+
+	const bool stickUp =
+		prevStick.y <= kStickThreshold &&
+		stick.y > kStickThreshold;
+
+	const bool stickDown =
+		prevStick.y >= -kStickThreshold &&
+		stick.y < -kStickThreshold;
+
+	const bool stickLeft =
+		prevStick.x >= -kStickThreshold &&
+		stick.x < -kStickThreshold;
+
+	const bool stickRight =
+		prevStick.x <= kStickThreshold &&
+		stick.x > kStickThreshold;
+
 	// 入力した方向に移動できるノードがあれば移動
-	if (Input::GetInstance()->TriggerKey(DIK_W)) {
+	if (input->TriggerKey(DIK_W) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadUP) ||
+		stickUp) {
+
 		next = stageSelectGraph->Move(currentNodeId, Direction::Up);
-	} else if (Input::GetInstance()->TriggerKey(DIK_S)) {
+
+	} else if (input->TriggerKey(DIK_S) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadDOWN) ||
+		stickDown) {
+
 		next = stageSelectGraph->Move(currentNodeId, Direction::Down);
-	} else if (Input::GetInstance()->TriggerKey(DIK_A)) {
+
+	} else if (input->TriggerKey(DIK_A) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadLEFT) ||
+		stickLeft) {
+
 		next = stageSelectGraph->Move(currentNodeId, Direction::Left);
-	} else if (Input::GetInstance()->TriggerKey(DIK_D)) {
+
+	} else if (input->TriggerKey(DIK_D) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::DPadRIGHT) ||
+		stickRight) {
+
 		next = stageSelectGraph->Move(currentNodeId, Direction::Right);
 	}
 
@@ -526,12 +565,19 @@ void StageSelectScene::Update()
 	// 一定時間経過するまで操作ができないようにする
 	if (inputLockTime_ >= inputLockDuration_) {
 		// Spaceが押されたらステージを開始する
-		if (Input::GetInstance()->TriggerKey(DIK_SPACE)) {
+		Input* input = Input::GetInstance();
+
+		if (input->TriggerKey(DIK_SPACE) ||
+			input->TriggerButton(0, ControllerButtonType::A)) {
+
 			const StageNode& node = stageSelectGraph->GetNode(currentNodeId);
 			PlayContext::GetInstance().SetSelectedStage(node.stageId, node.stageKey);
 
 			// ステージシーンへ切り替え
-			SceneManager::GetInstance()->ChangeSceneWithTransition("GAMEPLAY", TransitionType::Start);
+			SceneManager::GetInstance()->ChangeSceneWithTransition(
+				"GAMEPLAY",
+				TransitionType::Start
+			);
 		}
 	} else {
 		// 入力ロック時間を進める
@@ -539,10 +585,19 @@ void StageSelectScene::Update()
 	}
 	
 
-	// Escキーでタイトルへ
-	if (Input::GetInstance()->TriggerKey(DIK_ESCAPE)) {
+	Input* input = Input::GetInstance();
+
+	constexpr int kControllerNo = 0;
+
+	// Escキー / コントローラーStartボタンでタイトルへ
+	if (input->TriggerKey(DIK_ESCAPE) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::Start)) {
+
 		// タイトルシーンへ切り替え
-		SceneManager::GetInstance()->ChangeSceneWithTransition("TITLE",TransitionType::Start);
+		SceneManager::GetInstance()->ChangeSceneWithTransition(
+			"TITLE",
+			TransitionType::Start
+		);
 	}
 	cameraTransform.translate = { 0.0f,20.0f,0.0f };
 	cameraTransform.rotate = { 0.35f,0.0f,0.0f };
