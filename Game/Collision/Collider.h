@@ -15,7 +15,6 @@ struct AABB
 
 class Collider
 {
-
 public:
 	enum class Type
 	{
@@ -30,5 +29,14 @@ public:
 	virtual AABB GetAABB() const = 0;
 
 	virtual void OnCollision(Collider* other) = 0;
-};
 
+	// 攻撃判定を持っているか
+	virtual bool HasAttackAABB() const { return false; }
+
+	// 攻撃判定用AABB
+	virtual AABB GetAttackAABB() const { return GetAABB(); }
+
+	// 攻撃判定が当たったときの処理
+	// 処理したなら true
+	virtual bool OnAttackCollision(Collider* other) { return false; }
+};

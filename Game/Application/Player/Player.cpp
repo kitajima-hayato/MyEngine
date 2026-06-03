@@ -7,6 +7,7 @@
 #include "engine/base/ImGuiManager.h"
 #endif
 
+// 補助関数
 namespace
 {
 	constexpr int kControllerNo = 0;
@@ -65,6 +66,18 @@ namespace
 	}
 }
 
+// AABB同士の衝突判定
+static bool IntersectsAABB3D(const AABB& a, const AABB& b)
+{
+	return
+		a.min.x <= b.max.x &&
+		a.max.x >= b.min.x &&
+		a.min.y <= b.max.y &&
+		a.max.y >= b.min.y &&
+		a.min.z <= b.max.z &&
+		a.max.z >= b.min.z;
+}
+
 Collider::Type Player::GetType() const
 {
 	// 判定タイプがプレイヤーであることを返す
@@ -105,48 +118,94 @@ static bool IntersectsAABBRect2D(const AABB& aabb, const Rect& rect)
 
 void Player::OnCollision(Collider* other)
 {
-	// 衝突相手が存在しなかったら処理しない
-	if (!other)return;
+	if (!other) { return; }
 
 	switch (other->GetType())
 	{
-		// 敵に衝突したら
 	case Collider::Type::Enemy:
-		// すでにダメージ中なら何もしない（無敵時間）
+	{
+		// 攻撃中なら、攻撃判定に敵が入っているか確認
+		if (isAttack_) {
+			const AABB attackAABB = GetAttackAABB();
+			const AABB enemyAABB = other->GetAABB();
+
+			if (IntersectsAABB3D(attackAABB, enemyAABB)) {
+				// 既存の踏みつけ処理を再利用
+				AttackEnemy(other);
+				break;
+			}
+		}
+
+		// すでにダメージ中なら何もしない
 		if (isEnemyHit_) {
 			break;
 		}
 
 		// 踏みつけ判定
-		// プレイヤーが落下中 && プレイヤーが敵より上にいる
 		if (velocity_.y < 0.0f) {
-			// プレイヤーと敵のAABBを取得
-			AABB playerAABB = GetAABB();
-			AABB enemyAABB = other->GetAABB();
+			const AABB playerAABB = GetAABB();
+			const AABB enemyAABB = other->GetAABB();
 
-			// プレイヤーの底辺が敵の上部付近にあるかチェック
-			// プレイヤーの中心が敵の中心より上にある
-			float playerBottom = playerAABB.min.y;
-			float enemyTop = enemyAABB.max.y;
-			float enemyCenter = (enemyAABB.min.y + enemyAABB.max.y) * 0.5f;
-			float playerCenter = (playerAABB.min.y + playerAABB.max.y) * 0.5f;
+			const float playerBottom = playerAABB.min.y;
+			const float enemyTop = enemyAABB.max.y;
+			const float enemyCenter = (enemyAABB.min.y + enemyAABB.max.y) * 0.5f;
+			const float playerCenter = (playerAABB.min.y + playerAABB.max.y) * 0.5f;
 
-			// プレイヤーの中心が敵の中心より上 && プレイヤーの底が敵の上半分にある
 			if (playerCenter > enemyCenter && playerBottom < enemyTop + 0.2f) {
-				// 踏みつけ成功
 				StompEnemy(other);
 				break;
 			}
 		}
 
-		// 踏みつけ失敗 -> 通常のダメージ処理
 		TakeDamage();
 		break;
+	}
 
 	default:
-		// 特に何もしない
 		break;
 	}
+}
+
+AABB Player::GetAttackAABB() const
+{
+	// 攻撃判定用のAABB
+	AABB aabb{};
+
+	// プレイヤー座標を取得する
+	Vector3 pos = playerModel_->GetTranslate();
+
+	// 向いている方向
+	float dir = direction_ == Direction::kRight ? 1.0f : -1.0f;
+	// 攻撃範囲を計算する
+	float attackRange =
+		status_.kAttackRange +
+		status_.kAttackChargeRangeBonus * attackChargeRate_;
+
+	// 攻撃範囲を元にAABBのサイズを設定する
+	float halfWidth = attackRange * 0.5f;
+	float halfHeight = status_.kAttackHeight * 0.5f;
+	float halfDepth = status_.kAttackDepth;
+
+	// 位置から攻撃判定の中心を計算する
+	Vector3 center{
+		pos.x + dir * (status_.kWidth * 0.5f + halfWidth),
+		pos.y,
+		pos.z
+	};
+	// 中心からAABBの最小座標と最大座標
+	aabb.min = {
+		center.x - halfWidth,
+		center.y - halfHeight,
+		center.z - halfDepth
+	};
+	// 最大座標
+	aabb.max = {
+		center.x + halfWidth,
+		center.y + halfHeight,
+		center.z + halfDepth
+	};
+	// AABBを返す
+	return aabb;
 }
 
 void Player::TakeDamage()
@@ -165,21 +224,51 @@ void Player::TakeDamage()
 
 void Player::StompEnemy(Collider* enemy)
 {
-	// エネミーを倒す
-	if (EnemyBase* enemyBase = dynamic_cast<EnemyBase*>(enemy)) {
-		enemyBase->OnStomped();  // 敵に踏みつけられたことを通知
+	// 踏みつけのため反動ありのジャンプ
+	DefeatEnemy(enemy, true);
+}
 
-		// 敵の位置を取得してエフェクト発生
-		Vector3 enemyPos = enemyBase->GetTranslate();
-		if (stompEffect_) {
-			stompEffect_->SetTranslate(enemyPos);
-			stompEffect_->Play();
-		}
+void Player::DefeatEnemy(Collider* enemy, bool bouncePlayer)
+{
+	if (!enemy) {
+		return;
 	}
 
-	// プレイヤーは小ジャンプ（踏みつけた反動）
-	velocity_.y = status_.kStompJumpPower;
-	onGround_ = false;
+	EnemyBase* enemyBase = dynamic_cast<EnemyBase*>(enemy);
+	if (!enemyBase) {
+		return;
+	}
+
+	// 先に死亡位置を取っておく
+	Vector3 enemyPos = enemyBase->GetTranslate();
+
+	// 敵を倒す
+	enemyBase->OnStomped();
+
+	// 敵の死亡位置にパーティクルを出す
+	EmitEnemyDefeatParticle(enemyPos);
+
+	// 踏みつけの場合だけ反動ジャンプ
+	if (bouncePlayer) {
+		velocity_.y = status_.kStompJumpPower;
+		onGround_ = false;
+	}
+}
+
+void Player::EmitEnemyDefeatParticle(const Vector3 & position)
+{
+	if (!stompEffect_) {
+		return;
+	}
+
+	stompEffect_->SetTranslate(position);
+	stompEffect_->Play();
+}
+
+void Player::AttackEnemy(Collider * enemy)
+{
+	// 攻撃なので反動ジャンプなし
+	DefeatEnemy(enemy, false);
 }
 
 bool Player::IsTouchingDamageBlock()
@@ -298,12 +387,530 @@ Vector3 Player::GetFootParticlePos() const
 	const AABB aabb = GetAABB();
 	p.y = aabb.min.y;
 
-	// 地面に少しだけめり込ませる（見た目が安定する）
+	// 地面に少しだけめり込ませる
 	p.y += 0.02f;
 
-	// 2D寄りならZはそのままでOK。必要なら少し手前に出す等も可
 	return p;
 }
+
+void Player::UpdateInput()
+{
+	// 入力状態の初期化を行う
+	inputState_ = {};
+
+	// 入力が無ければ処理を行わない
+	if (!controlEnabled_) { return; }
+
+	// Input クラスのインスタンスを取得
+	auto* input = Input::GetInstance();
+
+	inputState_.moveRight =
+		input->PushKey(DIK_D) ||
+		IsControllerRightHold(input);
+
+	inputState_.moveLeft =
+		input->PushKey(DIK_A) ||
+		IsControllerLeftHold(input);
+
+	inputState_.triggerRight =
+		input->TriggerKey(DIK_D) ||
+		IsControllerRightTrigger(input);
+
+	inputState_.triggerLeft =
+		input->TriggerKey(DIK_A) ||
+		IsControllerLeftTrigger(input);
+
+	inputState_.jump =
+		input->TriggerKey(DIK_SPACE) ||
+		input->PushKey(DIK_W) ||
+		IsControllerJumpTrigger(input);
+
+	// アクションボタンの入力状態を更新 / 押した瞬間と放した瞬間 / コントローラーのボタンも同様に
+	// Jキー / Xボタン
+	inputState_.actionX.hold =
+		input->PushKey(DIK_J) ||
+		input->PushButton(kControllerNo, ControllerButtonType::X);
+
+	inputState_.actionX.trigger =
+		input->TriggerKey(DIK_J) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::X);
+
+	inputState_.actionX.release =
+		input->ReleaseKey(DIK_J) ||
+		input->ReleaseButton(kControllerNo, ControllerButtonType::X);
+
+	// Kキー / Bボタン
+	inputState_.actionB.hold =
+		input->PushKey(DIK_K) ||
+		input->PushButton(kControllerNo, ControllerButtonType::B);
+
+	inputState_.actionB.trigger =
+		input->TriggerKey(DIK_K) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::B);
+
+	inputState_.actionB.release =
+		input->ReleaseKey(DIK_K) ||
+		input->ReleaseButton(kControllerNo, ControllerButtonType::B);
+
+	// Lキー / Yボタン
+	inputState_.actionY.hold =
+		input->PushKey(DIK_L) ||
+		input->PushButton(kControllerNo, ControllerButtonType::Y);
+
+	inputState_.actionY.trigger =
+		input->TriggerKey(DIK_L) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::Y);
+
+	inputState_.actionY.release =
+		input->ReleaseKey(DIK_L) ||
+		input->ReleaseButton(kControllerNo, ControllerButtonType::Y);
+}
+
+void Player::UpdateChargeActions()
+{
+	// J / X：攻撃
+	// 攻撃だけは「その場にいるか」をチャージ中も確認したいので専用処理
+	UpdateAttackChargeAction();
+
+	// チャージ式のアクションボタンの処理を行うためのラムダ関数
+	auto updateChargeButton =
+		[this](ChargeButtonState& charge, const ButtonInputState& input, auto startAction)
+		{
+			if (input.trigger) {
+				charge.charging = true;
+				charge.frameCount = 0;
+			}
+
+			if (charge.charging && input.hold) {
+				if (charge.frameCount < status_.kMaxChargeFrame) {
+					++charge.frameCount;
+				}
+			}
+
+			if (charge.charging && input.release) {
+				float chargeRate = 0.0f;
+
+				if (charge.frameCount >= status_.kMinChargeFrame) {
+					chargeRate =
+						static_cast<float>(charge.frameCount - status_.kMinChargeFrame) /
+						static_cast<float>(status_.kMaxChargeFrame - status_.kMinChargeFrame);
+
+					chargeRate = std::clamp(chargeRate, 0.0f, 1.0f);
+				}
+
+				startAction(chargeRate);
+
+				charge.charging = false;
+				charge.frameCount = 0;
+			}
+		};
+
+	// K / B：特殊ダッシュ
+	updateChargeButton(
+		specialDashCharge_,
+		inputState_.actionB,
+		[this](float chargeRate)
+		{
+			StartSpecialDash(chargeRate);
+		}
+	);
+
+	// L / Y：高ジャンプ
+	updateChargeButton(
+		highJumpCharge_,
+		inputState_.actionY,
+		[this](float chargeRate)
+		{
+			StartHighJump(chargeRate);
+		}
+	);
+}
+
+void Player::StartSpecialDash(float chargeRate)
+{
+	// 地面にいない場合は特殊ダッシュしない
+	if (!onGround_) {
+		return;
+	}
+
+	// 左右入力中は特殊ダッシュしない
+	if (inputState_.moveRight || inputState_.moveLeft) {
+		return;
+	}
+
+	// 通常ダッシュ中は特殊ダッシュしない
+	if (isDash_) {
+		return;
+	}
+
+	// すでに特殊ダッシュ中なら開始しない
+	if (isSpecialDash_) {
+		return;
+	}
+
+	// スペシャルダッシュ開始
+	isSpecialDash_ = true;
+
+	// スペシャルダッシュのフレーム数をリセット
+	specialDashTimer_ = status_.kSpecialDashFrame;
+
+	// ダッシュ方向
+	specialDashDirection_ = direction_ == Direction::kRight ? 1 : -1;
+
+	// チャージ率に応じたダッシュ速度を計算
+	specialDashSpeed_ = std::lerp(
+		status_.kSpecialDashMinSpeed,
+		status_.kSpecialDashSpeed,
+		chargeRate
+	);
+
+	// X方向の速度を設定
+	velocity_.x = specialDashSpeed_ * specialDashDirection_;
+}
+
+void Player::StartHighJump(float chargeRate)
+{
+	// ハイジャンプ開始
+	// ジャンプができるのは地面にいるときだけ
+	if (!onGround_) return;
+
+	// ジャンプスイッチを切り替える
+	map_->ToggleJumpSwitch();
+	// ジャンプエフェクトを出す
+	EmitJumpParticle();
+
+	// チャージ率に応じたジャンプ力を計算
+	float jumpPower = std::lerp(
+		status_.kHighJumpPower,
+		status_.kMaxHighJumpPower,
+		chargeRate
+	);
+
+	// ジャンプブロックに触れている場合はさらにジャンプ力を上乗せ
+	if (IsOnJumpBlock()) {
+		jumpPower = (std::max)(jumpPower, status_.kJumpBlockPower);
+	}
+
+	// Y方向の速度を設定してジャンプ開始
+	velocity_.y = jumpPower;
+	onGround_ = false;
+}
+
+void Player::StartAttack(float chargeRate)
+{
+	if(isAttack_) {
+		return;
+	}
+
+	if(isSpecialDash_) {
+		return;
+	}
+
+	if (!CanChargeAttack()) {
+		return;
+	}
+
+	isAttack_ = true;
+	attackTimer_ = status_.kAttackFrame;
+	attackChargeRate_ = std::clamp(chargeRate, 0.0f, 1.0f);
+}
+
+bool Player::TryBreakBlockBySpecialDash(const CollisionMapInfo& collisionInfo)
+{
+	if (!map_ || !playerModel_) {
+		return false;
+	}
+
+	if (!isSpecialDash_) {
+		return false;
+	}
+
+	if (specialDashDirection_ == 0) {
+		return false;
+	}
+
+	Vector3 position = playerModel_->GetTranslate();
+
+	// 縦方向は、衝突判定で使われた移動後の位置に寄せる
+	position.y += collisionInfo.move.y;
+
+	// 現在の横端ではなく、特殊ダッシュで進む先まで見る
+	float forwardDistance = std::abs(specialDashSpeed_) + status_.kEpsilon;
+
+	float checkX =
+		position.x +
+		static_cast<float>(specialDashDirection_) *
+		(status_.kWidth * 0.5f + forwardDistance);
+
+	// 横3点：上・中央・下
+	std::array<Vector3, 3> checkPoints = {
+		Vector3{ checkX, position.y + status_.kHeight * 0.35f, position.z },
+		Vector3{ checkX, position.y,                         position.z },
+		Vector3{ checkX, position.y - status_.kHeight * 0.35f, position.z }
+	};
+
+	bool brokeBlock = false;
+
+	for (const Vector3& point : checkPoints) {
+		IndexSet indexSet = map_->GetMapChipIndexSetByPosition(point);
+		BlockType blockType = map_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
+
+		if (IsHitBlockBreakableTable(blockType)) {
+			map_->BreakBlock(indexSet.xIndex, indexSet.yIndex);
+			brokeBlock = true;
+		}
+	}
+
+	return brokeBlock;
+}
+
+void Player::UpdateAttack()
+{
+	// 攻撃中でなければ何もしない
+	if (!isAttack_) {
+		return;
+	}
+	// 攻撃時間のカウントダウン
+	if (attackTimer_ > 0) {
+		--attackTimer_;
+	}
+	// 攻撃時間が0になったら攻撃終了
+	if (attackTimer_ == 0) {
+		isAttack_ = false;
+		attackChargeRate_ = 0.0f;
+	}
+}
+
+bool Player::CanChargeAttack() const
+{
+	// 操作不能中は攻撃不可
+	if (!controlEnabled_) {
+		return false;
+	}
+
+	// 地面にいないなら攻撃不可
+	if (!onGround_) {
+		return false;
+	}
+
+	// すでに攻撃中なら不可
+	if (isAttack_) {
+		return false;
+	}
+
+	// 特殊ダッシュ中は不可
+	if (isSpecialDash_) {
+		return false;
+	}
+
+	// 通常ダッシュ中は不可
+	if (isDash_) {
+		return false;
+	}
+
+	// 左右入力中は不可
+	if (inputState_.moveRight || inputState_.moveLeft) {
+		return false;
+	}
+
+	// 横速度がまだ残っているなら不可
+	if (std::abs(velocity_.x) > status_.kAttackStopVelocityThreshold) {
+		return false;
+	}
+
+	return true;
+}
+
+void Player::UpdateAttackChargeAction()
+{
+	// J / Xを押した瞬間
+	if (inputState_.actionX.trigger) {
+		// その場にいないならチャージ開始しない
+		if (!CanChargeAttack()) {
+			attackCharge_ = {};
+			return;
+		}
+
+		attackCharge_.charging = true;
+		attackCharge_.frameCount = 0;
+	}
+
+	// チャージ中でなければ何もしない
+	if (!attackCharge_.charging) {
+		return;
+	}
+
+	// チャージ中に動いたらキャンセル
+	if (!CanChargeAttack()) {
+		attackCharge_ = {};
+		return;
+	}
+
+	// 押している間はチャージ
+	if (inputState_.actionX.hold) {
+		if (attackCharge_.frameCount < status_.kMaxChargeFrame) {
+			++attackCharge_.frameCount;
+		}
+	}
+
+	// 離した瞬間に攻撃
+	if (inputState_.actionX.release) {
+		float chargeRate = 0.0f;
+
+		if (attackCharge_.frameCount >= status_.kMinChargeFrame) {
+			chargeRate =
+				static_cast<float>(attackCharge_.frameCount - status_.kMinChargeFrame) /
+				static_cast<float>(status_.kMaxChargeFrame - status_.kMinChargeFrame);
+
+			chargeRate = std::clamp(chargeRate, 0.0f, 1.0f);
+		}
+
+		StartAttack(chargeRate);
+
+		attackCharge_ = {};
+	}
+}
+
+float Player::CalcChargeRate(const ChargeButtonState& charge) const
+{
+	// チャージ中でなければ0
+	if (charge.frameCount < status_.kMaxChargeFrame) {
+		return 0.0f;
+	}
+
+	// チャージ率を計算
+	const uint32_t chargeFrameRange = status_.kMaxChargeFrame - status_.kMinChargeFrame;
+
+	// チャージフレームの範囲が0の場合は、チャージ率を1.0f
+	if(chargeFrameRange == 0) {
+		return 1.0f;
+	}
+
+	// チャージ率を0.0f～1.0fの範囲で計算
+	float chargeRate = 
+		static_cast<float>(charge.frameCount - status_.kMinChargeFrame) /
+		static_cast<float>(chargeFrameRange);
+
+	// チャージ率を0.0f～1.0fの範囲に収める
+	return std::clamp(chargeRate, 0.0f, 1.0f);
+}
+
+void Player::UpdateChargeEffects()
+{
+	// エフェクトがない場合は何もしない
+	if (!playerModel_) {
+		return;
+	}
+	// プレイヤーの位置を取得 // 足元の位置も
+	const Vector3 playerPos = playerModel_->GetTranslate();
+	const Vector3 footPos = GetFootParticlePos();
+
+	// 向いている方向
+	const float dir =
+		direction_ == Direction::kRight ? 1.0f : -1.0f;
+
+	// 攻撃チャージ：プレイヤーの前方
+	Vector3 attackChargePos = playerPos;
+	attackChargePos.x += dir * (status_.kWidth * 0.6f);
+	attackChargePos.z -= 0.5f;
+
+	UpdateChargeEffect(
+		attackChargeEffect_.get(),
+		attackCharge_,
+		wasAttackCharging_,
+		attackChargePos,
+		8.0f,
+		35.0f
+	);
+
+	// 特殊ダッシュチャージ：足元
+	Vector3 dashChargePos = footPos;
+	dashChargePos.z -= 0.5f;
+
+	UpdateChargeEffect(
+		specialDashChargeEffect_.get(),
+		specialDashCharge_,
+		wasSpecialDashCharging_,
+		dashChargePos,
+		6.0f,
+		25.0f
+	);
+
+	// 高ジャンプチャージ：プレイヤー中心より少し上
+	Vector3 highJumpChargePos = playerPos;
+	highJumpChargePos.y += status_.kHeight * 0.4f;
+	highJumpChargePos.z -= 0.5f;
+
+	UpdateChargeEffect(
+		highJumpChargeEffect_.get(),
+		highJumpCharge_,
+		wasHighJumpCharging_,
+		highJumpChargePos,
+		6.0f,
+		22.0f
+	);
+	
+}
+
+void Player::UpdateChargeEffect(ParticleSystem* effect, const ChargeButtonState& charge, bool& wasCharging, const Vector3& position, float minEmissionRate, float maxEmissionRate)
+{
+	// エフェクトが無ければ何もせずチャージ状態もリセット
+	if (!effect) {
+		wasCharging = false;
+		return;
+	}
+	// チャージしていないなら停止
+	if(!charge.charging) {
+		if(wasCharging) {
+			effect->Pause();
+		}
+
+		wasCharging = false;
+		return;
+	}
+	// チャージしているなら位置を更新して再生
+	const float chargeRate = CalcChargeRate(charge);
+
+	// チャージ量に応じて発生量を増やす
+	const float emissionRate = std::lerp(minEmissionRate, maxEmissionRate, chargeRate);
+
+	// 位置を更新
+	effect->SetTranslate(position);
+	// 発生量を更新
+	effect->SetEmissionRate(emissionRate);
+
+	// マイフレーム再生するとリセットされる可能性があるので開始時だけ再生する
+	if (!wasCharging) {
+		effect->Play();
+	}
+
+	// チャージ状態を保存
+	wasCharging = true;
+
+
+}
+
+bool Player::OnAttackCollision(Collider* other)
+{
+	// 攻撃中でなければ攻撃判定はない
+	if (!other) {
+		return false;
+	}
+	// 攻撃中でなければ攻撃判定はない
+	if (!isAttack_) {
+		return false;
+	}
+	// 攻撃判定は敵にしかない
+	if (other->GetType() != Collider::Type::Enemy) {
+		return false;
+	}
+
+	// 攻撃で敵を倒す
+	AttackEnemy(other);
+
+	return true;
+}
+
 
 void Player::Respawn(const Vector3& pos)
 {
@@ -320,6 +927,31 @@ void Player::Respawn(const Vector3& pos)
 	isDying_ = false;
 	deathDemoFinished_ = false;
 	onGround_ = true;
+
+	// 攻撃状態のリセット
+	isAttack_ = false;
+	attackCharge_ = {};
+	attackTimer_ = 0;
+	attackChargeRate_ = 0.0f;
+
+	// ハイジャンプ状態のリセット
+	highJumpCharge_ = {};
+
+	// 特殊ダッシュ状態のリセット
+	specialDashCharge_ = {};
+	isSpecialDash_ = false;
+	specialDashTimer_ = 0;
+	specialDashDirection_ = 0;
+	specialDashSpeed_ = 0.0f;
+
+	// チャージエフェクトの解放
+	if (attackChargeEffect_) attackChargeEffect_->Pause();
+	if (specialDashChargeEffect_) specialDashChargeEffect_->Pause();
+	if (highJumpChargeEffect_) highJumpChargeEffect_->Pause();
+	// チャージエフェクトの解放
+	wasAttackCharging_ = false;
+	wasSpecialDashCharging_ = false;
+	wasHighJumpCharging_ = false;
 }
 
 void Player::BeginDeathDemo(const Vector3& cameraPos)
@@ -380,6 +1012,7 @@ bool Player::ConsumeDeathByFalling()
 }
 
 
+
 void Player::FlashingUpdate()
 {
 	// エネミーにヒットしていたら点滅処理 / 無敵時間
@@ -434,20 +1067,15 @@ void Player::PlayerTurn()
 
 void Player::UpdateDashEffect()
 {
-	auto* input = Input::GetInstance();
 
-	const bool movingRight =
-		(input->PushKey(DIK_D) || IsControllerRightHold(input)) &&
-		!(input->PushKey(DIK_A) || IsControllerLeftHold(input));
-
-	const bool movingLeft =
-		(input->PushKey(DIK_A) || IsControllerLeftHold(input)) &&
-		!(input->PushKey(DIK_D) || IsControllerRightHold(input));
-
+	// ダッシュエフェクトの更新
+	const bool movingRight = inputState_.moveRight && !inputState_.moveLeft;
+	const bool movingLeft = inputState_.moveLeft && !inputState_.moveRight;
+	// ダッシュが有効で、かつダッシュ方向に移動しているか
 	const bool dashActiveRight = isDash_ && (dashDirection_ == +1) && movingRight;
 	const bool dashActiveLeft = isDash_ && (dashDirection_ == -1) && movingLeft;
 	const bool dashActive = dashActiveRight || dashActiveLeft;
-
+	// ダッシュエフェクトを表示できる条件 / ダッシュ中かつ地面にいる
 	const bool canShowEffect = dashActive && onGround_;
 
 	Vector3 playerPos = playerModel_->GetTranslate();
@@ -483,15 +1111,8 @@ void Player::UpdateMoveEffect()
 {
 	if (!moveEffect_ || !playerModel_) { return; }
 
-	auto* input = Input::GetInstance();
-
-	const bool rightHold =
-		input->PushKey(DIK_D) ||
-		IsControllerRightHold(input);
-
-	const bool leftHold =
-		input->PushKey(DIK_A) ||
-		IsControllerLeftHold(input);
+	const bool rightHold = inputState_.moveRight;
+	const bool leftHold = inputState_.moveLeft;
 
 	const bool movingRight = rightHold && !leftHold;
 	const bool movingLeft = leftHold && !rightHold;
@@ -573,7 +1194,7 @@ void Player::Initialize(Vector3 position)
 	stompEffect_->SetEmissionRate(30.0f);
 	stompEffect_->SetLoop(false);
 	stompEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
- 
+
 
 	// ジャンプの開始と着地のパーティクル
 	jumpEffect_ = ParticlePresets::CreateJumpDust(position);
@@ -582,6 +1203,49 @@ void Player::Initialize(Vector3 position)
 	// ジャンプブロックに乗っているときの上昇エフェクト / 初期状態は停止
 	jumpBlockArrowEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
 	jumpBlockArrowEffect_->Pause();
+
+
+	// 攻撃チャージエフェクト
+	attackChargeEffect_ = ParticlePresets::CreateSparks(position);
+	attackChargeEffect_->Pause();
+	attackChargeEffect_->SetLoop(true);
+	attackChargeEffect_->SetEmissionRate(10.0f);
+	attackChargeEffect_->SetColor(Vector4(1.0f, 0.8f, 0.3f, 1.0f));
+
+	// 特殊ダッシュチャージエフェクト
+	specialDashChargeEffect_ = ParticlePresets::CreateSmoke(position);
+	specialDashChargeEffect_->Pause();
+	specialDashChargeEffect_->SetLoop(true);
+	specialDashChargeEffect_->SetEmissionRate(8.0f);
+	specialDashChargeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+	// 高ジャンプチャージエフェクト
+	highJumpChargeEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
+	highJumpChargeEffect_->Pause();
+	highJumpChargeEffect_->SetLoop(true);
+	highJumpChargeEffect_->SetEmissionRate(8.0f);
+	highJumpChargeEffect_->SetColor(Vector4(0.5f, 0.8f, 1.0f, 1.0f));
+
+	// 攻撃チャージエフェクト
+	attackChargeEffect_ = ParticlePresets::CreateSparks(position);
+	attackChargeEffect_->Pause();
+	attackChargeEffect_->SetLoop(true);
+	attackChargeEffect_->SetEmissionRate(10.0f);
+	attackChargeEffect_->SetColor(Vector4(1.0f, 0.8f, 0.3f, 1.0f));
+
+	// 特殊ダッシュチャージエフェクト
+	specialDashChargeEffect_ = ParticlePresets::CreateSmoke(position);
+	specialDashChargeEffect_->Pause();
+	specialDashChargeEffect_->SetLoop(true);
+	specialDashChargeEffect_->SetEmissionRate(8.0f);
+	specialDashChargeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+
+	// 高いジャンプチャージエフェクト
+	highJumpChargeEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
+	highJumpChargeEffect_->Pause();
+	highJumpChargeEffect_->SetLoop(true);
+	highJumpChargeEffect_->SetEmissionRate(8.0f);
+	highJumpChargeEffect_->SetColor(Vector4(0.5f, 0.8f, 1.0f, 1.0f));
 
 }
 
@@ -605,7 +1269,7 @@ void Player::Update()
 			if (!wasOnJumpBlock_) {
 				jumpBlockArrowEffect_->Play();
 			}
-		} 
+		}
 		// 乗っていないときはエフェクトを停止
 		else {
 			jumpBlockArrowEffect_->Pause();
@@ -615,14 +1279,20 @@ void Player::Update()
 	// 前フレームの状態を保持
 	wasOnJumpBlock_ = onJumpBlockNow;
 
-	
+
 	if (isDying_) {
 		UpdateDeathDemo();
 		playerModel_->Update();
 		return;
 	}
+	// 入力の更新
+	UpdateInput();
 	// プレイヤーの挙動更新
 	UpdateBehavior();
+	// チャージエフェクトの更新
+	UpdateChargeEffects();
+	// 移動エフェクトの更新
+	UpdateMoveEffect();
 	// 通常移動エフェクトの更新
 	UpdateMoveEffect();
 	// ダッシュエフェクトの更新
@@ -647,7 +1317,13 @@ void Player::Update()
 	if (jumpEffect_)jumpEffect_->Update();
 	if (landEffect_)landEffect_->Update();
 	if (jumpBlockArrowEffect_)jumpBlockArrowEffect_->Update();
-	
+
+
+	// チャージ類のエフェクト更新
+	if (attackChargeEffect_) attackChargeEffect_->Update();
+	if (specialDashChargeEffect_) specialDashChargeEffect_->Update();
+	if (highJumpChargeEffect_) highJumpChargeEffect_->Update();
+
 
 }
 
@@ -681,6 +1357,10 @@ void Player::UpdateBehavior()
 	Move();
 	// ジャンプ処理
 	Jump();
+	// 攻撃処理
+	UpdateAttack();
+	// チャージ項目の更新
+	UpdateChargeActions();
 
 	// 当たり判定処理
 	CollisionMapInfo collisionInfo;
@@ -736,32 +1416,47 @@ void Player::Move()
 		return;
 	}
 
-	auto* input = Input::GetInstance();
+	// スペシャルダッシュ中は通常の移動処理を行わない
+	if (isSpecialDash_) {
+		// チャージ率で決まった速度を維持
+		velocity_.x = specialDashSpeed_ * specialDashDirection_;
+
+		// ダッシュ中も転がっているように回転させる
+		Vector3 rotate = playerModel_->GetRotate();
+
+		// 通常移動と同じ向きで回転
+		// 倍率を掛けることで、特殊ダッシュらしく速く転がる
+		rotate.z -= velocity_.x * kSpecialDashRollScale;
+
+		playerModel_->SetRotate(rotate);
+
+		// ダッシュ時間のカウントダウン
+		if (specialDashTimer_ > 0) {
+			--specialDashTimer_;
+		} else {
+			isSpecialDash_ = false;
+			specialDashDirection_ = 0;
+			specialDashSpeed_ = 0.0f;
+		}
+
+		// 通常の移動処理は行わない
+		return;
+	}
+
 
 	//==================================================
 	// 入力状態
 	// キーボード + コントローラー
 	//==================================================
 
-	const bool keyRightHold = input->PushKey(DIK_D);
-	const bool keyLeftHold = input->PushKey(DIK_A);
+	const bool rightHold = inputState_.moveRight;
+	const bool leftHold = inputState_.moveLeft;
 
-	const bool controllerRightHold = IsControllerRightHold(input);
-	const bool controllerLeftHold = IsControllerLeftHold(input);
-
-	const bool rightHold = keyRightHold || controllerRightHold;
-	const bool leftHold = keyLeftHold || controllerLeftHold;
-
-	const bool rightTrig =
-		input->TriggerKey(DIK_D) ||
-		IsControllerRightTrigger(input);
-
-	const bool leftTrig =
-		input->TriggerKey(DIK_A) ||
-		IsControllerLeftTrigger(input);
+	const bool rightTrig = inputState_.triggerRight;
+	const bool leftTrig = inputState_.triggerLeft;
 
 	//==================================================
-	// ダブルタップ用タイマー更新
+	// ダッシュ判定用タイマー更新
 	//==================================================
 
 	if (rightTapTimer_ > 0) { --rightTapTimer_; }
@@ -813,13 +1508,16 @@ void Player::Move()
 
 	Vector3 acceleration{};
 
+	// ダッシュが有効で、かつダッシュ方向に移動しているか
 	const bool dashActiveRight = isDash_ && (dashDirection_ == +1) && movingRight;
 	const bool dashActiveLeft = isDash_ && (dashDirection_ == -1) && movingLeft;
 	const bool dashActive = dashActiveRight || dashActiveLeft;
 
+	// ダッシュ中は加速度と最大速度が上がる
 	float dashScale = dashActive ? status_.kDashSpeedScale : 1.0f;
 	float maxSpeed = status_.kMaxSpeed * dashScale;
 
+	// 移動入力に応じた加速度の計算
 	if (movingRight) {
 		if (velocity_.x < 0.0f) {
 			velocity_.x *= (1.0f - status_.kAttenuation);
@@ -834,7 +1532,9 @@ void Player::Move()
 
 		acceleration.x -= status_.kAcceleration * dashScale;
 		direction_ = Direction::kLeft;
-	} else {
+	}
+	// 移動入力がない場合は速度を減衰させる
+	else {
 		velocity_.x *= (1.0f - status_.kAttenuation);
 	}
 
@@ -850,6 +1550,7 @@ void Player::Move()
 		rotate.z = 0.0f;
 	}
 
+	// 回転の設定
 	playerModel_->SetRotate(rotate);
 
 	// 最大速度制限
@@ -869,12 +1570,7 @@ void Player::Jump()
 		return;
 	}
 
-	auto* input = Input::GetInstance();
-
-	const bool jumpTrigger =
-		input->TriggerKey(DIK_SPACE) ||
-		input->PushKey(DIK_W) ||
-		IsControllerJumpTrigger(input);
+	const bool jumpTrigger = inputState_.jump;
 
 	// 地面にいる場合
 	if (onGround_) {
@@ -1024,6 +1720,26 @@ void Player::LandingCollisionMove(CollisionMapInfo& collisionInfo)
 void Player::WallCollisionMove(CollisionMapInfo& collisionInfo)
 {
 	if (collisionInfo.hitWall) {
+		if (isSpecialDash_) {
+			// 特殊ダッシュで破壊可能ブロックを壊せたか
+			bool brokeBlock = TryBreakBlockBySpecialDash(collisionInfo);
+
+			// 特殊ダッシュは壁に衝突したら終了
+			isSpecialDash_ = false;
+			specialDashDirection_ = 0;
+			specialDashSpeed_ = 0.0f;
+
+			// 特殊ダッシュのキャンセル
+			if (!brokeBlock) {
+				velocity_.x = 0.0f;
+				collisionInfo.move.x = 0.0f;
+				return;
+			}
+			// 壊せないブロックに衝突
+			velocity_.x = 0.0f;
+			collisionInfo.move.x = 0.0f;
+			return;
+		}
 		// 壁に衝突したら移動量を調整
 		velocity_.x *= (1.0f - status_.kEpsilon);
 	}
@@ -1102,7 +1818,7 @@ bool Player::CheckCollisionPoints(const std::array<Vector3, 2>& posList, Collisi
 		// 当たり判定を取るブロックの種類かどうか
 		if (map_->IsSolidBlockAt(index.xIndex, index.yIndex)) {
 			isHit = true;
-		} 
+		}
 		// ゴールの判定をとるブロックかどうか
 		else if (IsHitGoalBlockTable(chip)) {
 			isGoal_ = true;
@@ -1231,6 +1947,23 @@ void Player::Finalize()
 		jumpBlockArrowEffect_->Stop();
 		jumpBlockArrowEffect_.reset();
 	}
+
+	// チャージエフェクト類の解放
+	if (attackChargeEffect_) {
+		attackChargeEffect_->Stop();
+		attackChargeEffect_.reset();
+	}
+
+	if (specialDashChargeEffect_) {
+		specialDashChargeEffect_->Stop();
+		specialDashChargeEffect_.reset();
+	}
+
+	if (highJumpChargeEffect_) {
+		highJumpChargeEffect_->Stop();
+		highJumpChargeEffect_.reset();
+	}
+	
 }
 
 void Player::ImGui()

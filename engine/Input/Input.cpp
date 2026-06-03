@@ -152,7 +152,7 @@ bool Input::TriggerKey(BYTE keyNumber)
 	return key[keyNumber] != 0 && keyPre[keyNumber] == 0;
 }
 
-bool Input::ReriseKey(BYTE keyNumber)
+bool Input::ReleaseKey(BYTE keyNumber)
 {
 	return key[keyNumber] == 0 && keyPre[keyNumber] != 0;
 }

@@ -168,8 +168,6 @@ void GameOverScene::Update()
 	title_->SetSize(titleBaseSize_);
 
 #ifdef USE_IMGUI
-	// Inputクラスの取得と省略
-	Input* input = Input::GetInstance();
 
 	// F1でデバッグカメラON/OFF
 	if (input->TriggerKey(DIK_1)) {

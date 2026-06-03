@@ -76,8 +76,18 @@ struct PlayerStatus {
 	float kJumpPower = 0.5f;
 	// 踏みつけ時のジャンプ力
 	float kStompJumpPower = 0.3f;
-	// 溜め時間
-	float kMaxChargeTime = 0.2f;
+
+	// チャージ攻撃の速度倍率
+	uint32_t kMinChargeFrame = 10;
+	uint32_t kMaxChargeFrame = 45;
+
+	// スペシャルダッシュのパラメーター
+	float kSpecialDashSpeed = 0.45f;
+	float kSpecialDashMinSpeed = 0.25f;
+	uint32_t kSpecialDashFrame = 12;
+
+	float kHighJumpPower = 0.65f;
+	float kMaxHighJumpPower = 0.85f;
 
 	//当たり判定パラメータ
 	// 幅
@@ -88,6 +98,15 @@ struct PlayerStatus {
 	float kBlank = 0.0f;
 	// 微小値
 	float kEpsilon = 0.05f;
+
+	// 攻撃パラメーター
+	uint32_t kAttackFrame = 10;
+	float kAttackRange = 0.75f;
+	float kAttackHeight = 0.55f;
+	float kAttackDepth = 0.5f;
+
+	// チャージ攻撃時にどれだけ攻撃範囲が広がるか
+	float kAttackChargeRangeBonus = 0.45f;
 
 	//減衰パラメーター
 	// 着地時の減衰率
@@ -104,10 +123,44 @@ struct PlayerStatus {
 
 	// プレイヤーの体力
 	uint32_t kHealth = 3;
+
+	// チャージ攻撃を使用できる停止判定の速度しきい値
+	float kAttackStopVelocityThreshold = 0.03f;
+
 };
+
 
 class Player :public Collider
 {
+private:
+	struct ButtonInputState {
+		bool hold = false;
+		bool trigger = false;
+		bool release = false;
+	};
+
+	// プレイヤーの入力状態をまとめる構造体
+	struct PlayerInputState {
+		// 左右の入力状態
+		bool moveRight = false;
+		bool moveLeft = false;
+		// ダッシュの入力状態
+		bool triggerRight = false;
+		bool triggerLeft = false;
+		// ジャンプの入力状態
+		bool jump = false;
+
+		ButtonInputState actionA;
+		ButtonInputState actionB;
+		ButtonInputState actionX;
+		ButtonInputState actionY;
+	};
+
+	struct ChargeButtonState {
+		uint32_t frameCount = 0;
+		bool charging = false;
+	};
+
 public:
 
 	/// <summary>
@@ -122,7 +175,18 @@ public:
 	// コライダーインターフェイス
 	Collider::Type GetType() const override;
 	AABB GetAABB() const override;
-	void OnCollision(Collider* other)override;
+	void OnCollision(Collider* other) override;
+
+	// 攻撃判定を持っているか
+	bool HasAttackAABB() const override { return isAttack_; }
+
+	// 攻撃判定のAABBを取得
+	AABB GetAttackAABB() const override;
+
+	// 攻撃判定が当たったときの処理
+	bool OnAttackCollision(Collider* other) override;
+
+
 
 public:
 
@@ -325,6 +389,22 @@ private:
 	void StompEnemy(Collider* enemy);
 
 	/// <summary>
+	/// エネミーに攻撃が当たったときの処理
+	/// </summary>
+	void DefeatEnemy(Collider* enemy,bool bouncePlayer);
+
+	/// <summary>
+	/// 敵の死亡位置にパーティクルの発生
+	/// </summary>
+	void EmitEnemyDefeatParticle(const Vector3& position);
+
+	/// <summary>
+	/// 攻撃で敵を倒す処理
+	/// </summary>
+	/// <param name="enemy"></param>
+	void AttackEnemy(Collider* enemy);
+
+	/// <summary>
 	/// ダメージブロックに触れているかの判定
 	/// </summary>
 	/// <returns></returns>
@@ -352,6 +432,77 @@ private:
 	/// <returns>パーティクルを発生させる足元の位置</returns>
 	Vector3 GetFootParticlePos() const;
 
+	/// <summary>
+	/// プレイヤーの入力状態を更新
+	/// </summary>
+	void UpdateInput();
+
+	/// <summary>
+	/// チャージ項目の処理
+	/// </summary>
+	void UpdateChargeActions();
+
+	/// <summary>
+	/// スペシャルダッシュの処理
+	/// </summary>
+	void StartSpecialDash(float chargeRate);
+
+	/// <summary>
+	/// ハイジャンプの処理
+	/// </summary>
+	void StartHighJump(float chargeRate);
+
+	/// <summary>
+	/// チャージ攻撃の処理
+	/// </summary>
+	void StartAttack(float chargeRate);
+
+	/// <summary>
+	/// スペシャルダッシュ中のブロック破壊処理
+	/// </summary>
+	bool TryBreakBlockBySpecialDash(const CollisionMapInfo& collisionInfo);
+
+
+	/// <summary>
+	/// チャージ攻撃の当たり判定と処理
+	/// </summary>
+	void UpdateAttack();
+
+	/// <summary>
+	/// チャージ攻撃が使用できる状態かどうか
+	/// </summary>
+	bool CanChargeAttack() const;
+
+	/// <summary>
+	/// チャージ攻撃の使用中の処理
+	/// </summary>
+	void UpdateAttackChargeAction();
+
+	/// <summary>
+	/// チャージ率からスペシャルダッシュの速度を計算
+	/// </summary>
+	float CalcChargeRate(const ChargeButtonState& charge) const;
+
+	/// <summary>
+	/// チャージ攻撃の使用中のエフェクトの更新
+	/// </summary>
+	void UpdateChargeEffects();
+
+	/// <summary>
+	/// 単体のチャージエフェクト更新
+	/// </summary>
+	/// <param name="effect"></param>
+	/// <param name="charge"></param>
+	/// <param name="wasCharging"></param>
+	/// <param name="position"></param>
+	/// <param name="minEmissionRate"></param>
+	/// <param name="maxEmissionRate"></param>
+	void UpdateChargeEffect(ParticleSystem* effect,
+		const ChargeButtonState& charge,
+		bool& wasCharging,
+		const Vector3& position,
+		float minEmissionRate,
+		float maxEmissionRate);
 
 public:	/// Setter / Getter
 	// 死亡判定の高さを設定
@@ -385,6 +536,8 @@ public:	/// Setter / Getter
 	// 落下死フラグを「消費」する（trueなら内部でfalseに戻す）
 	bool ConsumeDeathByFalling();
 
+	// プレイヤーが攻撃中かどうか
+	bool IsAttacking() const { return isAttack_; }
 
 private:	// メンバ変数
 	// プレイヤーステータス
@@ -493,5 +646,41 @@ private:	// メンバ変数
 	// ジャンプブロックに触れたときのエフェクト
 	std::unique_ptr<ParticleSystem> jumpBlockArrowEffect_;
 	bool wasOnJumpBlock_ = false;
+
+	// プレイヤーの入力状態
+	PlayerInputState inputState_ = {};
+
+	// チャージ攻撃の状態
+	ChargeButtonState attackCharge_;
+	bool isAttack_ = false;
+	uint32_t attackTimer_ = 0;
+	float attackChargeRate_ = 0.0f;
+
+	// スペシャルダッシュの状態
+	ChargeButtonState specialDashCharge_;
+	bool isSpecialDash_ = false;
+	uint32_t specialDashTimer_ = 0;
+	int32_t specialDashDirection_ = 0;
+	float specialDashSpeed_ = 0.0f;
+	float kSpecialDashRollScale = 1.2f;
+
+	// ハイジャンプのチャージ状態
+	ChargeButtonState highJumpCharge_;
+
+
+	// チャージ攻撃のチャージエフェクト
+	std::unique_ptr<ParticleSystem> attackChargeEffect_;
+	// 特殊ダッシュのチャージエフェクト
+	std::unique_ptr<ParticleSystem> specialDashChargeEffect_;
+	// ハイジャンプのチャージエフェクト
+	std::unique_ptr<ParticleSystem> highJumpChargeEffect_;
+
+	// チャージエフェクト再生状態
+	bool wasAttackCharging_ = false;
+	bool wasSpecialDashCharging_ = false;
+	bool wasHighJumpCharging_ = false;
+
+
+	
 };
 
