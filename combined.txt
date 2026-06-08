@@ -4502,6 +4502,7 @@ File Path: Game/Application/Player/Player.cpp
 ============================================================
 #include "Player.h"
 #include <algorithm>
+#include <cmath>
 #include "engine/Input/Input.h"
 #include "Game/Particle/ParticlePresets.h"
 #include "Game/Application/Enemy/EnemyBase/EnemyBase.h"
@@ -4509,6 +4510,7 @@ File Path: Game/Application/Player/Player.cpp
 #include "engine/base/ImGuiManager.h"
 #endif
 
+// 補助関数
 namespace
 {
 	constexpr int kControllerNo = 0;
@@ -4567,6 +4569,18 @@ namespace
 	}
 }
 
+// AABB同士の衝突判定
+static bool IntersectsAABB3D(const AABB& a, const AABB& b)
+{
+	return
+		a.min.x <= b.max.x &&
+		a.max.x >= b.min.x &&
+		a.min.y <= b.max.y &&
+		a.max.y >= b.min.y &&
+		a.min.z <= b.max.z &&
+		a.max.z >= b.min.z;
+}
+
 Collider::Type Player::GetType() const
 {
 	// 判定タイプがプレイヤーであることを返す
@@ -4607,48 +4621,94 @@ static bool IntersectsAABBRect2D(const AABB& aabb, const Rect& rect)
 
 void Player::OnCollision(Collider* other)
 {
-	// 衝突相手が存在しなかったら処理しない
-	if (!other)return;
+	if (!other) { return; }
 
 	switch (other->GetType())
 	{
-		// 敵に衝突したら
 	case Collider::Type::Enemy:
-		// すでにダメージ中なら何もしない（無敵時間）
+	{
+		// 攻撃中なら、攻撃判定に敵が入っているか確認
+		if (isAttack_) {
+			const AABB attackAABB = GetAttackAABB();
+			const AABB enemyAABB = other->GetAABB();
+
+			if (IntersectsAABB3D(attackAABB, enemyAABB)) {
+				// 既存の踏みつけ処理を再利用
+				AttackEnemy(other);
+				break;
+			}
+		}
+
+		// すでにダメージ中なら何もしない
 		if (isEnemyHit_) {
 			break;
 		}
 
 		// 踏みつけ判定
-		// プレイヤーが落下中 && プレイヤーが敵より上にいる
 		if (velocity_.y < 0.0f) {
-			// プレイヤーと敵のAABBを取得
-			AABB playerAABB = GetAABB();
-			AABB enemyAABB = other->GetAABB();
+			const AABB playerAABB = GetAABB();
+			const AABB enemyAABB = other->GetAABB();
 
-			// プレイヤーの底辺が敵の上部付近にあるかチェック
-			// プレイヤーの中心が敵の中心より上にある
-			float playerBottom = playerAABB.min.y;
-			float enemyTop = enemyAABB.max.y;
-			float enemyCenter = (enemyAABB.min.y + enemyAABB.max.y) * 0.5f;
-			float playerCenter = (playerAABB.min.y + playerAABB.max.y) * 0.5f;
+			const float playerBottom = playerAABB.min.y;
+			const float enemyTop = enemyAABB.max.y;
+			const float enemyCenter = (enemyAABB.min.y + enemyAABB.max.y) * 0.5f;
+			const float playerCenter = (playerAABB.min.y + playerAABB.max.y) * 0.5f;
 
-			// プレイヤーの中心が敵の中心より上 && プレイヤーの底が敵の上半分にある
 			if (playerCenter > enemyCenter && playerBottom < enemyTop + 0.2f) {
-				// 踏みつけ成功
 				StompEnemy(other);
 				break;
 			}
 		}
 
-		// 踏みつけ失敗 -> 通常のダメージ処理
 		TakeDamage();
 		break;
+	}
 
 	default:
-		// 特に何もしない
 		break;
 	}
+}
+
+AABB Player::GetAttackAABB() const
+{
+	// 攻撃判定用のAABB
+	AABB aabb{};
+
+	// プレイヤー座標を取得する
+	Vector3 pos = playerModel_->GetTranslate();
+
+	// 向いている方向
+	float dir = direction_ == Direction::kRight ? 1.0f : -1.0f;
+	// 攻撃範囲を計算する
+	float attackRange =
+		status_.kAttackRange +
+		status_.kAttackChargeRangeBonus * attackChargeRate_;
+
+	// 攻撃範囲を元にAABBのサイズを設定する
+	float halfWidth = attackRange * 0.5f;
+	float halfHeight = status_.kAttackHeight * 0.5f;
+	float halfDepth = status_.kAttackDepth;
+
+	// 位置から攻撃判定の中心を計算する
+	Vector3 center{
+		pos.x + dir * (status_.kWidth * 0.5f + halfWidth),
+		pos.y,
+		pos.z
+	};
+	// 中心からAABBの最小座標と最大座標
+	aabb.min = {
+		center.x - halfWidth,
+		center.y - halfHeight,
+		center.z - halfDepth
+	};
+	// 最大座標
+	aabb.max = {
+		center.x + halfWidth,
+		center.y + halfHeight,
+		center.z + halfDepth
+	};
+	// AABBを返す
+	return aabb;
 }
 
 void Player::TakeDamage()
@@ -4667,21 +4727,51 @@ void Player::TakeDamage()
 
 void Player::StompEnemy(Collider* enemy)
 {
-	// エネミーを倒す
-	if (EnemyBase* enemyBase = dynamic_cast<EnemyBase*>(enemy)) {
-		enemyBase->OnStomped();  // 敵に踏みつけられたことを通知
+	// 踏みつけのため反動ありのジャンプ
+	DefeatEnemy(enemy, true);
+}
 
-		// 敵の位置を取得してエフェクト発生
-		Vector3 enemyPos = enemyBase->GetTranslate();
-		if (stompEffect_) {
-			stompEffect_->SetTranslate(enemyPos);
-			stompEffect_->Play();
-		}
+void Player::DefeatEnemy(Collider* enemy, bool bouncePlayer)
+{
+	if (!enemy) {
+		return;
 	}
 
-	// プレイヤーは小ジャンプ（踏みつけた反動）
-	velocity_.y = status_.kStompJumpPower;
-	onGround_ = false;
+	EnemyBase* enemyBase = dynamic_cast<EnemyBase*>(enemy);
+	if (!enemyBase) {
+		return;
+	}
+
+	// 先に死亡位置を取っておく
+	Vector3 enemyPos = enemyBase->GetTranslate();
+
+	// 敵を倒す
+	enemyBase->OnStomped();
+
+	// 敵の死亡位置にパーティクルを出す
+	EmitEnemyDefeatParticle(enemyPos);
+
+	// 踏みつけの場合だけ反動ジャンプ
+	if (bouncePlayer) {
+		velocity_.y = status_.kStompJumpPower;
+		onGround_ = false;
+	}
+}
+
+void Player::EmitEnemyDefeatParticle(const Vector3 & position)
+{
+	if (!stompEffect_) {
+		return;
+	}
+
+	stompEffect_->SetTranslate(position);
+	stompEffect_->Play();
+}
+
+void Player::AttackEnemy(Collider * enemy)
+{
+	// 攻撃なので反動ジャンプなし
+	DefeatEnemy(enemy, false);
 }
 
 bool Player::IsTouchingDamageBlock()
@@ -4800,12 +4890,673 @@ Vector3 Player::GetFootParticlePos() const
 	const AABB aabb = GetAABB();
 	p.y = aabb.min.y;
 
-	// 地面に少しだけめり込ませる（見た目が安定する）
+	// 地面に少しだけめり込ませる
 	p.y += 0.02f;
 
-	// 2D寄りならZはそのままでOK。必要なら少し手前に出す等も可
 	return p;
 }
+
+void Player::UpdateInput()
+{
+	// 入力状態の初期化を行う
+	inputState_ = {};
+
+	// 入力が無ければ処理を行わない
+	if (!controlEnabled_) { return; }
+
+	// Input クラスのインスタンスを取得
+	auto* input = Input::GetInstance();
+
+	inputState_.moveRight =
+		input->PushKey(DIK_D) ||
+		IsControllerRightHold(input);
+
+	inputState_.moveLeft =
+		input->PushKey(DIK_A) ||
+		IsControllerLeftHold(input);
+
+	inputState_.triggerRight =
+		input->TriggerKey(DIK_D) ||
+		IsControllerRightTrigger(input);
+
+	inputState_.triggerLeft =
+		input->TriggerKey(DIK_A) ||
+		IsControllerLeftTrigger(input);
+
+	inputState_.jump =
+		input->TriggerKey(DIK_SPACE) ||
+		input->PushKey(DIK_W) ||
+		IsControllerJumpTrigger(input);
+
+	// アクションボタンの入力状態を更新 / 押した瞬間と放した瞬間 / コントローラーのボタンも同様に
+	// Jキー / Xボタン
+	inputState_.actionX.hold =
+		input->PushKey(DIK_J) ||
+		input->PushButton(kControllerNo, ControllerButtonType::X);
+
+	inputState_.actionX.trigger =
+		input->TriggerKey(DIK_J) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::X);
+
+	inputState_.actionX.release =
+		input->ReleaseKey(DIK_J) ||
+		input->ReleaseButton(kControllerNo, ControllerButtonType::X);
+
+	// Kキー / Bボタン
+	inputState_.actionB.hold =
+		input->PushKey(DIK_K) ||
+		input->PushButton(kControllerNo, ControllerButtonType::B);
+
+	inputState_.actionB.trigger =
+		input->TriggerKey(DIK_K) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::B);
+
+	inputState_.actionB.release =
+		input->ReleaseKey(DIK_K) ||
+		input->ReleaseButton(kControllerNo, ControllerButtonType::B);
+
+	// Lキー / Yボタン
+	inputState_.actionY.hold =
+		input->PushKey(DIK_L) ||
+		input->PushButton(kControllerNo, ControllerButtonType::Y);
+
+	inputState_.actionY.trigger =
+		input->TriggerKey(DIK_L) ||
+		input->TriggerButton(kControllerNo, ControllerButtonType::Y);
+
+	inputState_.actionY.release =
+		input->ReleaseKey(DIK_L) ||
+		input->ReleaseButton(kControllerNo, ControllerButtonType::Y);
+}
+
+void Player::UpdateChargeActions()
+{
+	// J / X：攻撃
+	UpdateAttackChargeAction();
+
+	// K / B：特殊ダッシュ
+	UpdateSpecialDashChargeAction();
+
+	// チャージ式のアクションボタンの処理を行うためのラムダ関数
+	auto updateChargeButton =
+		[this](ChargeButtonState& charge, const ButtonInputState& input, auto startAction)
+		{
+			if (input.trigger) {
+				charge.charging = true;
+				charge.frameCount = 0;
+			}
+
+			if (charge.charging && input.hold) {
+				if (charge.frameCount < status_.kMaxChargeFrame) {
+					++charge.frameCount;
+				}
+			}
+
+			if (charge.charging && input.release) {
+				const float chargeRate = CalcChargeRate(charge);
+
+				startAction(chargeRate);
+
+				charge.charging = false;
+				charge.frameCount = 0;
+			}
+		};
+
+	// L / Y：高ジャンプ
+	updateChargeButton(
+		highJumpCharge_,
+		inputState_.actionY,
+		[this](float chargeRate)
+		{
+			StartHighJump(chargeRate);
+		}
+	);
+}
+
+void Player::StartSpecialDash(float chargeRate)
+{
+	// 地面にいない場合は特殊ダッシュしない
+	if (!onGround_) {
+		return;
+	}
+
+	// 左右入力中は特殊ダッシュしない
+	if (inputState_.moveRight || inputState_.moveLeft) {
+		return;
+	}
+
+	// 通常ダッシュ中は特殊ダッシュしない
+	if (isDash_) {
+		return;
+	}
+
+	// すでに特殊ダッシュ中なら開始しない
+	if (isSpecialDash_) {
+		return;
+	}
+
+	// スペシャルダッシュ開始
+	isSpecialDash_ = true;
+
+	// スペシャルダッシュのフレーム数をリセット
+	specialDashTimer_ = status_.kSpecialDashFrame;
+
+	// ダッシュ方向
+	specialDashDirection_ = direction_ == Direction::kRight ? 1 : -1;
+
+	// チャージ率に応じたダッシュ速度を計算
+	specialDashSpeed_ = std::lerp(
+		status_.kSpecialDashMinSpeed,
+		status_.kSpecialDashSpeed,
+		chargeRate
+	);
+
+	// X方向の速度を設定
+	velocity_.x = specialDashSpeed_ * specialDashDirection_;
+
+	// 特殊ダッシュ発動時の後方爆発
+	EmitSpecialDashBurst();
+}
+
+void Player::StartHighJump(float chargeRate)
+{
+	// ハイジャンプ開始
+	// ジャンプができるのは地面にいるときだけ
+	if (!onGround_) return;
+
+	// ジャンプスイッチを切り替える
+	map_->ToggleJumpSwitch();
+	// ジャンプエフェクトを出す
+	EmitJumpParticle();
+
+	// チャージ率に応じたジャンプ力を計算
+	float jumpPower = std::lerp(
+		status_.kHighJumpPower,
+		status_.kMaxHighJumpPower,
+		chargeRate
+	);
+
+	// ジャンプブロックに触れている場合はさらにジャンプ力を上乗せ
+	if (IsOnJumpBlock()) {
+		jumpPower = (std::max)(jumpPower, status_.kJumpBlockPower);
+	}
+
+	// Y方向の速度を設定してジャンプ開始
+	velocity_.y = jumpPower;
+	onGround_ = false;
+}
+
+void Player::StartAttack(float chargeRate)
+{
+	if(isAttack_) {
+		return;
+	}
+
+	if(isSpecialDash_) {
+		return;
+	}
+
+	if (!CanChargeAttack()) {
+		return;
+	}
+
+	isAttack_ = true;
+	attackTimer_ = status_.kAttackFrame;
+	attackChargeRate_ = std::clamp(chargeRate, 0.0f, 1.0f);
+
+	// 攻撃開始のエフェクト
+	EmitAttackReleaseEffect();
+}
+
+bool Player::TryBreakBlockBySpecialDash(const CollisionMapInfo& collisionInfo)
+{
+	if (!map_ || !playerModel_) {
+		return false;
+	}
+
+	if (!isSpecialDash_) {
+		return false;
+	}
+
+	if (specialDashDirection_ == 0) {
+		return false;
+	}
+
+	Vector3 position = playerModel_->GetTranslate();
+
+	// 縦方向は、衝突判定で使われた移動後の位置に寄せる
+	position.y += collisionInfo.move.y;
+
+	// 現在の横端ではなく、特殊ダッシュで進む先まで見る
+	float forwardDistance = std::abs(specialDashSpeed_) + status_.kEpsilon;
+
+	float checkX =
+		position.x +
+		static_cast<float>(specialDashDirection_) *
+		(status_.kWidth * 0.5f + forwardDistance);
+
+	// 横3点：上・中央・下
+	std::array<Vector3, 3> checkPoints = {
+		Vector3{ checkX, position.y + status_.kHeight * 0.35f, position.z },
+		Vector3{ checkX, position.y,                         position.z },
+		Vector3{ checkX, position.y - status_.kHeight * 0.35f, position.z }
+	};
+
+	bool brokeBlock = false;
+
+	for (const Vector3& point : checkPoints) {
+		IndexSet indexSet = map_->GetMapChipIndexSetByPosition(point);
+		BlockType blockType = map_->GetMapChipTypeByIndex(indexSet.xIndex, indexSet.yIndex);
+
+		if (IsHitBlockBreakableTable(blockType)) {
+			map_->BreakBlock(indexSet.xIndex, indexSet.yIndex);
+			brokeBlock = true;
+		}
+	}
+
+	return brokeBlock;
+}
+
+void Player::UpdateAttack()
+{
+	// 攻撃中でなければ何もしない
+	if (!isAttack_) {
+		return;
+	}
+	// 攻撃時間のカウントダウン
+	if (attackTimer_ > 0) {
+		--attackTimer_;
+	}
+	// 攻撃時間が0になったら攻撃終了
+	if (attackTimer_ == 0) {
+		isAttack_ = false;
+		attackChargeRate_ = 0.0f;
+	}
+}
+
+bool Player::CanChargeAttack() const
+{
+	// 操作不能中は攻撃不可
+	if (!controlEnabled_) {
+		return false;
+	}
+
+	// 地面にいないなら攻撃不可
+	if (!onGround_) {
+		return false;
+	}
+
+	// すでに攻撃中なら不可
+	if (isAttack_) {
+		return false;
+	}
+
+	// 特殊ダッシュ中は不可
+	if (isSpecialDash_) {
+		return false;
+	}
+
+	// 通常ダッシュ中は不可
+	if (isDash_) {
+		return false;
+	}
+
+	// 左右入力中は不可
+	if (inputState_.moveRight || inputState_.moveLeft) {
+		return false;
+	}
+
+	// 横速度がまだ残っているなら不可
+	if (std::abs(velocity_.x) > status_.kAttackStopVelocityThreshold) {
+		return false;
+	}
+
+	return true;
+}
+
+void Player::UpdateAttackChargeAction()
+{
+	// J / Xを押した瞬間
+	if (inputState_.actionX.trigger) {
+		// その場にいないならチャージ開始しない
+		if (!CanChargeAttack()) {
+			attackCharge_ = {};
+			return;
+		}
+
+		attackCharge_.charging = true;
+		attackCharge_.frameCount = 0;
+	}
+
+	// チャージ中でなければ何もしない
+	if (!attackCharge_.charging) {
+		return;
+	}
+
+	// チャージ中に動いたらキャンセル
+	if (!CanChargeAttack()) {
+		attackCharge_ = {};
+		return;
+	}
+
+	// 押している間はチャージ
+	if (inputState_.actionX.hold) {
+		if (attackCharge_.frameCount < status_.kMaxChargeFrame) {
+			++attackCharge_.frameCount;
+		}
+	}
+
+	// 離した瞬間に攻撃
+	if (inputState_.actionX.release) {
+		float chargeRate = 0.0f;
+
+		if (attackCharge_.frameCount >= status_.kMinChargeFrame) {
+			chargeRate =
+				static_cast<float>(attackCharge_.frameCount - status_.kMinChargeFrame) /
+				static_cast<float>(status_.kMaxChargeFrame - status_.kMinChargeFrame);
+
+			chargeRate = std::clamp(chargeRate, 0.0f, 1.0f);
+		}
+
+		StartAttack(chargeRate);
+
+		attackCharge_ = {};
+	}
+}
+
+void Player::UpdateSpecialDashChargeAction()
+{
+	// K / B を押した瞬間
+	if (inputState_.actionB.trigger) {
+		// 止まっていないならチャージ開始しない
+		if (!CanChargeSpecialDash()) {
+			specialDashCharge_ = {};
+			return;
+		}
+
+		specialDashCharge_.charging = true;
+		specialDashCharge_.frameCount = 0;
+	}
+
+	// チャージ中でなければ何もしない
+	if (!specialDashCharge_.charging) {
+		return;
+	}
+
+	// チャージ中に動いたらキャンセル
+	if (!CanChargeSpecialDash()) {
+		specialDashCharge_ = {};
+		return;
+	}
+
+	// 押している間はチャージ
+	if (inputState_.actionB.hold) {
+		if (specialDashCharge_.frameCount < status_.kMaxChargeFrame) {
+			++specialDashCharge_.frameCount;
+		}
+	}
+
+	// 離した瞬間に特殊ダッシュ
+	if (inputState_.actionB.release) {
+		const float chargeRate = CalcChargeRate(specialDashCharge_);
+
+		StartSpecialDash(chargeRate);
+
+		specialDashCharge_ = {};
+	}
+}
+
+float Player::CalcChargeRate(const ChargeButtonState& charge) const
+{
+	// チャージ中でなければ0
+	if (charge.frameCount < status_.kMinChargeFrame) {
+		return 0.0f;
+	}
+
+	// チャージ率を計算
+	const uint32_t chargeFrameRange = status_.kMaxChargeFrame - status_.kMinChargeFrame;
+
+	// チャージフレームの範囲が0の場合は、チャージ率を1.0f
+	if(chargeFrameRange == 0) {
+		return 1.0f;
+	}
+
+	// チャージ率を0.0f～1.0fの範囲で計算
+	float chargeRate = 
+		static_cast<float>(charge.frameCount - status_.kMinChargeFrame) /
+		static_cast<float>(chargeFrameRange);
+
+	// チャージ率を0.0f～1.0fの範囲に収める
+	return std::clamp(chargeRate, 0.0f, 1.0f);
+}
+
+void Player::UpdateChargeEffects()
+{
+	// エフェクトがない場合は何もしない
+	if (!playerModel_) {
+		return;
+	}
+
+	// チャージダッシュのエフェクト更新
+	UpdateSpecialDashChargeEffect();
+	// ハイジャンプのエフェクト更新
+	UpdateHighJumpChargeEffect();
+	// チャージ攻撃のエフェクト更新
+	UpdateAttackChargeEffect();
+	
+}
+
+
+
+void Player::UpdateSpecialDashChargeEffect()
+{
+	if (!specialDashChargeEffect_ || !playerModel_) {
+		return;
+	}
+
+	if (!specialDashCharge_.charging) {
+		if (wasSpecialDashCharging_) {
+			specialDashChargeEffect_->Pause();
+		}
+
+		wasSpecialDashCharging_ = false;
+		return;
+	}
+
+	const float chargeRate = CalcChargeRate(specialDashCharge_);
+	const float dir = direction_ == Direction::kRight ? 1.0f : -1.0f;
+
+	Vector3 pos = GetFootParticlePos();
+
+	// 進行方向とは逆側に出すと、タイヤが空回りしている感じになる
+	pos.x -= dir * 0.35f;
+	pos.y += 0.05f;
+	pos.z -= 0.5f;
+
+
+	const float emissionRate = std::lerp(35.0f, 90.0f, chargeRate);
+
+	specialDashChargeEffect_->SetTranslate(pos);
+	specialDashChargeEffect_->SetEmissionRate(emissionRate);
+
+	if (!wasSpecialDashCharging_) {
+		specialDashChargeEffect_->Play();
+	}
+
+	wasSpecialDashCharging_ = true;
+}
+
+void Player::UpdateHighJumpChargeEffect()
+{
+	if (!highJumpChargeEffect_ || !playerModel_) {
+		return;
+	}
+
+	if (!highJumpCharge_.charging) {
+		if (wasHighJumpCharging_) {
+			highJumpChargeEffect_->Pause();
+		}
+
+		wasHighJumpCharging_ = false;
+		return;
+	}
+
+	const float chargeRate = CalcChargeRate(highJumpCharge_);
+
+	Vector3 pos = playerModel_->GetTranslate();
+	pos.y += status_.kHeight * 0.4f;
+	pos.z -= 0.5f;
+
+	highJumpChargeEffect_->SetTranslate(pos);
+	highJumpChargeEffect_->SetEmissionRate(std::lerp(8.0f, 24.0f, chargeRate));
+
+	if (!wasHighJumpCharging_) {
+		highJumpChargeEffect_->Play();
+	}
+
+	wasHighJumpCharging_ = true;
+}
+
+void Player::UpdateAttackChargeEffect()
+{
+	if (!attackChargeEffect_ || !playerModel_) {
+		return;
+	}
+
+	if (!attackCharge_.charging) {
+		if (wasAttackCharging_) {
+			attackChargeEffect_->Pause();
+
+			Vector3 rot = playerModel_->GetRotate();
+			rot.x = 0.0f;
+			playerModel_->SetRotate(rot);
+		}
+
+		wasAttackCharging_ = false;
+		attackChargeVisualAngle_ = 0.0f;
+		return;
+	}
+
+	const float chargeRate = CalcChargeRate(attackCharge_);
+	const float dir = direction_ == Direction::kRight ? 1.0f : -1.0f;
+
+	Vector3 pos = playerModel_->GetTranslate();
+
+	// 少し手前に出して見やすくする
+	pos.z -= 0.5f;
+
+	attackChargeEffect_->SetTranslate(pos);
+	attackChargeEffect_->SetEmissionRate(std::lerp(25.0f, 80.0f, chargeRate));
+
+	const float spinSpeed = std::lerp(0.25f, 0.75f, chargeRate);
+	attackChargeVisualAngle_ += spinSpeed;
+
+	Vector3 rot = playerModel_->GetRotate();
+
+	// X軸高速回転 + Y軸にもひねり
+	rot.x = attackChargeVisualAngle_;
+	rot.y += dir * spinSpeed * 0.6f;
+
+	playerModel_->SetRotate(rot);
+
+	if (!wasAttackCharging_) {
+		attackChargeEffect_->Play();
+	}
+
+	wasAttackCharging_ = true;
+}
+
+void Player::EmitSpecialDashBurst()
+{
+	if (!specialDashBurstEffect_ || !playerModel_) {
+		return;
+	}
+
+	Vector3 pos = playerModel_->GetTranslate();
+
+	// 特殊ダッシュの進行方向
+	const float dir = static_cast<float>(specialDashDirection_);
+
+	// 進行方向とは逆側に爆発を置く
+	pos.x -= dir * 0.45f;
+
+	// 足元寄り
+	pos.y -= status_.kHeight * 0.25f;
+
+	// 少し手前に出して見やすくする
+	pos.z -= 0.5f;
+
+	specialDashBurstEffect_->SetTranslate(pos);
+	specialDashBurstEffect_->Play();
+}
+
+
+void Player::EmitAttackReleaseEffect()
+{
+	if (!attackReleaseEffect_ || !playerModel_) {
+		return;
+	}
+
+	const float dir = direction_ == Direction::kRight ? 1.0f : -1.0f;
+
+	Vector3 pos = playerModel_->GetTranslate();
+
+	const float attackRange =
+		status_.kAttackRange +
+		status_.kAttackChargeRangeBonus * attackChargeRate_;
+
+	// プレイヤー前方、攻撃判定の始点〜中央あたり
+	pos.x += dir * (status_.kWidth * 0.5f + attackRange * 0.25f);
+	pos.y += 0.05f;
+	pos.z -= 0.5f;
+
+	if (direction_ == Direction::kRight) {
+		attackReleaseEffect_->SetEffectType(
+			ParticleManager::EffectType::AttackReleaseEnergyRight
+		);
+	} else {
+		attackReleaseEffect_->SetEffectType(
+			ParticleManager::EffectType::AttackReleaseEnergyLeft
+		);
+	}
+
+	attackReleaseEffect_->SetTranslate(pos);
+
+	// チャージ率で強さを変える
+	// 弧を見せるため、粒子数を少し多めにする
+	attackReleaseEffect_->SetEmissionRate(
+		std::lerp(160.0f, 260.0f, attackChargeRate_)
+	);
+
+	attackReleaseEffect_->SetBurstCount(
+		static_cast<uint32_t>(std::lerp(24.0f, 46.0f, attackChargeRate_))
+	);
+
+	attackReleaseEffect_->Play();
+}
+
+
+bool Player::OnAttackCollision(Collider* other)
+{
+	// 攻撃中でなければ攻撃判定はない
+	if (!other) {
+		return false;
+	}
+	// 攻撃中でなければ攻撃判定はない
+	if (!isAttack_) {
+		return false;
+	}
+	// 攻撃判定は敵にしかない
+	if (other->GetType() != Collider::Type::Enemy) {
+		return false;
+	}
+
+	// 攻撃で敵を倒す
+	AttackEnemy(other);
+
+	return true;
+}
+
 
 void Player::Respawn(const Vector3& pos)
 {
@@ -4822,6 +5573,33 @@ void Player::Respawn(const Vector3& pos)
 	isDying_ = false;
 	deathDemoFinished_ = false;
 	onGround_ = true;
+
+	// 攻撃状態のリセット
+	isAttack_ = false;
+	attackCharge_ = {};
+	attackTimer_ = 0;
+	attackChargeRate_ = 0.0f;
+
+	// ハイジャンプ状態のリセット
+	highJumpCharge_ = {};
+
+	// 特殊ダッシュ状態のリセット
+	specialDashCharge_ = {};
+	isSpecialDash_ = false;
+	specialDashTimer_ = 0;
+	specialDashDirection_ = 0;
+	specialDashSpeed_ = 0.0f;
+
+	// チャージエフェクトの解放
+	if (attackChargeEffect_) attackChargeEffect_->Pause();
+	if (specialDashChargeEffect_) specialDashChargeEffect_->Pause();
+	if (highJumpChargeEffect_) highJumpChargeEffect_->Pause();
+	if (specialDashBurstEffect_) specialDashBurstEffect_->Pause();
+	if (attackReleaseEffect_) attackReleaseEffect_->Pause();
+	// チャージエフェクトの解放
+	wasAttackCharging_ = false;
+	wasSpecialDashCharging_ = false;
+	wasHighJumpCharging_ = false;
 }
 
 void Player::BeginDeathDemo(const Vector3& cameraPos)
@@ -4881,6 +5659,42 @@ bool Player::ConsumeDeathByFalling()
 	return true;
 }
 
+bool Player::CanChargeSpecialDash() const
+{
+	// 操作不能中は不可
+	if (!controlEnabled_) {
+		return false;
+	}
+
+	// 地面にいないなら不可
+	if (!onGround_) {
+		return false;
+	}
+
+	// 左右入力中は不可
+	if (inputState_.moveRight || inputState_.moveLeft) {
+		return false;
+	}
+
+	// 通常ダッシュ中は不可
+	if (isDash_) {
+		return false;
+	}
+
+	// すでに特殊ダッシュ中なら不可
+	if (isSpecialDash_) {
+		return false;
+	}
+
+	// 横速度がまだ残っているなら不可
+	if (std::abs(velocity_.x) > status_.kAttackStopVelocityThreshold) {
+		return false;
+	}
+
+	return true;
+}
+
+
 
 void Player::FlashingUpdate()
 {
@@ -4936,20 +5750,15 @@ void Player::PlayerTurn()
 
 void Player::UpdateDashEffect()
 {
-	auto* input = Input::GetInstance();
 
-	const bool movingRight =
-		(input->PushKey(DIK_D) || IsControllerRightHold(input)) &&
-		!(input->PushKey(DIK_A) || IsControllerLeftHold(input));
-
-	const bool movingLeft =
-		(input->PushKey(DIK_A) || IsControllerLeftHold(input)) &&
-		!(input->PushKey(DIK_D) || IsControllerRightHold(input));
-
+	// ダッシュエフェクトの更新
+	const bool movingRight = inputState_.moveRight && !inputState_.moveLeft;
+	const bool movingLeft = inputState_.moveLeft && !inputState_.moveRight;
+	// ダッシュが有効で、かつダッシュ方向に移動しているか
 	const bool dashActiveRight = isDash_ && (dashDirection_ == +1) && movingRight;
 	const bool dashActiveLeft = isDash_ && (dashDirection_ == -1) && movingLeft;
 	const bool dashActive = dashActiveRight || dashActiveLeft;
-
+	// ダッシュエフェクトを表示できる条件 / ダッシュ中かつ地面にいる
 	const bool canShowEffect = dashActive && onGround_;
 
 	Vector3 playerPos = playerModel_->GetTranslate();
@@ -4985,15 +5794,8 @@ void Player::UpdateMoveEffect()
 {
 	if (!moveEffect_ || !playerModel_) { return; }
 
-	auto* input = Input::GetInstance();
-
-	const bool rightHold =
-		input->PushKey(DIK_D) ||
-		IsControllerRightHold(input);
-
-	const bool leftHold =
-		input->PushKey(DIK_A) ||
-		IsControllerLeftHold(input);
+	const bool rightHold = inputState_.moveRight;
+	const bool leftHold = inputState_.moveLeft;
 
 	const bool movingRight = rightHold && !leftHold;
 	const bool movingLeft = leftHold && !rightHold;
@@ -5044,7 +5846,6 @@ void Player::Initialize(Vector3 position)
 	moveEffect_->Pause();
 	moveEffect_->SetEmissionRate(5.0f);
 	moveEffect_->SetLoop(true);
-	//moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
 	moveEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 
@@ -5055,7 +5856,6 @@ void Player::Initialize(Vector3 position)
 	dashSmokeEffect_->Pause();
 	dashSmokeEffect_->SetEmissionRate(15.0f);
 	dashSmokeEffect_->SetLoop(true);
-	//dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
 	dashSmokeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 
@@ -5075,7 +5875,7 @@ void Player::Initialize(Vector3 position)
 	stompEffect_->SetEmissionRate(30.0f);
 	stompEffect_->SetLoop(false);
 	stompEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
- 
+
 
 	// ジャンプの開始と着地のパーティクル
 	jumpEffect_ = ParticlePresets::CreateJumpDust(position);
@@ -5084,6 +5884,32 @@ void Player::Initialize(Vector3 position)
 	// ジャンプブロックに乗っているときの上昇エフェクト / 初期状態は停止
 	jumpBlockArrowEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
 	jumpBlockArrowEffect_->Pause();
+
+
+	// 攻撃チャージエフェクト
+	attackChargeEffect_ = ParticlePresets::CreateAttackChargeEnergy(position);
+	attackChargeEffect_->Pause();
+
+	// 攻撃発動時の放出エフェクト
+	attackReleaseEffect_ = ParticlePresets::CreateAttackReleaseEnergy(position);
+	attackReleaseEffect_->Pause();
+
+	// 特殊ダッシュチャージエフェクト
+	specialDashChargeEffect_ = ParticlePresets::CreateFireSparkCharge(position);
+	specialDashChargeEffect_->Pause();
+	specialDashChargeEffect_->SetLoop(true);
+	specialDashChargeEffect_->SetEmissionRate(25.0f);
+	specialDashChargeEffect_->SetColor(Vector4(1.0f, 0.55f, 0.15f, 1.0f));
+
+	specialDashBurstEffect_ = ParticlePresets::CreateSpecialDashBurst(position);
+	specialDashBurstEffect_->Pause();
+
+	// 高ジャンプチャージエフェクト
+	highJumpChargeEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
+	highJumpChargeEffect_->Pause();
+	highJumpChargeEffect_->SetLoop(true);
+	highJumpChargeEffect_->SetEmissionRate(8.0f);
+	highJumpChargeEffect_->SetColor(Vector4(0.5f, 0.8f, 1.0f, 1.0f));
 
 }
 
@@ -5107,7 +5933,7 @@ void Player::Update()
 			if (!wasOnJumpBlock_) {
 				jumpBlockArrowEffect_->Play();
 			}
-		} 
+		}
 		// 乗っていないときはエフェクトを停止
 		else {
 			jumpBlockArrowEffect_->Pause();
@@ -5117,20 +5943,24 @@ void Player::Update()
 	// 前フレームの状態を保持
 	wasOnJumpBlock_ = onJumpBlockNow;
 
-	
+
 	if (isDying_) {
 		UpdateDeathDemo();
 		playerModel_->Update();
 		return;
 	}
+	// 入力の更新
+	UpdateInput();
 	// プレイヤーの挙動更新
 	UpdateBehavior();
-	// 通常移動エフェクトの更新
+	// 移動エフェクトの更新
 	UpdateMoveEffect();
 	// ダッシュエフェクトの更新
 	UpdateDashEffect();
 	// プレイヤーの回転
 	PlayerTurn();
+	// チャージエフェクトの更新
+	UpdateChargeEffects();
 	// エネミーにヒットしたら
 	FlashingUpdate();
 
@@ -5149,8 +5979,15 @@ void Player::Update()
 	if (jumpEffect_)jumpEffect_->Update();
 	if (landEffect_)landEffect_->Update();
 	if (jumpBlockArrowEffect_)jumpBlockArrowEffect_->Update();
-	
 
+
+	// チャージ類のエフェクト更新
+	if (attackChargeEffect_) attackChargeEffect_->Update();
+	if (specialDashChargeEffect_) specialDashChargeEffect_->Update();
+	if (highJumpChargeEffect_) highJumpChargeEffect_->Update();
+
+	if (specialDashBurstEffect_) specialDashBurstEffect_->Update();
+	if (attackReleaseEffect_) attackReleaseEffect_->Update();
 }
 
 
@@ -5183,6 +6020,10 @@ void Player::UpdateBehavior()
 	Move();
 	// ジャンプ処理
 	Jump();
+	// 攻撃処理
+	UpdateAttack();
+	// チャージ項目の更新
+	UpdateChargeActions();
 
 	// 当たり判定処理
 	CollisionMapInfo collisionInfo;
@@ -5238,32 +6079,47 @@ void Player::Move()
 		return;
 	}
 
-	auto* input = Input::GetInstance();
+	// スペシャルダッシュ中は通常の移動処理を行わない
+	if (isSpecialDash_) {
+		// チャージ率で決まった速度を維持
+		velocity_.x = specialDashSpeed_ * specialDashDirection_;
+
+		// ダッシュ中も転がっているように回転させる
+		Vector3 rotate = playerModel_->GetRotate();
+
+		// 通常移動と同じ向きで回転
+		// 倍率を掛けることで、特殊ダッシュらしく速く転がる
+		rotate.z -= velocity_.x * kSpecialDashRollScale;
+
+		playerModel_->SetRotate(rotate);
+
+		// ダッシュ時間のカウントダウン
+		if (specialDashTimer_ > 0) {
+			--specialDashTimer_;
+		} else {
+			isSpecialDash_ = false;
+			specialDashDirection_ = 0;
+			specialDashSpeed_ = 0.0f;
+		}
+
+		// 通常の移動処理は行わない
+		return;
+	}
+
 
 	//==================================================
 	// 入力状態
 	// キーボード + コントローラー
 	//==================================================
 
-	const bool keyRightHold = input->PushKey(DIK_D);
-	const bool keyLeftHold = input->PushKey(DIK_A);
+	const bool rightHold = inputState_.moveRight;
+	const bool leftHold = inputState_.moveLeft;
 
-	const bool controllerRightHold = IsControllerRightHold(input);
-	const bool controllerLeftHold = IsControllerLeftHold(input);
-
-	const bool rightHold = keyRightHold || controllerRightHold;
-	const bool leftHold = keyLeftHold || controllerLeftHold;
-
-	const bool rightTrig =
-		input->TriggerKey(DIK_D) ||
-		IsControllerRightTrigger(input);
-
-	const bool leftTrig =
-		input->TriggerKey(DIK_A) ||
-		IsControllerLeftTrigger(input);
+	const bool rightTrig = inputState_.triggerRight;
+	const bool leftTrig = inputState_.triggerLeft;
 
 	//==================================================
-	// ダブルタップ用タイマー更新
+	// ダッシュ判定用タイマー更新
 	//==================================================
 
 	if (rightTapTimer_ > 0) { --rightTapTimer_; }
@@ -5315,13 +6171,16 @@ void Player::Move()
 
 	Vector3 acceleration{};
 
+	// ダッシュが有効で、かつダッシュ方向に移動しているか
 	const bool dashActiveRight = isDash_ && (dashDirection_ == +1) && movingRight;
 	const bool dashActiveLeft = isDash_ && (dashDirection_ == -1) && movingLeft;
 	const bool dashActive = dashActiveRight || dashActiveLeft;
 
+	// ダッシュ中は加速度と最大速度が上がる
 	float dashScale = dashActive ? status_.kDashSpeedScale : 1.0f;
 	float maxSpeed = status_.kMaxSpeed * dashScale;
 
+	// 移動入力に応じた加速度の計算
 	if (movingRight) {
 		if (velocity_.x < 0.0f) {
 			velocity_.x *= (1.0f - status_.kAttenuation);
@@ -5336,7 +6195,9 @@ void Player::Move()
 
 		acceleration.x -= status_.kAcceleration * dashScale;
 		direction_ = Direction::kLeft;
-	} else {
+	}
+	// 移動入力がない場合は速度を減衰させる
+	else {
 		velocity_.x *= (1.0f - status_.kAttenuation);
 	}
 
@@ -5352,6 +6213,7 @@ void Player::Move()
 		rotate.z = 0.0f;
 	}
 
+	// 回転の設定
 	playerModel_->SetRotate(rotate);
 
 	// 最大速度制限
@@ -5371,12 +6233,7 @@ void Player::Jump()
 		return;
 	}
 
-	auto* input = Input::GetInstance();
-
-	const bool jumpTrigger =
-		input->TriggerKey(DIK_SPACE) ||
-		input->PushKey(DIK_W) ||
-		IsControllerJumpTrigger(input);
+	const bool jumpTrigger = inputState_.jump;
 
 	// 地面にいる場合
 	if (onGround_) {
@@ -5526,6 +6383,26 @@ void Player::LandingCollisionMove(CollisionMapInfo& collisionInfo)
 void Player::WallCollisionMove(CollisionMapInfo& collisionInfo)
 {
 	if (collisionInfo.hitWall) {
+		if (isSpecialDash_) {
+			// 特殊ダッシュで破壊可能ブロックを壊せたか
+			bool brokeBlock = TryBreakBlockBySpecialDash(collisionInfo);
+
+			// 特殊ダッシュは壁に衝突したら終了
+			isSpecialDash_ = false;
+			specialDashDirection_ = 0;
+			specialDashSpeed_ = 0.0f;
+
+			// 特殊ダッシュのキャンセル
+			if (!brokeBlock) {
+				velocity_.x = 0.0f;
+				collisionInfo.move.x = 0.0f;
+				return;
+			}
+			// 壊せないブロックに衝突
+			velocity_.x = 0.0f;
+			collisionInfo.move.x = 0.0f;
+			return;
+		}
 		// 壁に衝突したら移動量を調整
 		velocity_.x *= (1.0f - status_.kEpsilon);
 	}
@@ -5604,7 +6481,7 @@ bool Player::CheckCollisionPoints(const std::array<Vector3, 2>& posList, Collisi
 		// 当たり判定を取るブロックの種類かどうか
 		if (map_->IsSolidBlockAt(index.xIndex, index.yIndex)) {
 			isHit = true;
-		} 
+		}
 		// ゴールの判定をとるブロックかどうか
 		else if (IsHitGoalBlockTable(chip)) {
 			isGoal_ = true;
@@ -5732,6 +6609,30 @@ void Player::Finalize()
 	if (jumpBlockArrowEffect_) {
 		jumpBlockArrowEffect_->Stop();
 		jumpBlockArrowEffect_.reset();
+	}
+
+	// チャージエフェクト類の解放
+	if (attackChargeEffect_) {
+		attackChargeEffect_->Stop();
+		attackChargeEffect_.reset();
+	}
+
+	if (specialDashChargeEffect_) {
+		specialDashChargeEffect_->Stop();
+		specialDashChargeEffect_.reset();
+	}
+
+	if (highJumpChargeEffect_) {
+		highJumpChargeEffect_->Stop();
+		highJumpChargeEffect_.reset();
+	}
+	if (specialDashBurstEffect_) {
+		specialDashBurstEffect_->Stop();
+		specialDashBurstEffect_.reset();
+	}
+	if (attackReleaseEffect_) {
+		attackReleaseEffect_->Stop();
+		attackReleaseEffect_.reset();
 	}
 }
 
@@ -5939,8 +6840,18 @@ struct PlayerStatus {
 	float kJumpPower = 0.5f;
 	// 踏みつけ時のジャンプ力
 	float kStompJumpPower = 0.3f;
-	// 溜め時間
-	float kMaxChargeTime = 0.2f;
+
+	// チャージ攻撃の速度倍率
+	uint32_t kMinChargeFrame = 10;
+	uint32_t kMaxChargeFrame = 45;
+
+	// スペシャルダッシュのパラメーター
+	float kSpecialDashSpeed = 0.45f;
+	float kSpecialDashMinSpeed = 0.25f;
+	uint32_t kSpecialDashFrame = 12;
+
+	float kHighJumpPower = 0.65f;
+	float kMaxHighJumpPower = 0.85f;
 
 	//当たり判定パラメータ
 	// 幅
@@ -5951,6 +6862,15 @@ struct PlayerStatus {
 	float kBlank = 0.0f;
 	// 微小値
 	float kEpsilon = 0.05f;
+
+	// 攻撃パラメーター
+	uint32_t kAttackFrame = 10;
+	float kAttackRange = 0.75f;
+	float kAttackHeight = 0.55f;
+	float kAttackDepth = 0.5f;
+
+	// チャージ攻撃時にどれだけ攻撃範囲が広がるか
+	float kAttackChargeRangeBonus = 0.45f;
 
 	//減衰パラメーター
 	// 着地時の減衰率
@@ -5967,10 +6887,44 @@ struct PlayerStatus {
 
 	// プレイヤーの体力
 	uint32_t kHealth = 3;
+
+	// チャージ攻撃を使用できる停止判定の速度しきい値
+	float kAttackStopVelocityThreshold = 0.03f;
+
 };
+
 
 class Player :public Collider
 {
+private:
+	struct ButtonInputState {
+		bool hold = false;
+		bool trigger = false;
+		bool release = false;
+	};
+
+	// プレイヤーの入力状態をまとめる構造体
+	struct PlayerInputState {
+		// 左右の入力状態
+		bool moveRight = false;
+		bool moveLeft = false;
+		// ダッシュの入力状態
+		bool triggerRight = false;
+		bool triggerLeft = false;
+		// ジャンプの入力状態
+		bool jump = false;
+
+		ButtonInputState actionA;
+		ButtonInputState actionB;
+		ButtonInputState actionX;
+		ButtonInputState actionY;
+	};
+
+	struct ChargeButtonState {
+		uint32_t frameCount = 0;
+		bool charging = false;
+	};
+
 public:
 
 	/// <summary>
@@ -5985,7 +6939,18 @@ public:
 	// コライダーインターフェイス
 	Collider::Type GetType() const override;
 	AABB GetAABB() const override;
-	void OnCollision(Collider* other)override;
+	void OnCollision(Collider* other) override;
+
+	// 攻撃判定を持っているか
+	bool HasAttackAABB() const override { return isAttack_; }
+
+	// 攻撃判定のAABBを取得
+	AABB GetAttackAABB() const override;
+
+	// 攻撃判定が当たったときの処理
+	bool OnAttackCollision(Collider* other) override;
+
+
 
 public:
 
@@ -6188,6 +7153,22 @@ private:
 	void StompEnemy(Collider* enemy);
 
 	/// <summary>
+	/// エネミーに攻撃が当たったときの処理
+	/// </summary>
+	void DefeatEnemy(Collider* enemy,bool bouncePlayer);
+
+	/// <summary>
+	/// 敵の死亡位置にパーティクルの発生
+	/// </summary>
+	void EmitEnemyDefeatParticle(const Vector3& position);
+
+	/// <summary>
+	/// 攻撃で敵を倒す処理
+	/// </summary>
+	/// <param name="enemy"></param>
+	void AttackEnemy(Collider* enemy);
+
+	/// <summary>
 	/// ダメージブロックに触れているかの判定
 	/// </summary>
 	/// <returns></returns>
@@ -6215,6 +7196,91 @@ private:
 	/// <returns>パーティクルを発生させる足元の位置</returns>
 	Vector3 GetFootParticlePos() const;
 
+	/// <summary>
+	/// プレイヤーの入力状態を更新
+	/// </summary>
+	void UpdateInput();
+
+	/// <summary>
+	/// チャージ項目の処理
+	/// </summary>
+	void UpdateChargeActions();
+
+	/// <summary>
+	/// スペシャルダッシュの処理
+	/// </summary>
+	void StartSpecialDash(float chargeRate);
+
+	/// <summary>
+	/// ハイジャンプの処理
+	/// </summary>
+	void StartHighJump(float chargeRate);
+
+	/// <summary>
+	/// チャージ攻撃の処理
+	/// </summary>
+	void StartAttack(float chargeRate);
+
+	/// <summary>
+	/// スペシャルダッシュ中のブロック破壊処理
+	/// </summary>
+	bool TryBreakBlockBySpecialDash(const CollisionMapInfo& collisionInfo);
+
+
+	/// <summary>
+	/// チャージ攻撃の当たり判定と処理
+	/// </summary>
+	void UpdateAttack();
+
+	/// <summary>
+	/// チャージ攻撃が使用できる状態かどうか
+	/// </summary>
+	bool CanChargeAttack() const;
+
+	/// <summary>
+	/// チャージ攻撃の使用中の処理
+	/// </summary>
+	void UpdateAttackChargeAction();
+
+	/// <summary>
+	/// 特殊ダッシュ専用のチャージ処理
+	/// </summary>
+	void UpdateSpecialDashChargeAction();
+
+	/// <summary>
+	/// チャージ率からスペシャルダッシュの速度を計算
+	/// </summary>
+	float CalcChargeRate(const ChargeButtonState& charge) const;
+
+	/// <summary>
+	/// チャージ攻撃の使用中のエフェクトの更新
+	/// </summary>
+	void UpdateChargeEffects();
+
+	/// <summary>
+	/// スペシャルダッシュのエフェクトの更新
+	/// </summary>
+	void UpdateSpecialDashChargeEffect();
+
+	/// <summary>
+	/// ハイジャンプのエフェクトの更新
+	/// </summary>
+	void UpdateHighJumpChargeEffect();
+
+	/// <summary>
+	/// チャージ攻撃のエフェクトの更新
+	/// </summary>
+	void UpdateAttackChargeEffect();
+
+	/// <summary>
+	/// 特殊ダッシュチャージ後の爆発エフェクトの発生
+	/// </summary>
+	void EmitSpecialDashBurst();
+
+	/// <summary>
+	/// 攻撃発動時のエネルギー放出
+	/// </summary>
+	void EmitAttackReleaseEffect();
 
 public:	/// Setter / Getter
 	// 死亡判定の高さを設定
@@ -6247,6 +7313,14 @@ public:	/// Setter / Getter
 
 	// 落下死フラグを「消費」する（trueなら内部でfalseに戻す）
 	bool ConsumeDeathByFalling();
+
+	// プレイヤーが攻撃中かどうか
+	bool IsAttacking() const { return isAttack_; }
+
+	// 特殊ダッシュが使用可能か
+	bool CanChargeSpecialDash() const;
+
+
 
 
 private:	// メンバ変数
@@ -6356,6 +7430,47 @@ private:	// メンバ変数
 	// ジャンプブロックに触れたときのエフェクト
 	std::unique_ptr<ParticleSystem> jumpBlockArrowEffect_;
 	bool wasOnJumpBlock_ = false;
+
+	// プレイヤーの入力状態
+	PlayerInputState inputState_ = {};
+
+	// チャージ攻撃の状態
+	ChargeButtonState attackCharge_;
+	bool isAttack_ = false;
+	uint32_t attackTimer_ = 0;
+	float attackChargeRate_ = 0.0f;
+
+	// スペシャルダッシュの状態
+	ChargeButtonState specialDashCharge_;
+	bool isSpecialDash_ = false;
+	uint32_t specialDashTimer_ = 0;
+	int32_t specialDashDirection_ = 0;
+	float specialDashSpeed_ = 0.0f;
+	float kSpecialDashRollScale = 1.2f;
+
+	// ハイジャンプのチャージ状態
+	ChargeButtonState highJumpCharge_;
+
+
+	// チャージ攻撃のチャージエフェクト
+	std::unique_ptr<ParticleSystem> attackChargeEffect_;
+	// 特殊ダッシュのチャージエフェクト
+	std::unique_ptr<ParticleSystem> specialDashChargeEffect_;
+	// 特殊ダッシュのチャージ後の爆発エフェクト
+	std::unique_ptr<ParticleSystem> specialDashBurstEffect_;
+	// ハイジャンプのチャージエフェクト
+	std::unique_ptr<ParticleSystem> highJumpChargeEffect_;
+
+	// チャージエフェクト再生状態
+	bool wasAttackCharging_ = false;
+	bool wasSpecialDashCharging_ = false;
+	bool wasHighJumpCharging_ = false;
+
+	// 攻撃チャージ中の見た目用回転角
+	float attackChargeVisualAngle_ = 0.0f;
+
+	// 攻撃発動時のエネルギー放出エフェクト
+	std::unique_ptr<ParticleSystem> attackReleaseEffect_;
 };
 
 
@@ -7852,7 +8967,6 @@ struct AABB
 
 class Collider
 {
-
 public:
 	enum class Type
 	{
@@ -7867,9 +8981,17 @@ public:
 	virtual AABB GetAABB() const = 0;
 
 	virtual void OnCollision(Collider* other) = 0;
+
+	// 攻撃判定を持っているか
+	virtual bool HasAttackAABB() const { return false; }
+
+	// 攻撃判定用AABB
+	virtual AABB GetAttackAABB() const { return GetAABB(); }
+
+	// 攻撃判定が当たったときの処理
+	// 処理したなら true
+	virtual bool OnAttackCollision(Collider* other) { return false; }
 };
-
-
 
 ============================================================
 File Path: Game/Collision/CollisionManager.cpp
@@ -7890,21 +9012,35 @@ void CollisionManager::Clear()
 
 void CollisionManager::CheckAllCollisions()
 {
-	/// 全てのコライダー同士の衝突判定
-    for (size_t i = 0; i < colliders.size(); ++i)
-    {
-        for (size_t j = i + 1; j < colliders.size(); ++j)
-        {
-            Collider* a = colliders[i];
-            Collider* b = colliders[j];
-			/// 衝突判定
-            if (IsColliding(a, b))
+	for (size_t i = 0; i < colliders.size(); ++i)
+	{
+		for (size_t j = i + 1; j < colliders.size(); ++j)
+		{
+			Collider* a = colliders[i];
+			Collider* b = colliders[j];
+
+			if (!a || !b) {
+				continue;
+			}
+
+			// 攻撃判定を先に見る
+			bool handledByAttack = false;
+			handledByAttack |= CheckAttackCollision(a, b);
+			handledByAttack |= CheckAttackCollision(b, a);
+
+			// 攻撃で処理済みなら、通常衝突は行わない
+			// これにより、攻撃が当たったのに同時にダメージを受ける事故を防ぐ
+			if (handledByAttack) {
+				continue;
+			}
+
+			// 通常の本体AABB同士の衝突
+			if (IsColliding(a, b))
 			{
-                /// 衝突している場合、通知を行う
-                NotifyCollision(a, b);
-            }
-        }
-    }
+				NotifyCollision(a, b);
+			}
+		}
+	}
 }
 
 bool CollisionManager::IsColliding(Collider* a, Collider* b) {
@@ -7920,12 +9056,37 @@ void CollisionManager::NotifyCollision(Collider* a, Collider* b) {
     b->OnCollision(a);
 }
 
+bool CollisionManager::CheckAttackCollision(Collider* attacker, Collider* target)
+{
+	// アタッカーが攻撃判定を持っているか
+	if (!attacker || !target) {
+		return false;
+	}
+
+	// アタッカーが攻撃判定を持っていないなら
+	if (!attacker->HasAttackAABB()) {
+		return false;
+	}
+
+	// ターゲットが攻撃判定を持っている
+	const AABB attackAABB = attacker->GetAttackAABB();
+	const AABB targetAABB = target->GetAABB();
+	// 攻撃判定とターゲットの本体AABBが交差しているか
+	if (!attackAABB.Intersects(targetAABB)) {
+		return false;
+	}
+
+	// 交差しているなら、アタッカーに攻撃が当たったことを通知
+	return attacker->OnAttackCollision(target);
+}
+
 ============================================================
 File Path: Game/Collision/CollisionManager.h
 ============================================================
 #pragma once
 #include "engine/math/MyMath.h"
 #include "Game/Collision/Collider.h"
+#include <vector>
 /// <summary>
 /// 衝突判定管理クラス
 /// </summary>
@@ -7957,12 +9118,19 @@ private:
 	/// </summary>
 	void NotifyCollision(Collider* a, Collider* b);
 
+	/// <summary>
+	/// 攻撃判定の衝突判定と処理
+	/// </summary>
+	/// <param name="a">アタッカー</param>
+	/// <param name="b">ターゲット</param>
+	/// <returns>ターゲットが攻撃を受けたかどうか</returns>
+	bool CheckAttackCollision(Collider* a, Collider* b);
+
 private:
 	/// <summary>
 	/// 判定対象リスト
 	/// </summary>
 	std::vector<Collider*>colliders;
-	
 	
 };
 
@@ -8640,6 +9808,7 @@ File Path: Game/Particle/ParticleManager.cpp
 #include <TextureManager.h>
 #include "WinAPI.h"
 #include <numbers>
+#include <cmath>
 
 using namespace Engine;
 
@@ -9631,6 +10800,69 @@ Particle ParticleManager::MakeUpArrowParticle(std::mt19937& randomEngine, const 
 	return p;
 }
 
+Particle ParticleManager::MakeSpecialDashBurstParticle(
+	std::mt19937& randomEngine,
+	const Vector3& position
+)
+{
+	Particle particle;
+
+	// 後方で爆ぜる感じ。横方向に強く散る
+	std::uniform_real_distribution<float> distAngle(0.0f, 2.0f * std::numbers::pi_v<float>);
+	std::uniform_real_distribution<float> distSpeed(1.8f, 4.5f);
+	std::uniform_real_distribution<float> distUpSpeed(0.2f, 1.2f);
+	std::uniform_real_distribution<float> distZ(-0.4f, 0.4f);
+
+	std::uniform_real_distribution<float> distOffset(-0.08f, 0.08f);
+	std::uniform_real_distribution<float> distScale(0.16f, 0.34f);
+	std::uniform_real_distribution<float> distLifetime(0.12f, 0.28f);
+
+	const float angle = distAngle(randomEngine);
+	const float speed = distSpeed(randomEngine);
+
+	particle.velocity = {
+		std::cos(angle) * speed,
+		distUpSpeed(randomEngine),
+		distZ(randomEngine)
+	};
+
+	const float scale = distScale(randomEngine);
+
+	particle.transform.scale = {
+		scale,
+		scale,
+		scale
+	};
+
+	particle.transform.rotate = {
+		0.0f,
+		0.0f,
+		angle
+	};
+
+	particle.transform.translate = {
+		position.x + distOffset(randomEngine),
+		position.y + distOffset(randomEngine),
+		position.z + distOffset(randomEngine)
+	};
+
+	// 爆発・噴射っぽいオレンジ
+	std::uniform_real_distribution<float> distGreen(0.45f, 0.85f);
+	std::uniform_real_distribution<float> distBlue(0.05f, 0.18f);
+
+	particle.color = {
+		1.0f,
+		distGreen(randomEngine),
+		distBlue(randomEngine),
+		1.0f
+	};
+
+	particle.lifeTime = distLifetime(randomEngine);
+	particle.currentTime = 0.0f;
+
+	return particle;
+}
+
 Particle ParticleManager::MakeRingEffect(const Vector3& position) {
 	Particle particle;
 	particle.transform.scale = { 1.0f, 1.0f, 1.0f };     // サイズ（大きすぎると画面外）
@@ -9653,6 +10885,77 @@ Particle ParticleManager::MakeCylinderEffect(const Vector3& position)
 	particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	particle.lifeTime = 1.0f;
 	particle.currentTime = 0.0f;
+	return particle;
+}
+
+Particle ParticleManager::MakeFireSparkParticle(std::mt19937& randomEngine, const Vector3& position)
+{
+	Particle particle;
+
+	// 横方向に強く、少し上にも飛ぶ
+	std::uniform_real_distribution<float> distVelocityX(-7.0f, 7.0f);
+	std::uniform_real_distribution<float> distVelocityY(0.4f, 2.2f);
+	std::uniform_real_distribution<float> distVelocityZ(-0.8f, 0.8f);
+
+	// 発生位置を少しだけばらす
+	std::uniform_real_distribution<float> distOffsetX(-0.08f, 0.08f);
+	std::uniform_real_distribution<float> distOffsetY(-0.03f, 0.08f);
+	std::uniform_real_distribution<float> distOffsetZ(-0.04f, 0.04f);
+
+	// 細長い火花
+	std::uniform_real_distribution<float> distThickness(0.015f, 0.035f);
+	std::uniform_real_distribution<float> distLength(0.12f, 0.28f);
+
+	// 短寿命
+	std::uniform_real_distribution<float> distLifetime(0.08f, 0.18f);
+
+	// 色のばらつき
+	std::uniform_real_distribution<float> distRed(1.2f, 1.8f);
+	std::uniform_real_distribution<float> distGreen(0.45f, 0.85f);
+	std::uniform_real_distribution<float> distBlue(0.05f, 0.20f);
+
+	const float vx = distVelocityX(randomEngine);
+	const float vy = distVelocityY(randomEngine);
+	const float vz = distVelocityZ(randomEngine);
+
+	particle.velocity = {
+		vx,
+		vy,
+		vz
+	};
+
+	particle.transform.translate = {
+		position.x + distOffsetX(randomEngine),
+		position.y + distOffsetY(randomEngine),
+		position.z + distOffsetZ(randomEngine)
+	};
+
+	// 細長い板状にする
+	particle.transform.scale = {
+		distThickness(randomEngine),
+		distLength(randomEngine),
+		1.0f
+	};
+
+	// 速度方向に伸びて見えるように回転
+	float angle = std::atan2(vy, vx);
+	particle.transform.rotate = {
+		0.0f,
+		0.0f,
+		angle - std::numbers::pi_v<float> *0.5f
+	};
+
+	// 加算前提なので少し強めの色
+	particle.color = {
+		distRed(randomEngine),
+		distGreen(randomEngine),
+		distBlue(randomEngine),
+		1.0f
+	};
+
+	particle.lifeTime = distLifetime(randomEngine);
+	particle.currentTime = 0.0f;
+
 	return particle;
 }
 
@@ -9788,12 +11091,22 @@ Particle ParticleManager::MakeParticleByType(std::mt19937& randomEngine, const V
 		return MakeSmokeParticle(randomEngine, position);
 	case EffectType::Spark:
 		return MakeSparkParticle(randomEngine, position);
+	case EffectType::FireSpark:
+		return MakeFireSparkParticle(randomEngine, position);
+	case EffectType::SpecialDashBurst:
+		return MakeSpecialDashBurstParticle(randomEngine, position);
 	case EffectType::JumpDust:
 		return MakeJumpDustParticle(randomEngine, position);
 	case EffectType::LandDust:
 		return MakeLandDustParticle(randomEngine, position);
 	case EffectType::UpArrow:
 		return MakeUpArrowParticle(randomEngine, position);
+	case EffectType::AttackChargeEnergy:
+		return MakeAttackChargeEnergyParticle(randomEngine, position);
+	case EffectType::AttackReleaseEnergyRight:
+		return MakeAttackReleaseEnergyRightParticle(randomEngine, position);
+	case EffectType::AttackReleaseEnergyLeft:
+		return MakeAttackReleaseEnergyLeftParticle(randomEngine, position);
 	case EffectType::Default:
 	default:
 		return MakeParticle(randomEngine, position);
@@ -9808,6 +11121,7 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 {
 	Particle particle;
 
+	// EffectTypeに応じて適切なパーティクルを生成
 	switch (type)
 	{
 	case EffectType::Explosion:
@@ -9819,6 +11133,12 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 	case EffectType::Spark:
 		particle = MakeSparkParticle(randomEngine, position);
 		break;
+	case EffectType::FireSpark:
+		particle = MakeFireSparkParticle(randomEngine, position);
+		break;
+	case EffectType::SpecialDashBurst:
+		particle = MakeSpecialDashBurstParticle(randomEngine, position);
+		break;
 	case EffectType::JumpDust:
 		particle = MakeJumpDustParticle(randomEngine, position);
 		break;
@@ -9827,6 +11147,15 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 		break;
 	case EffectType::UpArrow:
 		particle = MakeUpArrowParticle(randomEngine, position);
+		break;
+	case EffectType::AttackChargeEnergy:
+		particle = MakeAttackChargeEnergyParticle(randomEngine, position);
+		break;
+	case EffectType::AttackReleaseEnergyRight:
+		particle = MakeAttackReleaseEnergyRightParticle(randomEngine, position);
+		break;
+	case EffectType::AttackReleaseEnergyLeft:
+		particle = MakeAttackReleaseEnergyLeftParticle(randomEngine, position);
 		break;
 	case EffectType::Default:
 	default:
@@ -9839,6 +11168,225 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 	particle.color.y *= colorTint.y;
 	particle.color.z *= colorTint.z;
 	particle.color.w *= colorTint.w;
+
+	return particle;
+}
+
+Particle ParticleManager::MakeAttackChargeEnergyParticle(
+	std::mt19937& randomEngine,
+	const Vector3& position
+)
+{
+	Particle particle;
+
+	// プレイヤー周囲に発生させる
+	std::uniform_real_distribution<float> distAngle(0.0f, 2.0f * std::numbers::pi_v<float>);
+	std::uniform_real_distribution<float> distRadius(0.45f, 1.05f);
+	std::uniform_real_distribution<float> distYScale(0.45f, 0.85f);
+	std::uniform_real_distribution<float> distZ(-0.08f, 0.08f);
+
+	std::uniform_real_distribution<float> distScale(0.045f, 0.095f);
+	std::uniform_real_distribution<float> distLifetime(0.18f, 0.35f);
+
+	const float angle = distAngle(randomEngine);
+	const float radius = distRadius(randomEngine);
+
+	Vector3 spawnPos{
+		position.x + std::cos(angle) * radius,
+		position.y + std::sin(angle) * radius * distYScale(randomEngine),
+		position.z + distZ(randomEngine)
+	};
+
+	particle.transform.translate = spawnPos;
+
+	// 中心へ向かう方向
+	Vector3 toCenter{
+		position.x - spawnPos.x,
+		position.y - spawnPos.y,
+		position.z - spawnPos.z
+	};
+
+	float length = std::sqrt(
+		toCenter.x * toCenter.x +
+		toCenter.y * toCenter.y +
+		toCenter.z * toCenter.z
+	);
+
+	if (length > 0.0001f) {
+		toCenter.x /= length;
+		toCenter.y /= length;
+		toCenter.z /= length;
+	}
+
+	std::uniform_real_distribution<float> distSpeed(2.0f, 4.5f);
+
+	const float speed = distSpeed(randomEngine);
+
+	// 中心に吸い込まれる速度
+	particle.velocity = {
+		toCenter.x * speed,
+		toCenter.y * speed,
+		toCenter.z * speed
+	};
+
+	const float scale = distScale(randomEngine);
+	particle.transform.scale = {
+		scale,
+		scale,
+		scale
+	};
+
+	particle.transform.rotate = {
+		0.0f,
+		0.0f,
+		angle
+	};
+
+	// エネルギー感のある黄色〜青白系
+	std::uniform_real_distribution<float> distBlue(0.7f, 1.2f);
+
+	particle.color = {
+		1.0f,
+		0.85f,
+		distBlue(randomEngine),
+		1.0f
+	};
+
+	particle.lifeTime = distLifetime(randomEngine);
+	particle.currentTime = 0.0f;
+
+	return particle;
+}
+
+Particle ParticleManager::MakeAttackReleaseEnergyRightParticle(
+	std::mt19937& randomEngine,
+	const Vector3& position
+)
+{
+	Particle particle;
+
+	// 3本の弧を作る
+	// band 0: 内側
+	// band 1: 中間
+	// band 2: 外側
+	std::uniform_int_distribution<int> distBand(0, 2);
+
+	// 弧の上下角度
+	// -70度 ～ +70度くらいにすると「)」の形になりやすい
+	std::uniform_real_distribution<float> distArcAngle(
+		-70.0f * std::numbers::pi_v<float> / 180.0f,
+		70.0f * std::numbers::pi_v<float> / 180.0f
+	);
+
+	// 少しだけ形を崩すためのランダム
+	std::uniform_real_distribution<float> distJitter(-0.035f, 0.035f);
+	std::uniform_real_distribution<float> distZ(-0.04f, 0.04f);
+
+	// 速度と寿命
+	std::uniform_real_distribution<float> distSpeed(3.5f, 5.8f);
+	std::uniform_real_distribution<float> distLifetime(0.11f, 0.20f);
+
+	// 弧の種類
+	const int band = distBand(randomEngine);
+	const float theta = distArcAngle(randomEngine);
+
+	// 弧の半径
+	// 値が離れているほど「)))」の層が見えやすい
+	const float radiusTable[3] = {
+		0.22f,
+		0.42f,
+		0.62f
+	};
+
+	const float radius = radiusTable[band];
+
+	// 右向きの「)」を作る
+	// cos(theta) が前方、sin(theta) が上下
+	const float x = std::cos(theta) * radius;
+	const float y = std::sin(theta) * radius;
+
+	// 弧の中心を少し前に置く
+	// Player側でも前方にずらしているので、ここでは控えめ
+	particle.transform.translate = {
+		position.x + x + distJitter(randomEngine),
+		position.y + y + distJitter(randomEngine),
+		position.z + distZ(randomEngine)
+	};
+
+	// 弧全体を前方向へ進ませる
+	const float speed = distSpeed(randomEngine);
+
+	// 外側の弧ほど少し速くすると、外へ広がる衝撃波感が出る
+	const float bandSpeedBonus = static_cast<float>(band) * 0.5f;
+
+	particle.velocity = {
+		speed + bandSpeedBonus,
+		y * 0.8f,
+		0.0f
+	};
+
+	// 弧に沿った細長い粒にする
+	// 点ではなく、短い線分として見せる
+	const float lengthTable[3] = {
+		0.26f,
+		0.34f,
+		0.42f
+	};
+
+	const float thicknessTable[3] = {
+		0.055f,
+		0.065f,
+		0.075f
+	};
+
+	particle.transform.scale = {
+		lengthTable[band],
+		thicknessTable[band],
+		1.0f
+	};
+
+	// 弧に沿って回転させる
+	// 右半円の接線方向
+	const float tangentAngle = std::atan2(std::cos(theta), -std::sin(theta));
+
+	particle.transform.rotate = {
+		0.0f,
+		0.0f,
+		tangentAngle
+	};
+
+	// 中心に近いほど白く、外側ほど青くする
+	const Vector4 colorTable[3] = {
+		{ 1.00f, 1.15f, 1.45f, 1.0f },
+		{ 0.75f, 1.00f, 1.55f, 1.0f },
+		{ 0.45f, 0.85f, 1.65f, 1.0f }
+	};
+
+	particle.color = colorTable[band];
+
+	particle.lifeTime = distLifetime(randomEngine);
+	particle.currentTime = 0.0f;
+
+	return particle;
+}
+
+Particle ParticleManager::MakeAttackReleaseEnergyLeftParticle(
+	std::mt19937& randomEngine,
+	const Vector3& position
+)
+{
+	Particle particle = MakeAttackReleaseEnergyRightParticle(randomEngine, position);
+
+	// 位置を左右反転
+	particle.transform.translate.x =
+		position.x - (particle.transform.translate.x - position.x);
+
+	// 速度も左右反転
+	particle.velocity.x *= -1.0f;
+
+	// 回転も左右反転後の速度・形に合わせる
+	particle.transform.rotate.z =
+		std::numbers::pi_v<float> -particle.transform.rotate.z;
 
 	return particle;
 }
@@ -9953,14 +11501,19 @@ public:
 
 	// エフェクトタイプ列挙型
 	enum class EffectType {
-		Default,		// 通常エフェクト
-		Explosion,		// 爆発
-		Smoke,			// 煙
-		Spark,			// 火花
-		MagicCircle,	// 魔法陣
-		JumpDust,		// ジャンプダスト
-		LandDust,		// 着地ダスト
-		UpArrow,		// 上向きの矢印
+		Default,			// 通常エフェクト
+		Explosion,			// 爆発
+		Smoke,				// 煙
+		Spark,				// 火花
+		FireSpark,			// 火花（炎）
+		SpecialDashBurst,	// 特殊ダッシュバースト
+		MagicCircle,		// 魔法陣
+		JumpDust,			// ジャンプダスト
+		LandDust,			// 着地ダスト
+		UpArrow,			// 上向きの矢印
+		AttackChargeEnergy, // 攻撃チャージエネルギー
+		AttackReleaseEnergyRight,	// 攻撃リリースエネルギー（右）
+		AttackReleaseEnergyLeft		// 攻撃リリースエネルギー（左）
 	};
 
 	/// <summary>
@@ -10042,6 +11595,20 @@ private:
 	/// </summary>
 	Particle MakeParticleByTypeWithColor(std::mt19937& randomEngine, const Vector3& position, EffectType type, const Vector4& colorTint);
 
+	/// <summary>
+	/// 攻撃チャージ中に周囲から集まるエネルギー
+	/// </summary>
+	Particle MakeAttackChargeEnergyParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
+	/// 攻撃発動時に右方向へ飛ぶエネルギー
+	/// </summary>
+	Particle MakeAttackReleaseEnergyRightParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
+	/// 攻撃発動時に左方向へ飛ぶエネルギー
+	/// </summary>
+	Particle MakeAttackReleaseEnergyLeftParticle(std::mt19937& randomEngine, const Vector3& position);
 
 public:
 	/// <summary>
@@ -10059,8 +11626,8 @@ public:
 	/// <param name="name">パーティクルグループの名前</param>
 	/// <param name="textureFilePath">使用する画像のファイルパス</param>
 	/// <param name="blendMode">ブレンドモード（デフォルトは加算）</param>
-	void CreateParticleGroup(const std::string& name, 
-		const std::string textureFilePath, 
+	void CreateParticleGroup(const std::string& name,
+		const std::string textureFilePath,
 		BlendMode blendMode = BlendMode::kBlendModeAdd);
 
 
@@ -10172,6 +11739,11 @@ public:
 	Particle MakeUpArrowParticle(std::mt19937& randomEngine, const Vector3& position);
 
 	/// <summary>
+	/// 特殊ダッシュ発動時の後方爆発パーティクル生成
+	/// </summary>
+	Particle MakeSpecialDashBurstParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
 	/// Ringエフェクト
 	/// </summary>
 	/// <param name="position"></param>
@@ -10184,7 +11756,10 @@ public:
 	/// <returns></returns>
 	Particle MakeCylinderEffect(const Vector3& position);
 
-
+	/// <summary>
+	/// 火花らしい細長いパーティクル生成
+	/// </summary>
+	Particle MakeFireSparkParticle(std::mt19937& randomEngine, const Vector3& position);
 
 	/// <summary>
 	/// Ring
@@ -10565,7 +12140,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOnBurst(const Vecto
 {
 	auto ps = ParticleSystem::Create(
 		"ToggleOnBurst",
-		"resources/Effects/Particles/Textures/square.dds");
+		"resources/Effects/Particles/Textures/square.png");
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::Spark);
@@ -10602,6 +12177,147 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOffBurst(const Vect
 
 	// 少し赤寄り
 	ps->SetColor(Vector4(1.1f, 0.45f, 0.45f, 0.85f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateFireSparkCharge(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"FireSparkCharge",
+		"resources/Effects/Particles/Textures/square.png",
+		BlendMode::kBlendModeAdd
+	);
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::FireSpark);
+
+	// 長押し中に出続ける
+	ps->SetLoop(true);
+
+	// チャージ中の発生量
+	ps->SetEmissionRate(45.0f);
+	ps->SetBurstCount(4);
+
+	ps->GetMainModule().duration = 1.0f;
+	ps->GetMainModule().startLifetime = 0.15f;
+
+	ps->SetColor(Vector4(1.4f, 0.75f, 0.25f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateFireSparkBurst(const Vector3& position)
+{
+	// チャージが完了して放つ火花のバーストエフェクト
+	auto ps = ParticleSystem::Create(
+		"FireSparkBurst",
+		"resources/Effects/Particles/Textures/square.png",
+		BlendMode::kBlendModeAdd
+	);
+	// 発生位置の設定
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::FireSpark);
+
+	// 一瞬だけ出す
+	ps->SetLoop(false);
+
+	// 一瞬に多めに出す
+	ps->SetEmissionRate(120.0f);
+	ps->SetBurstCount(14);
+	// 寿命は短め
+	ps->GetMainModule().duration = 0.10f;
+	ps->GetMainModule().startLifetime = 0.14f;
+	// 色はチャージ中よりさらに強調
+	ps->SetColor(Vector4(1.6f, 0.8f, 0.25f, 1.0f));
+
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateSpecialDashBurst(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"SpecialDashBurst",
+		"resources/Effects/Particles/Textures/circle.dds",
+		BlendMode::kBlendModeAdd
+	);
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::SpecialDashBurst);
+
+	// 発動時だけ
+	ps->SetLoop(false);
+
+	// 一瞬に多めに出す
+	ps->SetEmissionRate(90.0f);
+	ps->SetBurstCount(16);
+
+	ps->GetMainModule().duration = 0.12f;
+	ps->GetMainModule().startLifetime = 0.20f;
+
+	// オレンジ寄り
+	ps->SetColor(Vector4(1.5f, 0.75f, 0.25f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateAttackChargeEnergy(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"AttackChargeEnergy",
+		"resources/Effects/Particles/Textures/circle.dds",
+		BlendMode::kBlendModeAdd
+	);
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::AttackChargeEnergy);
+
+	// チャージ中に出続ける
+	ps->SetLoop(true);
+
+	// 発生量
+	ps->SetEmissionRate(35.0f);
+	ps->SetBurstCount(3);
+
+	ps->GetMainModule().duration = 1.0f;
+	ps->GetMainModule().startLifetime = 0.25f;
+
+	// 黄色寄りのエネルギー
+	ps->SetColor(Vector4(1.2f, 1.0f, 0.55f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateAttackReleaseEnergy(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"AttackReleaseEnergy",
+		"resources/Effects/Particles/Textures/circle.png",
+		BlendMode::kBlendModeAdd
+	);
+
+	ps->SetTranslate(position);
+
+	// 初期値は右向き。Player側で向きに応じてRight/Leftを切り替える
+	ps->SetEffectType(ParticleManager::EffectType::AttackReleaseEnergyRight);
+
+	// 攻撃発動時だけ出す
+	ps->SetLoop(false);
+
+	// 衝撃波の弧を見せるため少し多めに出す
+	ps->SetEmissionRate(220.0f);
+	ps->SetBurstCount(36);
+
+	// 短く強く
+	ps->GetMainModule().duration = 0.08f;
+	ps->GetMainModule().startLifetime = 0.18f;
+
+	// 青白い衝撃波
+	ps->SetColor(Vector4(0.75f, 1.0f, 1.45f, 1.0f));
 
 	ps->Pause();
 	return ps;
@@ -10691,6 +12407,36 @@ public:
 	/// トグルブロックが無効になった瞬間の演出
 	/// </summary>
 	static std::unique_ptr<ParticleSystem> CreateToggleOffBurst(const Vector3& position = { 0, 0, 0 });
+
+
+	/// <summary>
+	/// 火花チャージエフェクト
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateFireSparkCharge(const Vector3& position = { 0.0f,0.0f,0.0f });
+
+	/// <summary>
+	/// 火花バーストエフェクト
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateFireSparkBurst(const Vector3& position = { 0.0f,0.0f,0.0f });
+
+	/// <summary>
+	/// 特殊ダッシュ発動時の後方爆発
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateSpecialDashBurst(const Vector3& position = { 0.0f, 0.0f, 0.0f });
+
+	/// <summary>
+	/// 攻撃チャージ中に周囲から集まるエネルギー
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateAttackChargeEnergy(
+		const Vector3& position = { 0.0f,0.0f,0.0f }
+	);
+
+	/// <summary>
+	/// 攻撃発動時に前方へ放出されるエネルギー
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateAttackReleaseEnergy(
+		const Vector3& position = { 0.0f,0.0f,0.0f }
+	);
 };
 
 
@@ -11623,8 +13369,6 @@ void GameOverScene::Update()
 	title_->SetSize(titleBaseSize_);
 
 #ifdef USE_IMGUI
-	// Inputクラスの取得と省略
-	Input* input = Input::GetInstance();
 
 	// F1でデバッグカメラON/OFF
 	if (input->TriggerKey(DIK_1)) {
@@ -13356,38 +15100,38 @@ void PauseUI::LoadSprite()
 {
 	// 画面を少し暗くする黒いスプライト
 	auto overlaySprite = std::make_unique<Sprite>();
-	overlaySprite->Initialize("resources/Scenes/Pause/UI/Texture/PauseBlack.dds");
+	overlaySprite->Initialize("resources/Scenes/Pause/UI/Texture/PauseBlack.png");
 	overlaySprite->SetPosition({ 0.0f,0.0f });
-	overlaySprite->SetSize({ 1280.0f,720.0f });
+	overlaySprite->SetSize({ 1280.0f,720.0f }); 
 	overlaySprite->SetColor({ 1.0f,1.0f,1.0f,0.55f });
 	sprites_.push_back(std::move(overlaySprite));
 
 	auto circleSlot = std::make_unique<Sprite>();
-	circleSlot->Initialize("resources/Scenes/Pause/UI/Texture/PauseUICircleSlot_2.dds");
+	circleSlot->Initialize("resources/Scenes/Pause/UI/Texture/PauseUICircleSlot_2.png");
 	circleSlot->SetPosition({ 0.0f, 0.0f });
 	circleSlot->SetSize({ 1280.0f,720.0f });
 	sprites_.push_back(std::move(circleSlot));
 
 	// スロット上
 	slotUIUp_ = std::make_unique<Sprite>();
-	slotUIUp_->Initialize("resources/Scenes/Pause/UI/Texture/PauseUISlotItemUP_IconB.dds");
+	slotUIUp_->Initialize("resources/Scenes/Pause/UI/Texture/PauseUISlotItemUP_IconB.png");
 	slotUIUp_->SetPosition({ 0.0f, 0.0f });
 	slotUIUp_->SetSize({ 1280.0f, 720.0f });
 
 
 	// スロット下
 	slotUIDown_ = std::make_unique<Sprite>();
-	slotUIDown_->Initialize("resources/Scenes/Pause/UI/Texture/PauseUISlotItemDown_IconB.dds");
+	slotUIDown_->Initialize("resources/Scenes/Pause/UI/Texture/PauseUISlotItemDown_IconB.png");
 	slotUIDown_->SetPosition({ 0.0f, 0.0f });
 	slotUIDown_->SetSize({ 1280.0f, 720.0f });
 	// スロット左
 	slotUILeft_ = std::make_unique<Sprite>();
-	slotUILeft_->Initialize("resources/Scenes/Pause/UI/Texture/PauseUISlotItemLeft_IconB.dds");
+	slotUILeft_->Initialize("resources/Scenes/Pause/UI/Texture/PauseUISlotItemLeft_IconB.png");
 	slotUILeft_->SetPosition({ 0.0f, 0.0f });
 	slotUILeft_->SetSize({ 1280.0f, 720.0f });
 	// スロット右
 	slotUIRight_ = std::make_unique<Sprite>();
-	slotUIRight_->Initialize("resources/Scenes/Pause/UI/Texture/PauseUISlotItemRight_IconB.dds");
+	slotUIRight_->Initialize("resources/Scenes/Pause/UI/Texture/PauseUISlotItemRight_IconB.png");
 	slotUIRight_->SetPosition({ 0.0f, 0.0f });
 	slotUIRight_->SetSize({ 1280.0f, 720.0f });
 
@@ -13407,28 +15151,28 @@ void PauseUI::LoadSprite()
 
 
 	slotTextUIUp_ = std::make_unique<Sprite>();
-	slotTextUIUp_->Initialize("resources/Scenes/Pause/UI/Texture/PlayText.dds");
+	slotTextUIUp_->Initialize("resources/Scenes/Pause/UI/Texture/PlayText.png");
 	slotTextUIUp_->SetPosition({ 0.0f, 0.0f });
 	slotTextUIUp_->SetSize({ 1280.0f, 720.0f });
 
 	slotTextUIDown_ = std::make_unique<Sprite>();
-	slotTextUIDown_->Initialize("resources/Scenes/Pause/UI/Texture/TitleText.dds");
+	slotTextUIDown_->Initialize("resources/Scenes/Pause/UI/Texture/TitleText.png");
 	slotTextUIDown_->SetPosition({ 0.0f, 0.0f });
 	slotTextUIDown_->SetSize({ 1280.0f, 720.0f });
 
 	slotTextUILeft_ = std::make_unique<Sprite>();
-	slotTextUILeft_->Initialize("resources/Scenes/Pause/UI/Texture/SelectText.dds");
+	slotTextUILeft_->Initialize("resources/Scenes/Pause/UI/Texture/SelectText.png");
 	slotTextUILeft_->SetPosition({ 0.0f, 0.0f });
 	slotTextUILeft_->SetSize({ 1280.0f, 720.0f });
 
 	slotTextUIRight_ = std::make_unique<Sprite>();
-	slotTextUIRight_->Initialize("resources/Scenes/Pause/UI/Texture/ReTryText.dds");
+	slotTextUIRight_->Initialize("resources/Scenes/Pause/UI/Texture/ReTryText.png");
 	slotTextUIRight_->SetPosition({ 0.0f, 0.0f });
 	slotTextUIRight_->SetSize({ 1280.0f, 720.0f });
 
 
 	decideKeyUI_ = std::make_unique<Sprite>();
-	decideKeyUI_->Initialize("resources/Scenes/Pause/UI/Texture/SpaceText.dds");
+	decideKeyUI_->Initialize("resources/Scenes/Pause/UI/Texture/SpaceText.png");
 	decideKeyUI_->SetPosition({ 0.0f, 0.0f });
 	decideKeyUI_->SetSize({ 1280.0f, 720.0f });
 
@@ -22146,7 +23890,7 @@ bool Input::TriggerKey(BYTE keyNumber)
 	return key[keyNumber] != 0 && keyPre[keyNumber] == 0;
 }
 
-bool Input::ReriseKey(BYTE keyNumber)
+bool Input::ReleaseKey(BYTE keyNumber)
 {
 	return key[keyNumber] == 0 && keyPre[keyNumber] != 0;
 }
@@ -22262,7 +24006,7 @@ public:
 
 	bool PushKey(BYTE keyNumber);
 	bool TriggerKey(BYTE keyNumber);
-	bool ReriseKey(BYTE keyNumber);
+	bool ReleaseKey(BYTE keyNumber);
 
 	//==================================================
 	// マウス
