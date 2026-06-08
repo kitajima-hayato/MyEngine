@@ -79,5 +79,35 @@ public:
 	/// トグルブロックが無効になった瞬間の演出
 	/// </summary>
 	static std::unique_ptr<ParticleSystem> CreateToggleOffBurst(const Vector3& position = { 0, 0, 0 });
+
+
+	/// <summary>
+	/// 火花チャージエフェクト
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateFireSparkCharge(const Vector3& position = { 0.0f,0.0f,0.0f });
+
+	/// <summary>
+	/// 火花バーストエフェクト
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateFireSparkBurst(const Vector3& position = { 0.0f,0.0f,0.0f });
+
+	/// <summary>
+	/// 特殊ダッシュ発動時の後方爆発
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateSpecialDashBurst(const Vector3& position = { 0.0f, 0.0f, 0.0f });
+
+	/// <summary>
+	/// 攻撃チャージ中に周囲から集まるエネルギー
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateAttackChargeEnergy(
+		const Vector3& position = { 0.0f,0.0f,0.0f }
+	);
+
+	/// <summary>
+	/// 攻撃発動時に前方へ放出されるエネルギー
+	/// </summary>
+	static std::unique_ptr<ParticleSystem> CreateAttackReleaseEnergy(
+		const Vector3& position = { 0.0f,0.0f,0.0f }
+	);
 };
 

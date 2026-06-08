@@ -29,14 +29,19 @@ public:
 
 	// エフェクトタイプ列挙型
 	enum class EffectType {
-		Default,		// 通常エフェクト
-		Explosion,		// 爆発
-		Smoke,			// 煙
-		Spark,			// 火花
-		MagicCircle,	// 魔法陣
-		JumpDust,		// ジャンプダスト
-		LandDust,		// 着地ダスト
-		UpArrow,		// 上向きの矢印
+		Default,			// 通常エフェクト
+		Explosion,			// 爆発
+		Smoke,				// 煙
+		Spark,				// 火花
+		FireSpark,			// 火花（炎）
+		SpecialDashBurst,	// 特殊ダッシュバースト
+		MagicCircle,		// 魔法陣
+		JumpDust,			// ジャンプダスト
+		LandDust,			// 着地ダスト
+		UpArrow,			// 上向きの矢印
+		AttackChargeEnergy, // 攻撃チャージエネルギー
+		AttackReleaseEnergyRight,	// 攻撃リリースエネルギー（右）
+		AttackReleaseEnergyLeft		// 攻撃リリースエネルギー（左）
 	};
 
 	/// <summary>
@@ -118,6 +123,20 @@ private:
 	/// </summary>
 	Particle MakeParticleByTypeWithColor(std::mt19937& randomEngine, const Vector3& position, EffectType type, const Vector4& colorTint);
 
+	/// <summary>
+	/// 攻撃チャージ中に周囲から集まるエネルギー
+	/// </summary>
+	Particle MakeAttackChargeEnergyParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
+	/// 攻撃発動時に右方向へ飛ぶエネルギー
+	/// </summary>
+	Particle MakeAttackReleaseEnergyRightParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
+	/// 攻撃発動時に左方向へ飛ぶエネルギー
+	/// </summary>
+	Particle MakeAttackReleaseEnergyLeftParticle(std::mt19937& randomEngine, const Vector3& position);
 
 public:
 	/// <summary>
@@ -135,8 +154,8 @@ public:
 	/// <param name="name">パーティクルグループの名前</param>
 	/// <param name="textureFilePath">使用する画像のファイルパス</param>
 	/// <param name="blendMode">ブレンドモード（デフォルトは加算）</param>
-	void CreateParticleGroup(const std::string& name, 
-		const std::string textureFilePath, 
+	void CreateParticleGroup(const std::string& name,
+		const std::string textureFilePath,
 		BlendMode blendMode = BlendMode::kBlendModeAdd);
 
 
@@ -248,6 +267,11 @@ public:
 	Particle MakeUpArrowParticle(std::mt19937& randomEngine, const Vector3& position);
 
 	/// <summary>
+	/// 特殊ダッシュ発動時の後方爆発パーティクル生成
+	/// </summary>
+	Particle MakeSpecialDashBurstParticle(std::mt19937& randomEngine, const Vector3& position);
+
+	/// <summary>
 	/// Ringエフェクト
 	/// </summary>
 	/// <param name="position"></param>
@@ -260,7 +284,10 @@ public:
 	/// <returns></returns>
 	Particle MakeCylinderEffect(const Vector3& position);
 
-
+	/// <summary>
+	/// 火花らしい細長いパーティクル生成
+	/// </summary>
+	Particle MakeFireSparkParticle(std::mt19937& randomEngine, const Vector3& position);
 
 	/// <summary>
 	/// Ring
