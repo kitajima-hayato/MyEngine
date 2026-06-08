@@ -207,7 +207,7 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOnBurst(const Vecto
 {
 	auto ps = ParticleSystem::Create(
 		"ToggleOnBurst",
-		"resources/Effects/Particles/Textures/square.dds");
+		"resources/Effects/Particles/Textures/square.png");
 
 	ps->SetTranslate(position);
 	ps->SetEffectType(ParticleManager::EffectType::Spark);
@@ -244,6 +244,147 @@ std::unique_ptr<ParticleSystem> ParticlePresets::CreateToggleOffBurst(const Vect
 
 	// 少し赤寄り
 	ps->SetColor(Vector4(1.1f, 0.45f, 0.45f, 0.85f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateFireSparkCharge(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"FireSparkCharge",
+		"resources/Effects/Particles/Textures/square.png",
+		BlendMode::kBlendModeAdd
+	);
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::FireSpark);
+
+	// 長押し中に出続ける
+	ps->SetLoop(true);
+
+	// チャージ中の発生量
+	ps->SetEmissionRate(45.0f);
+	ps->SetBurstCount(4);
+
+	ps->GetMainModule().duration = 1.0f;
+	ps->GetMainModule().startLifetime = 0.15f;
+
+	ps->SetColor(Vector4(1.4f, 0.75f, 0.25f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateFireSparkBurst(const Vector3& position)
+{
+	// チャージが完了して放つ火花のバーストエフェクト
+	auto ps = ParticleSystem::Create(
+		"FireSparkBurst",
+		"resources/Effects/Particles/Textures/square.png",
+		BlendMode::kBlendModeAdd
+	);
+	// 発生位置の設定
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::FireSpark);
+
+	// 一瞬だけ出す
+	ps->SetLoop(false);
+
+	// 一瞬に多めに出す
+	ps->SetEmissionRate(120.0f);
+	ps->SetBurstCount(14);
+	// 寿命は短め
+	ps->GetMainModule().duration = 0.10f;
+	ps->GetMainModule().startLifetime = 0.14f;
+	// 色はチャージ中よりさらに強調
+	ps->SetColor(Vector4(1.6f, 0.8f, 0.25f, 1.0f));
+
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateSpecialDashBurst(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"SpecialDashBurst",
+		"resources/Effects/Particles/Textures/circle.dds",
+		BlendMode::kBlendModeAdd
+	);
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::SpecialDashBurst);
+
+	// 発動時だけ
+	ps->SetLoop(false);
+
+	// 一瞬に多めに出す
+	ps->SetEmissionRate(90.0f);
+	ps->SetBurstCount(16);
+
+	ps->GetMainModule().duration = 0.12f;
+	ps->GetMainModule().startLifetime = 0.20f;
+
+	// オレンジ寄り
+	ps->SetColor(Vector4(1.5f, 0.75f, 0.25f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateAttackChargeEnergy(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"AttackChargeEnergy",
+		"resources/Effects/Particles/Textures/circle.dds",
+		BlendMode::kBlendModeAdd
+	);
+
+	ps->SetTranslate(position);
+	ps->SetEffectType(ParticleManager::EffectType::AttackChargeEnergy);
+
+	// チャージ中に出続ける
+	ps->SetLoop(true);
+
+	// 発生量
+	ps->SetEmissionRate(35.0f);
+	ps->SetBurstCount(3);
+
+	ps->GetMainModule().duration = 1.0f;
+	ps->GetMainModule().startLifetime = 0.25f;
+
+	// 黄色寄りのエネルギー
+	ps->SetColor(Vector4(1.2f, 1.0f, 0.55f, 1.0f));
+
+	ps->Pause();
+	return ps;
+}
+
+std::unique_ptr<ParticleSystem> ParticlePresets::CreateAttackReleaseEnergy(const Vector3& position)
+{
+	auto ps = ParticleSystem::Create(
+		"AttackReleaseEnergy",
+		"resources/Effects/Particles/Textures/circle.png",
+		BlendMode::kBlendModeAdd
+	);
+
+	ps->SetTranslate(position);
+
+	// 初期値は右向き。Player側で向きに応じてRight/Leftを切り替える
+	ps->SetEffectType(ParticleManager::EffectType::AttackReleaseEnergyRight);
+
+	// 攻撃発動時だけ出す
+	ps->SetLoop(false);
+
+	// 衝撃波の弧を見せるため少し多めに出す
+	ps->SetEmissionRate(220.0f);
+	ps->SetBurstCount(36);
+
+	// 短く強く
+	ps->GetMainModule().duration = 0.08f;
+	ps->GetMainModule().startLifetime = 0.18f;
+
+	// 青白い衝撃波
+	ps->SetColor(Vector4(0.75f, 1.0f, 1.45f, 1.0f));
 
 	ps->Pause();
 	return ps;

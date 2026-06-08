@@ -34,7 +34,7 @@ public:
 
 	bool PushKey(BYTE keyNumber);
 	bool TriggerKey(BYTE keyNumber);
-	bool ReriseKey(BYTE keyNumber);
+	bool ReleaseKey(BYTE keyNumber);
 
 	//==================================================
 	// マウス
