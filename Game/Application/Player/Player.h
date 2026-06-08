@@ -479,6 +479,11 @@ private:
 	void UpdateAttackChargeAction();
 
 	/// <summary>
+	/// 特殊ダッシュ専用のチャージ処理
+	/// </summary>
+	void UpdateSpecialDashChargeAction();
+
+	/// <summary>
 	/// チャージ率からスペシャルダッシュの速度を計算
 	/// </summary>
 	float CalcChargeRate(const ChargeButtonState& charge) const;
@@ -489,20 +494,29 @@ private:
 	void UpdateChargeEffects();
 
 	/// <summary>
-	/// 単体のチャージエフェクト更新
+	/// スペシャルダッシュのエフェクトの更新
 	/// </summary>
-	/// <param name="effect"></param>
-	/// <param name="charge"></param>
-	/// <param name="wasCharging"></param>
-	/// <param name="position"></param>
-	/// <param name="minEmissionRate"></param>
-	/// <param name="maxEmissionRate"></param>
-	void UpdateChargeEffect(ParticleSystem* effect,
-		const ChargeButtonState& charge,
-		bool& wasCharging,
-		const Vector3& position,
-		float minEmissionRate,
-		float maxEmissionRate);
+	void UpdateSpecialDashChargeEffect();
+
+	/// <summary>
+	/// ハイジャンプのエフェクトの更新
+	/// </summary>
+	void UpdateHighJumpChargeEffect();
+
+	/// <summary>
+	/// チャージ攻撃のエフェクトの更新
+	/// </summary>
+	void UpdateAttackChargeEffect();
+
+	/// <summary>
+	/// 特殊ダッシュチャージ後の爆発エフェクトの発生
+	/// </summary>
+	void EmitSpecialDashBurst();
+
+	/// <summary>
+	/// 攻撃発動時のエネルギー放出
+	/// </summary>
+	void EmitAttackReleaseEffect();
 
 public:	/// Setter / Getter
 	// 死亡判定の高さを設定
@@ -538,6 +552,12 @@ public:	/// Setter / Getter
 
 	// プレイヤーが攻撃中かどうか
 	bool IsAttacking() const { return isAttack_; }
+
+	// 特殊ダッシュが使用可能か
+	bool CanChargeSpecialDash() const;
+
+
+
 
 private:	// メンバ変数
 	// プレイヤーステータス
@@ -672,6 +692,8 @@ private:	// メンバ変数
 	std::unique_ptr<ParticleSystem> attackChargeEffect_;
 	// 特殊ダッシュのチャージエフェクト
 	std::unique_ptr<ParticleSystem> specialDashChargeEffect_;
+	// 特殊ダッシュのチャージ後の爆発エフェクト
+	std::unique_ptr<ParticleSystem> specialDashBurstEffect_;
 	// ハイジャンプのチャージエフェクト
 	std::unique_ptr<ParticleSystem> highJumpChargeEffect_;
 
@@ -680,7 +702,10 @@ private:	// メンバ変数
 	bool wasSpecialDashCharging_ = false;
 	bool wasHighJumpCharging_ = false;
 
+	// 攻撃チャージ中の見た目用回転角
+	float attackChargeVisualAngle_ = 0.0f;
 
-	
+	// 攻撃発動時のエネルギー放出エフェクト
+	std::unique_ptr<ParticleSystem> attackReleaseEffect_;
 };
 

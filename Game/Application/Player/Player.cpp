@@ -1,5 +1,6 @@
 #include "Player.h"
 #include <algorithm>
+#include <cmath>
 #include "engine/Input/Input.h"
 #include "Game/Particle/ParticlePresets.h"
 #include "Game/Application/Enemy/EnemyBase/EnemyBase.h"
@@ -469,8 +470,10 @@ void Player::UpdateInput()
 void Player::UpdateChargeActions()
 {
 	// J / X：攻撃
-	// 攻撃だけは「その場にいるか」をチャージ中も確認したいので専用処理
 	UpdateAttackChargeAction();
+
+	// K / B：特殊ダッシュ
+	UpdateSpecialDashChargeAction();
 
 	// チャージ式のアクションボタンの処理を行うためのラムダ関数
 	auto updateChargeButton =
@@ -488,15 +491,7 @@ void Player::UpdateChargeActions()
 			}
 
 			if (charge.charging && input.release) {
-				float chargeRate = 0.0f;
-
-				if (charge.frameCount >= status_.kMinChargeFrame) {
-					chargeRate =
-						static_cast<float>(charge.frameCount - status_.kMinChargeFrame) /
-						static_cast<float>(status_.kMaxChargeFrame - status_.kMinChargeFrame);
-
-					chargeRate = std::clamp(chargeRate, 0.0f, 1.0f);
-				}
+				const float chargeRate = CalcChargeRate(charge);
 
 				startAction(chargeRate);
 
@@ -504,16 +499,6 @@ void Player::UpdateChargeActions()
 				charge.frameCount = 0;
 			}
 		};
-
-	// K / B：特殊ダッシュ
-	updateChargeButton(
-		specialDashCharge_,
-		inputState_.actionB,
-		[this](float chargeRate)
-		{
-			StartSpecialDash(chargeRate);
-		}
-	);
 
 	// L / Y：高ジャンプ
 	updateChargeButton(
@@ -566,6 +551,9 @@ void Player::StartSpecialDash(float chargeRate)
 
 	// X方向の速度を設定
 	velocity_.x = specialDashSpeed_ * specialDashDirection_;
+
+	// 特殊ダッシュ発動時の後方爆発
+	EmitSpecialDashBurst();
 }
 
 void Player::StartHighJump(float chargeRate)
@@ -613,6 +601,9 @@ void Player::StartAttack(float chargeRate)
 	isAttack_ = true;
 	attackTimer_ = status_.kAttackFrame;
 	attackChargeRate_ = std::clamp(chargeRate, 0.0f, 1.0f);
+
+	// 攻撃開始のエフェクト
+	EmitAttackReleaseEffect();
 }
 
 bool Player::TryBreakBlockBySpecialDash(const CollisionMapInfo& collisionInfo)
@@ -771,10 +762,52 @@ void Player::UpdateAttackChargeAction()
 	}
 }
 
+void Player::UpdateSpecialDashChargeAction()
+{
+	// K / B を押した瞬間
+	if (inputState_.actionB.trigger) {
+		// 止まっていないならチャージ開始しない
+		if (!CanChargeSpecialDash()) {
+			specialDashCharge_ = {};
+			return;
+		}
+
+		specialDashCharge_.charging = true;
+		specialDashCharge_.frameCount = 0;
+	}
+
+	// チャージ中でなければ何もしない
+	if (!specialDashCharge_.charging) {
+		return;
+	}
+
+	// チャージ中に動いたらキャンセル
+	if (!CanChargeSpecialDash()) {
+		specialDashCharge_ = {};
+		return;
+	}
+
+	// 押している間はチャージ
+	if (inputState_.actionB.hold) {
+		if (specialDashCharge_.frameCount < status_.kMaxChargeFrame) {
+			++specialDashCharge_.frameCount;
+		}
+	}
+
+	// 離した瞬間に特殊ダッシュ
+	if (inputState_.actionB.release) {
+		const float chargeRate = CalcChargeRate(specialDashCharge_);
+
+		StartSpecialDash(chargeRate);
+
+		specialDashCharge_ = {};
+	}
+}
+
 float Player::CalcChargeRate(const ChargeButtonState& charge) const
 {
 	// チャージ中でなければ0
-	if (charge.frameCount < status_.kMaxChargeFrame) {
+	if (charge.frameCount < status_.kMinChargeFrame) {
 		return 0.0f;
 	}
 
@@ -801,94 +834,205 @@ void Player::UpdateChargeEffects()
 	if (!playerModel_) {
 		return;
 	}
-	// プレイヤーの位置を取得 // 足元の位置も
-	const Vector3 playerPos = playerModel_->GetTranslate();
-	const Vector3 footPos = GetFootParticlePos();
 
-	// 向いている方向
-	const float dir =
-		direction_ == Direction::kRight ? 1.0f : -1.0f;
-
-	// 攻撃チャージ：プレイヤーの前方
-	Vector3 attackChargePos = playerPos;
-	attackChargePos.x += dir * (status_.kWidth * 0.6f);
-	attackChargePos.z -= 0.5f;
-
-	UpdateChargeEffect(
-		attackChargeEffect_.get(),
-		attackCharge_,
-		wasAttackCharging_,
-		attackChargePos,
-		8.0f,
-		35.0f
-	);
-
-	// 特殊ダッシュチャージ：足元
-	Vector3 dashChargePos = footPos;
-	dashChargePos.z -= 0.5f;
-
-	UpdateChargeEffect(
-		specialDashChargeEffect_.get(),
-		specialDashCharge_,
-		wasSpecialDashCharging_,
-		dashChargePos,
-		6.0f,
-		25.0f
-	);
-
-	// 高ジャンプチャージ：プレイヤー中心より少し上
-	Vector3 highJumpChargePos = playerPos;
-	highJumpChargePos.y += status_.kHeight * 0.4f;
-	highJumpChargePos.z -= 0.5f;
-
-	UpdateChargeEffect(
-		highJumpChargeEffect_.get(),
-		highJumpCharge_,
-		wasHighJumpCharging_,
-		highJumpChargePos,
-		6.0f,
-		22.0f
-	);
+	// チャージダッシュのエフェクト更新
+	UpdateSpecialDashChargeEffect();
+	// ハイジャンプのエフェクト更新
+	UpdateHighJumpChargeEffect();
+	// チャージ攻撃のエフェクト更新
+	UpdateAttackChargeEffect();
 	
 }
 
-void Player::UpdateChargeEffect(ParticleSystem* effect, const ChargeButtonState& charge, bool& wasCharging, const Vector3& position, float minEmissionRate, float maxEmissionRate)
+
+
+void Player::UpdateSpecialDashChargeEffect()
 {
-	// エフェクトが無ければ何もせずチャージ状態もリセット
-	if (!effect) {
-		wasCharging = false;
+	if (!specialDashChargeEffect_ || !playerModel_) {
 		return;
 	}
-	// チャージしていないなら停止
-	if(!charge.charging) {
-		if(wasCharging) {
-			effect->Pause();
+
+	if (!specialDashCharge_.charging) {
+		if (wasSpecialDashCharging_) {
+			specialDashChargeEffect_->Pause();
 		}
 
-		wasCharging = false;
+		wasSpecialDashCharging_ = false;
 		return;
 	}
-	// チャージしているなら位置を更新して再生
-	const float chargeRate = CalcChargeRate(charge);
 
-	// チャージ量に応じて発生量を増やす
-	const float emissionRate = std::lerp(minEmissionRate, maxEmissionRate, chargeRate);
+	const float chargeRate = CalcChargeRate(specialDashCharge_);
+	const float dir = direction_ == Direction::kRight ? 1.0f : -1.0f;
 
-	// 位置を更新
-	effect->SetTranslate(position);
-	// 発生量を更新
-	effect->SetEmissionRate(emissionRate);
+	Vector3 pos = GetFootParticlePos();
 
-	// マイフレーム再生するとリセットされる可能性があるので開始時だけ再生する
-	if (!wasCharging) {
-		effect->Play();
+	// 進行方向とは逆側に出すと、タイヤが空回りしている感じになる
+	pos.x -= dir * 0.35f;
+	pos.y += 0.05f;
+	pos.z -= 0.5f;
+
+
+	const float emissionRate = std::lerp(35.0f, 90.0f, chargeRate);
+
+	specialDashChargeEffect_->SetTranslate(pos);
+	specialDashChargeEffect_->SetEmissionRate(emissionRate);
+
+	if (!wasSpecialDashCharging_) {
+		specialDashChargeEffect_->Play();
 	}
 
-	// チャージ状態を保存
-	wasCharging = true;
-
-
+	wasSpecialDashCharging_ = true;
 }
+
+void Player::UpdateHighJumpChargeEffect()
+{
+	if (!highJumpChargeEffect_ || !playerModel_) {
+		return;
+	}
+
+	if (!highJumpCharge_.charging) {
+		if (wasHighJumpCharging_) {
+			highJumpChargeEffect_->Pause();
+		}
+
+		wasHighJumpCharging_ = false;
+		return;
+	}
+
+	const float chargeRate = CalcChargeRate(highJumpCharge_);
+
+	Vector3 pos = playerModel_->GetTranslate();
+	pos.y += status_.kHeight * 0.4f;
+	pos.z -= 0.5f;
+
+	highJumpChargeEffect_->SetTranslate(pos);
+	highJumpChargeEffect_->SetEmissionRate(std::lerp(8.0f, 24.0f, chargeRate));
+
+	if (!wasHighJumpCharging_) {
+		highJumpChargeEffect_->Play();
+	}
+
+	wasHighJumpCharging_ = true;
+}
+
+void Player::UpdateAttackChargeEffect()
+{
+	if (!attackChargeEffect_ || !playerModel_) {
+		return;
+	}
+
+	if (!attackCharge_.charging) {
+		if (wasAttackCharging_) {
+			attackChargeEffect_->Pause();
+
+			Vector3 rot = playerModel_->GetRotate();
+			rot.x = 0.0f;
+			playerModel_->SetRotate(rot);
+		}
+
+		wasAttackCharging_ = false;
+		attackChargeVisualAngle_ = 0.0f;
+		return;
+	}
+
+	const float chargeRate = CalcChargeRate(attackCharge_);
+	const float dir = direction_ == Direction::kRight ? 1.0f : -1.0f;
+
+	Vector3 pos = playerModel_->GetTranslate();
+
+	// 少し手前に出して見やすくする
+	pos.z -= 0.5f;
+
+	attackChargeEffect_->SetTranslate(pos);
+	attackChargeEffect_->SetEmissionRate(std::lerp(25.0f, 80.0f, chargeRate));
+
+	const float spinSpeed = std::lerp(0.25f, 0.75f, chargeRate);
+	attackChargeVisualAngle_ += spinSpeed;
+
+	Vector3 rot = playerModel_->GetRotate();
+
+	// X軸高速回転 + Y軸にもひねり
+	rot.x = attackChargeVisualAngle_;
+	rot.y += dir * spinSpeed * 0.6f;
+
+	playerModel_->SetRotate(rot);
+
+	if (!wasAttackCharging_) {
+		attackChargeEffect_->Play();
+	}
+
+	wasAttackCharging_ = true;
+}
+
+void Player::EmitSpecialDashBurst()
+{
+	if (!specialDashBurstEffect_ || !playerModel_) {
+		return;
+	}
+
+	Vector3 pos = playerModel_->GetTranslate();
+
+	// 特殊ダッシュの進行方向
+	const float dir = static_cast<float>(specialDashDirection_);
+
+	// 進行方向とは逆側に爆発を置く
+	pos.x -= dir * 0.45f;
+
+	// 足元寄り
+	pos.y -= status_.kHeight * 0.25f;
+
+	// 少し手前に出して見やすくする
+	pos.z -= 0.5f;
+
+	specialDashBurstEffect_->SetTranslate(pos);
+	specialDashBurstEffect_->Play();
+}
+
+
+void Player::EmitAttackReleaseEffect()
+{
+	if (!attackReleaseEffect_ || !playerModel_) {
+		return;
+	}
+
+	const float dir = direction_ == Direction::kRight ? 1.0f : -1.0f;
+
+	Vector3 pos = playerModel_->GetTranslate();
+
+	const float attackRange =
+		status_.kAttackRange +
+		status_.kAttackChargeRangeBonus * attackChargeRate_;
+
+	// プレイヤー前方、攻撃判定の始点〜中央あたり
+	pos.x += dir * (status_.kWidth * 0.5f + attackRange * 0.25f);
+	pos.y += 0.05f;
+	pos.z -= 0.5f;
+
+	if (direction_ == Direction::kRight) {
+		attackReleaseEffect_->SetEffectType(
+			ParticleManager::EffectType::AttackReleaseEnergyRight
+		);
+	} else {
+		attackReleaseEffect_->SetEffectType(
+			ParticleManager::EffectType::AttackReleaseEnergyLeft
+		);
+	}
+
+	attackReleaseEffect_->SetTranslate(pos);
+
+	// チャージ率で強さを変える
+	// 弧を見せるため、粒子数を少し多めにする
+	attackReleaseEffect_->SetEmissionRate(
+		std::lerp(160.0f, 260.0f, attackChargeRate_)
+	);
+
+	attackReleaseEffect_->SetBurstCount(
+		static_cast<uint32_t>(std::lerp(24.0f, 46.0f, attackChargeRate_))
+	);
+
+	attackReleaseEffect_->Play();
+}
+
 
 bool Player::OnAttackCollision(Collider* other)
 {
@@ -948,6 +1092,8 @@ void Player::Respawn(const Vector3& pos)
 	if (attackChargeEffect_) attackChargeEffect_->Pause();
 	if (specialDashChargeEffect_) specialDashChargeEffect_->Pause();
 	if (highJumpChargeEffect_) highJumpChargeEffect_->Pause();
+	if (specialDashBurstEffect_) specialDashBurstEffect_->Pause();
+	if (attackReleaseEffect_) attackReleaseEffect_->Pause();
 	// チャージエフェクトの解放
 	wasAttackCharging_ = false;
 	wasSpecialDashCharging_ = false;
@@ -1008,6 +1154,41 @@ bool Player::ConsumeDeathByFalling()
 {
 	if (!isDeathByFalling_) { return false; }
 	isDeathByFalling_ = false;
+	return true;
+}
+
+bool Player::CanChargeSpecialDash() const
+{
+	// 操作不能中は不可
+	if (!controlEnabled_) {
+		return false;
+	}
+
+	// 地面にいないなら不可
+	if (!onGround_) {
+		return false;
+	}
+
+	// 左右入力中は不可
+	if (inputState_.moveRight || inputState_.moveLeft) {
+		return false;
+	}
+
+	// 通常ダッシュ中は不可
+	if (isDash_) {
+		return false;
+	}
+
+	// すでに特殊ダッシュ中なら不可
+	if (isSpecialDash_) {
+		return false;
+	}
+
+	// 横速度がまだ残っているなら不可
+	if (std::abs(velocity_.x) > status_.kAttackStopVelocityThreshold) {
+		return false;
+	}
+
 	return true;
 }
 
@@ -1163,7 +1344,6 @@ void Player::Initialize(Vector3 position)
 	moveEffect_->Pause();
 	moveEffect_->SetEmissionRate(5.0f);
 	moveEffect_->SetLoop(true);
-	//moveEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
 	moveEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 
@@ -1174,7 +1354,6 @@ void Player::Initialize(Vector3 position)
 	dashSmokeEffect_->Pause();
 	dashSmokeEffect_->SetEmissionRate(15.0f);
 	dashSmokeEffect_->SetLoop(true);
-	//dashSmokeEffect_->SetColor(Vector4(0.7f, 0.6f, 0.4f, 1.0f));
 	dashSmokeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
 
 
@@ -1206,41 +1385,24 @@ void Player::Initialize(Vector3 position)
 
 
 	// 攻撃チャージエフェクト
-	attackChargeEffect_ = ParticlePresets::CreateSparks(position);
+	attackChargeEffect_ = ParticlePresets::CreateAttackChargeEnergy(position);
 	attackChargeEffect_->Pause();
-	attackChargeEffect_->SetLoop(true);
-	attackChargeEffect_->SetEmissionRate(10.0f);
-	attackChargeEffect_->SetColor(Vector4(1.0f, 0.8f, 0.3f, 1.0f));
+
+	// 攻撃発動時の放出エフェクト
+	attackReleaseEffect_ = ParticlePresets::CreateAttackReleaseEnergy(position);
+	attackReleaseEffect_->Pause();
 
 	// 特殊ダッシュチャージエフェクト
-	specialDashChargeEffect_ = ParticlePresets::CreateSmoke(position);
+	specialDashChargeEffect_ = ParticlePresets::CreateFireSparkCharge(position);
 	specialDashChargeEffect_->Pause();
 	specialDashChargeEffect_->SetLoop(true);
-	specialDashChargeEffect_->SetEmissionRate(8.0f);
-	specialDashChargeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
+	specialDashChargeEffect_->SetEmissionRate(25.0f);
+	specialDashChargeEffect_->SetColor(Vector4(1.0f, 0.55f, 0.15f, 1.0f));
+
+	specialDashBurstEffect_ = ParticlePresets::CreateSpecialDashBurst(position);
+	specialDashBurstEffect_->Pause();
 
 	// 高ジャンプチャージエフェクト
-	highJumpChargeEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
-	highJumpChargeEffect_->Pause();
-	highJumpChargeEffect_->SetLoop(true);
-	highJumpChargeEffect_->SetEmissionRate(8.0f);
-	highJumpChargeEffect_->SetColor(Vector4(0.5f, 0.8f, 1.0f, 1.0f));
-
-	// 攻撃チャージエフェクト
-	attackChargeEffect_ = ParticlePresets::CreateSparks(position);
-	attackChargeEffect_->Pause();
-	attackChargeEffect_->SetLoop(true);
-	attackChargeEffect_->SetEmissionRate(10.0f);
-	attackChargeEffect_->SetColor(Vector4(1.0f, 0.8f, 0.3f, 1.0f));
-
-	// 特殊ダッシュチャージエフェクト
-	specialDashChargeEffect_ = ParticlePresets::CreateSmoke(position);
-	specialDashChargeEffect_->Pause();
-	specialDashChargeEffect_->SetLoop(true);
-	specialDashChargeEffect_->SetEmissionRate(8.0f);
-	specialDashChargeEffect_->SetColor(Vector4(1.0f, 1.0f, 1.0f, 1.0f));
-
-	// 高いジャンプチャージエフェクト
 	highJumpChargeEffect_ = ParticlePresets::CreateJumpBlockArrow(position);
 	highJumpChargeEffect_->Pause();
 	highJumpChargeEffect_->SetLoop(true);
@@ -1289,16 +1451,14 @@ void Player::Update()
 	UpdateInput();
 	// プレイヤーの挙動更新
 	UpdateBehavior();
-	// チャージエフェクトの更新
-	UpdateChargeEffects();
 	// 移動エフェクトの更新
-	UpdateMoveEffect();
-	// 通常移動エフェクトの更新
 	UpdateMoveEffect();
 	// ダッシュエフェクトの更新
 	UpdateDashEffect();
 	// プレイヤーの回転
 	PlayerTurn();
+	// チャージエフェクトの更新
+	UpdateChargeEffects();
 	// エネミーにヒットしたら
 	FlashingUpdate();
 
@@ -1324,7 +1484,8 @@ void Player::Update()
 	if (specialDashChargeEffect_) specialDashChargeEffect_->Update();
 	if (highJumpChargeEffect_) highJumpChargeEffect_->Update();
 
-
+	if (specialDashBurstEffect_) specialDashBurstEffect_->Update();
+	if (attackReleaseEffect_) attackReleaseEffect_->Update();
 }
 
 
@@ -1963,7 +2124,14 @@ void Player::Finalize()
 		highJumpChargeEffect_->Stop();
 		highJumpChargeEffect_.reset();
 	}
-	
+	if (specialDashBurstEffect_) {
+		specialDashBurstEffect_->Stop();
+		specialDashBurstEffect_.reset();
+	}
+	if (attackReleaseEffect_) {
+		attackReleaseEffect_->Stop();
+		attackReleaseEffect_.reset();
+	}
 }
 
 void Player::ImGui()

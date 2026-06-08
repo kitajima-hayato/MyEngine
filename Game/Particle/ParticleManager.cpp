@@ -4,6 +4,7 @@
 #include <TextureManager.h>
 #include "WinAPI.h"
 #include <numbers>
+#include <cmath>
 
 using namespace Engine;
 
@@ -995,6 +996,69 @@ Particle ParticleManager::MakeUpArrowParticle(std::mt19937& randomEngine, const 
 	return p;
 }
 
+Particle ParticleManager::MakeSpecialDashBurstParticle(
+	std::mt19937& randomEngine,
+	const Vector3& position
+)
+{
+	Particle particle;
+
+	// 後方で爆ぜる感じ。横方向に強く散る
+	std::uniform_real_distribution<float> distAngle(0.0f, 2.0f * std::numbers::pi_v<float>);
+	std::uniform_real_distribution<float> distSpeed(1.8f, 4.5f);
+	std::uniform_real_distribution<float> distUpSpeed(0.2f, 1.2f);
+	std::uniform_real_distribution<float> distZ(-0.4f, 0.4f);
+
+	std::uniform_real_distribution<float> distOffset(-0.08f, 0.08f);
+	std::uniform_real_distribution<float> distScale(0.16f, 0.34f);
+	std::uniform_real_distribution<float> distLifetime(0.12f, 0.28f);
+
+	const float angle = distAngle(randomEngine);
+	const float speed = distSpeed(randomEngine);
+
+	particle.velocity = {
+		std::cos(angle) * speed,
+		distUpSpeed(randomEngine),
+		distZ(randomEngine)
+	};
+
+	const float scale = distScale(randomEngine);
+
+	particle.transform.scale = {
+		scale,
+		scale,
+		scale
+	};
+
+	particle.transform.rotate = {
+		0.0f,
+		0.0f,
+		angle
+	};
+
+	particle.transform.translate = {
+		position.x + distOffset(randomEngine),
+		position.y + distOffset(randomEngine),
+		position.z + distOffset(randomEngine)
+	};
+
+	// 爆発・噴射っぽいオレンジ
+	std::uniform_real_distribution<float> distGreen(0.45f, 0.85f);
+	std::uniform_real_distribution<float> distBlue(0.05f, 0.18f);
+
+	particle.color = {
+		1.0f,
+		distGreen(randomEngine),
+		distBlue(randomEngine),
+		1.0f
+	};
+
+	particle.lifeTime = distLifetime(randomEngine);
+	particle.currentTime = 0.0f;
+
+	return particle;
+}
+
 Particle ParticleManager::MakeRingEffect(const Vector3& position) {
 	Particle particle;
 	particle.transform.scale = { 1.0f, 1.0f, 1.0f };     // サイズ（大きすぎると画面外）
@@ -1017,6 +1081,77 @@ Particle ParticleManager::MakeCylinderEffect(const Vector3& position)
 	particle.color = { 1.0f, 1.0f, 1.0f, 1.0f };
 	particle.lifeTime = 1.0f;
 	particle.currentTime = 0.0f;
+	return particle;
+}
+
+Particle ParticleManager::MakeFireSparkParticle(std::mt19937& randomEngine, const Vector3& position)
+{
+	Particle particle;
+
+	// 横方向に強く、少し上にも飛ぶ
+	std::uniform_real_distribution<float> distVelocityX(-7.0f, 7.0f);
+	std::uniform_real_distribution<float> distVelocityY(0.4f, 2.2f);
+	std::uniform_real_distribution<float> distVelocityZ(-0.8f, 0.8f);
+
+	// 発生位置を少しだけばらす
+	std::uniform_real_distribution<float> distOffsetX(-0.08f, 0.08f);
+	std::uniform_real_distribution<float> distOffsetY(-0.03f, 0.08f);
+	std::uniform_real_distribution<float> distOffsetZ(-0.04f, 0.04f);
+
+	// 細長い火花
+	std::uniform_real_distribution<float> distThickness(0.015f, 0.035f);
+	std::uniform_real_distribution<float> distLength(0.12f, 0.28f);
+
+	// 短寿命
+	std::uniform_real_distribution<float> distLifetime(0.08f, 0.18f);
+
+	// 色のばらつき
+	std::uniform_real_distribution<float> distRed(1.2f, 1.8f);
+	std::uniform_real_distribution<float> distGreen(0.45f, 0.85f);
+	std::uniform_real_distribution<float> distBlue(0.05f, 0.20f);
+
+	const float vx = distVelocityX(randomEngine);
+	const float vy = distVelocityY(randomEngine);
+	const float vz = distVelocityZ(randomEngine);
+
+	particle.velocity = {
+		vx,
+		vy,
+		vz
+	};
+
+	particle.transform.translate = {
+		position.x + distOffsetX(randomEngine),
+		position.y + distOffsetY(randomEngine),
+		position.z + distOffsetZ(randomEngine)
+	};
+
+	// 細長い板状にする
+	particle.transform.scale = {
+		distThickness(randomEngine),
+		distLength(randomEngine),
+		1.0f
+	};
+
+	// 速度方向に伸びて見えるように回転
+	float angle = std::atan2(vy, vx);
+	particle.transform.rotate = {
+		0.0f,
+		0.0f,
+		angle - std::numbers::pi_v<float> *0.5f
+	};
+
+	// 加算前提なので少し強めの色
+	particle.color = {
+		distRed(randomEngine),
+		distGreen(randomEngine),
+		distBlue(randomEngine),
+		1.0f
+	};
+
+	particle.lifeTime = distLifetime(randomEngine);
+	particle.currentTime = 0.0f;
+
 	return particle;
 }
 
@@ -1152,12 +1287,22 @@ Particle ParticleManager::MakeParticleByType(std::mt19937& randomEngine, const V
 		return MakeSmokeParticle(randomEngine, position);
 	case EffectType::Spark:
 		return MakeSparkParticle(randomEngine, position);
+	case EffectType::FireSpark:
+		return MakeFireSparkParticle(randomEngine, position);
+	case EffectType::SpecialDashBurst:
+		return MakeSpecialDashBurstParticle(randomEngine, position);
 	case EffectType::JumpDust:
 		return MakeJumpDustParticle(randomEngine, position);
 	case EffectType::LandDust:
 		return MakeLandDustParticle(randomEngine, position);
 	case EffectType::UpArrow:
 		return MakeUpArrowParticle(randomEngine, position);
+	case EffectType::AttackChargeEnergy:
+		return MakeAttackChargeEnergyParticle(randomEngine, position);
+	case EffectType::AttackReleaseEnergyRight:
+		return MakeAttackReleaseEnergyRightParticle(randomEngine, position);
+	case EffectType::AttackReleaseEnergyLeft:
+		return MakeAttackReleaseEnergyLeftParticle(randomEngine, position);
 	case EffectType::Default:
 	default:
 		return MakeParticle(randomEngine, position);
@@ -1172,6 +1317,7 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 {
 	Particle particle;
 
+	// EffectTypeに応じて適切なパーティクルを生成
 	switch (type)
 	{
 	case EffectType::Explosion:
@@ -1183,6 +1329,12 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 	case EffectType::Spark:
 		particle = MakeSparkParticle(randomEngine, position);
 		break;
+	case EffectType::FireSpark:
+		particle = MakeFireSparkParticle(randomEngine, position);
+		break;
+	case EffectType::SpecialDashBurst:
+		particle = MakeSpecialDashBurstParticle(randomEngine, position);
+		break;
 	case EffectType::JumpDust:
 		particle = MakeJumpDustParticle(randomEngine, position);
 		break;
@@ -1191,6 +1343,15 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 		break;
 	case EffectType::UpArrow:
 		particle = MakeUpArrowParticle(randomEngine, position);
+		break;
+	case EffectType::AttackChargeEnergy:
+		particle = MakeAttackChargeEnergyParticle(randomEngine, position);
+		break;
+	case EffectType::AttackReleaseEnergyRight:
+		particle = MakeAttackReleaseEnergyRightParticle(randomEngine, position);
+		break;
+	case EffectType::AttackReleaseEnergyLeft:
+		particle = MakeAttackReleaseEnergyLeftParticle(randomEngine, position);
 		break;
 	case EffectType::Default:
 	default:
@@ -1203,6 +1364,225 @@ Particle ParticleManager::MakeParticleByTypeWithColor(
 	particle.color.y *= colorTint.y;
 	particle.color.z *= colorTint.z;
 	particle.color.w *= colorTint.w;
+
+	return particle;
+}
+
+Particle ParticleManager::MakeAttackChargeEnergyParticle(
+	std::mt19937& randomEngine,
+	const Vector3& position
+)
+{
+	Particle particle;
+
+	// プレイヤー周囲に発生させる
+	std::uniform_real_distribution<float> distAngle(0.0f, 2.0f * std::numbers::pi_v<float>);
+	std::uniform_real_distribution<float> distRadius(0.45f, 1.05f);
+	std::uniform_real_distribution<float> distYScale(0.45f, 0.85f);
+	std::uniform_real_distribution<float> distZ(-0.08f, 0.08f);
+
+	std::uniform_real_distribution<float> distScale(0.045f, 0.095f);
+	std::uniform_real_distribution<float> distLifetime(0.18f, 0.35f);
+
+	const float angle = distAngle(randomEngine);
+	const float radius = distRadius(randomEngine);
+
+	Vector3 spawnPos{
+		position.x + std::cos(angle) * radius,
+		position.y + std::sin(angle) * radius * distYScale(randomEngine),
+		position.z + distZ(randomEngine)
+	};
+
+	particle.transform.translate = spawnPos;
+
+	// 中心へ向かう方向
+	Vector3 toCenter{
+		position.x - spawnPos.x,
+		position.y - spawnPos.y,
+		position.z - spawnPos.z
+	};
+
+	float length = std::sqrt(
+		toCenter.x * toCenter.x +
+		toCenter.y * toCenter.y +
+		toCenter.z * toCenter.z
+	);
+
+	if (length > 0.0001f) {
+		toCenter.x /= length;
+		toCenter.y /= length;
+		toCenter.z /= length;
+	}
+
+	std::uniform_real_distribution<float> distSpeed(2.0f, 4.5f);
+
+	const float speed = distSpeed(randomEngine);
+
+	// 中心に吸い込まれる速度
+	particle.velocity = {
+		toCenter.x * speed,
+		toCenter.y * speed,
+		toCenter.z * speed
+	};
+
+	const float scale = distScale(randomEngine);
+	particle.transform.scale = {
+		scale,
+		scale,
+		scale
+	};
+
+	particle.transform.rotate = {
+		0.0f,
+		0.0f,
+		angle
+	};
+
+	// エネルギー感のある黄色〜青白系
+	std::uniform_real_distribution<float> distBlue(0.7f, 1.2f);
+
+	particle.color = {
+		1.0f,
+		0.85f,
+		distBlue(randomEngine),
+		1.0f
+	};
+
+	particle.lifeTime = distLifetime(randomEngine);
+	particle.currentTime = 0.0f;
+
+	return particle;
+}
+
+Particle ParticleManager::MakeAttackReleaseEnergyRightParticle(
+	std::mt19937& randomEngine,
+	const Vector3& position
+)
+{
+	Particle particle;
+
+	// 3本の弧を作る
+	// band 0: 内側
+	// band 1: 中間
+	// band 2: 外側
+	std::uniform_int_distribution<int> distBand(0, 2);
+
+	// 弧の上下角度
+	// -70度 ～ +70度くらいにすると「)」の形になりやすい
+	std::uniform_real_distribution<float> distArcAngle(
+		-70.0f * std::numbers::pi_v<float> / 180.0f,
+		70.0f * std::numbers::pi_v<float> / 180.0f
+	);
+
+	// 少しだけ形を崩すためのランダム
+	std::uniform_real_distribution<float> distJitter(-0.035f, 0.035f);
+	std::uniform_real_distribution<float> distZ(-0.04f, 0.04f);
+
+	// 速度と寿命
+	std::uniform_real_distribution<float> distSpeed(3.5f, 5.8f);
+	std::uniform_real_distribution<float> distLifetime(0.11f, 0.20f);
+
+	// 弧の種類
+	const int band = distBand(randomEngine);
+	const float theta = distArcAngle(randomEngine);
+
+	// 弧の半径
+	// 値が離れているほど「)))」の層が見えやすい
+	const float radiusTable[3] = {
+		0.22f,
+		0.42f,
+		0.62f
+	};
+
+	const float radius = radiusTable[band];
+
+	// 右向きの「)」を作る
+	// cos(theta) が前方、sin(theta) が上下
+	const float x = std::cos(theta) * radius;
+	const float y = std::sin(theta) * radius;
+
+	// 弧の中心を少し前に置く
+	// Player側でも前方にずらしているので、ここでは控えめ
+	particle.transform.translate = {
+		position.x + x + distJitter(randomEngine),
+		position.y + y + distJitter(randomEngine),
+		position.z + distZ(randomEngine)
+	};
+
+	// 弧全体を前方向へ進ませる
+	const float speed = distSpeed(randomEngine);
+
+	// 外側の弧ほど少し速くすると、外へ広がる衝撃波感が出る
+	const float bandSpeedBonus = static_cast<float>(band) * 0.5f;
+
+	particle.velocity = {
+		speed + bandSpeedBonus,
+		y * 0.8f,
+		0.0f
+	};
+
+	// 弧に沿った細長い粒にする
+	// 点ではなく、短い線分として見せる
+	const float lengthTable[3] = {
+		0.26f,
+		0.34f,
+		0.42f
+	};
+
+	const float thicknessTable[3] = {
+		0.055f,
+		0.065f,
+		0.075f
+	};
+
+	particle.transform.scale = {
+		lengthTable[band],
+		thicknessTable[band],
+		1.0f
+	};
+
+	// 弧に沿って回転させる
+	// 右半円の接線方向
+	const float tangentAngle = std::atan2(std::cos(theta), -std::sin(theta));
+
+	particle.transform.rotate = {
+		0.0f,
+		0.0f,
+		tangentAngle
+	};
+
+	// 中心に近いほど白く、外側ほど青くする
+	const Vector4 colorTable[3] = {
+		{ 1.00f, 1.15f, 1.45f, 1.0f },
+		{ 0.75f, 1.00f, 1.55f, 1.0f },
+		{ 0.45f, 0.85f, 1.65f, 1.0f }
+	};
+
+	particle.color = colorTable[band];
+
+	particle.lifeTime = distLifetime(randomEngine);
+	particle.currentTime = 0.0f;
+
+	return particle;
+}
+
+Particle ParticleManager::MakeAttackReleaseEnergyLeftParticle(
+	std::mt19937& randomEngine,
+	const Vector3& position
+)
+{
+	Particle particle = MakeAttackReleaseEnergyRightParticle(randomEngine, position);
+
+	// 位置を左右反転
+	particle.transform.translate.x =
+		position.x - (particle.transform.translate.x - position.x);
+
+	// 速度も左右反転
+	particle.velocity.x *= -1.0f;
+
+	// 回転も左右反転後の速度・形に合わせる
+	particle.transform.rotate.z =
+		std::numbers::pi_v<float> -particle.transform.rotate.z;
 
 	return particle;
 }
