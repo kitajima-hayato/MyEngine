@@ -92,6 +92,14 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	isGameOverPending_ = false;
 	gameOverTimer_ = 0.0f;
 
+	// ボスステージの場合ボスステージを生成する
+	if (stageKey == "boss") {
+		isBossStage_ = true;
+		// インスタンスの生成とプレイヤーとマップをセット
+		bossStageManager_ = std::make_unique<BossStageManager>();
+		bossStageManager_->Initialize(map.get(), player.get());
+	}
+
 }
 
 void GamePlayScene::CheckPlayerAlive()
@@ -283,19 +291,30 @@ void GamePlayScene::Update()
 	}
 
 	//==================================================
+	// ボスステージ
+	//==================================================
+	// ボスステージの更新　/ ボスステージなら
+	if (isBossStage_ && bossStageManager_) {
+		bossStageManager_->Update();
+		bossStageManager_->CheckCollision();
+	}
+
+	//==================================================
 	// HUD / ImGui更新
 	//==================================================
 
 	gamePlayHUD_->Update();
+
+	
 
 	DrawImgui();
 }
 
 void GamePlayScene::Draw()
 {
-	///////////////////
-	//  モデルの描画   //
-	///////////////////
+	//==================================================
+	// モデルの描画
+	//==================================================
 
 	// 背景の描画
 	backGround->Draw();
@@ -311,14 +330,19 @@ void GamePlayScene::Draw()
 		enemy->Draw();
 	}
 
+	// ボスステージの描画　/ ボスステージなら
+	if (isBossStage_ && bossStageManager_) {
+		bossStageManager_->Draw();
+	}
+
 	ModelParticleManager::GetInstance().Draw();
 
 	ParticleManager::GetInstance()->Draw();
 	
 
-	///////////////////
-	// スプライトの描画 //
-	///////////////////
+	//==================================================
+	// スプライトの描画
+	//==================================================
 
 
 	damageFeedBack_->Draw();

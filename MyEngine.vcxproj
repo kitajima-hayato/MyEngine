@@ -108,6 +108,10 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Application\Boss\BossProjectile.cpp" />
+    <ClCompile Include="Game\Application\Boss\BossEnemy.cpp" />
+    <ClCompile Include="Game\Application\Boss\BossSpawnedObject.cpp" />
+    <ClCompile Include="Game\Application\Boss\BossStageManager.cpp" />
     <ClCompile Include="engine\Input\Controller.cpp" />
     <ClCompile Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.cpp" />
     <ClCompile Include="Game\Application\BackGround\Decoration\DecorationField.cpp" />
@@ -188,6 +192,10 @@
     <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Application\Boss\BossProjectile.h" />
+    <ClInclude Include="Game\Application\Boss\BossEnemy.h" />
+    <ClInclude Include="Game\Application\Boss\BossSpawnedObject.h" />
+    <ClInclude Include="Game\Application\Boss\BossStageManager.h" />
     <ClInclude Include="engine\Input\Controller.h" />
     <ClInclude Include="engine\Input\InputData.h" />
     <ClInclude Include="Game\Application\Enemy\EnemyBase\DropEnemyBase.h" />

@@ -14,6 +14,8 @@
 #include "Game/Collision/MapCollisionQuery.h"
 #include "Game/Collision/Collider.h"
 #include "Game/Application/RespawnSequence.h"
+#include "Game/Application/Boss/BossStageManager.h"
+
 /// <summary>
 /// ゲームプレイシーン
 /// ゲームプレイ中のシーンを管理する
@@ -124,17 +126,10 @@ private:
 	Camera* camera = nullptr;
 	Transform cameraTransform;
 
-	
-
 	// 被弾フィードバック
 	std::unique_ptr<DamageFeedBack> damageFeedBack_;
 
-
-	
 	float shakeAmp_ = 0.1f;
-
-	
-
 
 	/// タイトルロゴ
 	std::unique_ptr<Object3D> titleLogoObject;
@@ -142,7 +137,6 @@ private:
 
 	/// バックグラウンド
 	std::unique_ptr<BackGround> backGround;
-
 
 
 	// フォローカメラ
@@ -198,6 +192,11 @@ private:
 
 	// スタートカメラをスキップしたときにプレイヤーが動かないようにするフラグ
 	bool skipJustFinishedThisFrame_ = false;
+
+
+	// ボスステージマネージャー
+	std::unique_ptr<BossStageManager> bossStageManager_;
+	bool isBossStage_ = false;
 };
 
 
