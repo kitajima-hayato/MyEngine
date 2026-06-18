@@ -97,7 +97,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 		isBossStage_ = true;
 		// インスタンスの生成とプレイヤーとマップをセット
 		bossStageManager_ = std::make_unique<BossStageManager>();
-		bossStageManager_->Initialize(map.get(), player.get());
+		bossStageManager_->Initialize(map.get(), player.get(),collision_.get());
 	}
 
 }
@@ -293,6 +293,17 @@ void GamePlayScene::Update()
 	//==================================================
 	// ボスステージ
 	//==================================================
+	
+	// ボスステージの入り口にいるか
+	if (player->GetIsAtBossEntrance()) {
+		PlayContext::GetInstance().SetSelectedStageKey("boss");
+		sceneManager->ChangeSceneWithTransition(
+			"GAMEPLAY",
+			TransitionType::Start
+		);
+		return;
+	}
+
 	// ボスステージの更新　/ ボスステージなら
 	if (isBossStage_ && bossStageManager_) {
 		bossStageManager_->Update();
@@ -514,31 +525,15 @@ void GamePlayScene::Finalize()
 void GamePlayScene::DrawImgui()
 {
 #ifdef USE_IMGUI
-	ImGui::Begin("Camera Settings / GamePlayScene");
-	if (ImGui::Button("Test Shake")) {
-		damageFeedBack_->StartShake(0.6f, 0.35f, false);
-	}
+	ImGui::Begin("GamePlayScene");
+	
+	
+	bool flag = player->GetIsAtBossEntrance();
 
-	// 読み込んでいるマップデータのキー
-	ImGui::Text("SelectedStage:%s", stageKey);
-
-	// カメラの配置 / 回転修正
-	cameraTransform.translate = camera->GetTranslate();
-	ImGui::DragFloat3("Camera Position", &cameraTransform.translate.x, 0.1f, -10000.0f, 10000.0f);
-
-	cameraTransform.rotate = camera->GetRotate();
-	ImGui::DragFloat3("Camera Rotation", &cameraTransform.rotate.x, 0.1f, -180.0f, 180.0f);
-
-
-
-	if (ImGui::Button("Vertical Camera")) {
-		cameraTransform.translate = { 8.0f,20.0f,0.0f };
-		cameraTransform.rotate = { 1.6f,0.0f,0.0f };
-	}
+	ImGui::Text("Player is at boss entrance: %s", flag ? "true" : "false");
+	
 	ImGui::End();
 
-	camera->SetTranslate(cameraTransform.translate);
-	camera->SetRotate(cameraTransform.rotate);
 #endif
 
 }

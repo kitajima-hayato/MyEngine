@@ -58,6 +58,13 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 	case BlockType::toggleBlockOff:
 		blockModel->SetModel("GamePlay/Blocks/toggleblock_off");
 		break;
+	case BlockType::BossSpawnableBlock:
+		// blockModel->SetModel("GamePlay/Blocks/bossspawnableblock");
+		blockModel->SetModel("GamePlay/Blocks/sandblock");
+		break;
+	case BlockType::BossEntrance:
+		// 見た目は無し(プレイヤーが通り抜けるトリガーゾーン)
+		break;
 	default:
 		blockModel->SetModel("GamePlay/Blocks/grassblock");
 		break;
@@ -75,7 +82,9 @@ void Block::Initialize(BlockType blockType, Vector3 position) {
 
 
 void Block::Update() {
-	if (blockType == BlockType::Air || !isAlive_) return;
+	if (blockType == BlockType::Air || 
+		blockType == BlockType::BossEntrance ||
+		!isAlive_) return;
 	// 移動ブロックの処理
 	if (blockType == BlockType::moveBlock) {
 		if (moveRight_) {
@@ -115,7 +124,9 @@ void Block::Update() {
 
 void Block::Draw() {
 	// ブロックの描画 / 描画対象が無い場合と壊れている場合は描画しない
-	if (blockType == BlockType::Air || !isAlive_) return;
+	if (blockType == BlockType::Air || 
+		blockType == BlockType::BossEntrance ||
+		!isAlive_) return;
 	blockModel->Draw();
 }
 

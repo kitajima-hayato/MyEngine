@@ -1,6 +1,7 @@
 #pragma once
 #include "Game/Application/Enemy/EnemyBase/EnemyBase.h"
 #include "engine/math/MyMath.h"
+#include <cstdint>
 
 /// <summary>
 /// ボスエネミークラス
@@ -20,15 +21,25 @@ public:
 	void OnStomped() override;
 
 
+	/// <summary>
+	/// ダメージを受ける
+	/// </summary>
+	/// <param name="damage">受けるダメージ数</param>
 	void TakeDamage(int32_t damage);
 
-
+	/// <summary>
+	/// HPが0になっているか
+	/// </summary>
+	/// <returns>HPが0ならtrue、それ以外はfalse</returns>
 	bool IsDefeated() const { return stats.health == 0; }
 
 	// BossProjectileの発射フラグ
 	bool HasPendingShot()const { return pendingShot_; }
 
-
+	/// <summary>
+	/// 発射フラグを消費して、発射元の座標を取得する関数
+	/// </summary>
+	/// <returns>発射元の座標</returns>
 	Vector3 ConsumeShotOrigin();
 
 
@@ -46,6 +57,7 @@ private:
 	void UpdatePhase();
 
 private:
+	// ボスの行動フェーズ
 	enum class Phase {
 		kPhase1,kPhase2,kPhase3,
 	};

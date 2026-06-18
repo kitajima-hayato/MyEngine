@@ -55,6 +55,8 @@ private:	// メンバ関数
 	void ScanAndCreateSpawnedObjects();
 
 
+
+
 private:	// メンバ変数
 
 	// ボスのインスタンス
