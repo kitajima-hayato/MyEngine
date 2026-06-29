@@ -353,6 +353,13 @@ private:
 	bool IsHitBlockDamageTable(BlockType type);
 
 	/// <summary>
+	/// ボス出現ブロック当たり判定テーブル
+	/// </summary>
+	/// <param name="type">ボス出現ブロックの種類</param>
+	/// <returns>ボス出現ブロックかどうか</returns>
+	bool IsHitBossEntranceTable(BlockType type);
+
+	/// <summary>
 	/// デバッグ用プレイヤー死亡時リセット
 	/// </summary>
 	void DebugPlayerReset();
@@ -556,7 +563,8 @@ public:	/// Setter / Getter
 	// 特殊ダッシュが使用可能か
 	bool CanChargeSpecialDash() const;
 
-
+	// ボス部屋の入り口にいるかどうか
+	bool GetIsAtBossEntrance()const { return isAtBossEntrance_; }
 
 
 private:	// メンバ変数
@@ -707,5 +715,8 @@ private:	// メンバ変数
 
 	// 攻撃発動時のエネルギー放出エフェクト
 	std::unique_ptr<ParticleSystem> attackReleaseEffect_;
+
+	// ボス部屋の入り口にいるかどうか
+	bool isAtBossEntrance_ = false;
 };
 

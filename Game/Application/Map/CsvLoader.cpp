@@ -1,5 +1,4 @@
 #include "CsvLoader.h"
-#include "Game/Application/Block/Block.h"
 
 const std::string CsvLoader::frontFilePath = "resources/Data/MapData/";
 const std::string CsvLoader::extensionCsv_ = ".csv";

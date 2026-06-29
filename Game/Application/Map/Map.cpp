@@ -20,6 +20,8 @@ ImVec4 GetBlockColorByType(BlockType blockType) {
 	case BlockType::damageBlock: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
 	case BlockType::toggleBlockOn: return ImVec4(0.2f, 0.8f, 0.2f, 1.0f);
 	case BlockType::toggleBlockOff: return ImVec4(0.8f, 0.2f, 0.2f, 1.0f);
+	case BlockType::BossSpawnableBlock: return ImVec4(1.0f, 0.5f, 0.0f, 1.0f);
+	case BlockType::BossEntrance:       return ImVec4(0.6f, 0.0f, 1.0f, 1.0f);
 	default:                     return ImVec4(0.5f, 0.5f, 0.5f, 1.0f);
 	}
 }
@@ -27,10 +29,6 @@ ImVec4 GetBlockColorByType(BlockType blockType) {
 
 void Map::Initialize(const std::string& mapFilePath)
 {
-	// マップデータの初期化
-	mapChipData_.mapData.resize(kMapHeight, std::vector<BlockType>(kMapWidth, BlockType::Air));
-
-	mapChipData_.hazardData.resize(kMapHeight, std::vector<HazardType>(kMapWidth, HazardType::None));
 
 	// マップ番号の保存
 	mapNumber_ = mapFilePath;
@@ -442,6 +440,9 @@ void Map::MapEditor()
 				"DamageBlock",
 				"ToggleBlockOn",
 				"ToggleBlockOff",
+				"BossSpawnableBlock",
+				"BossEntrance",
+
 			};
 
 			static int currentHazardTypeInt = 0;
@@ -866,6 +867,9 @@ bool Map::IsSolidBlockAt(uint32_t xIndex, uint32_t yIndex) const
 	// ゴールは判定をとらない / 触れたらis goalをtrueにするだけ
 	BlockType type = mapChipData_.mapData[yIndex][xIndex];
 	if (type == BlockType::kGoalUp || type == BlockType::kGoalDown) {
+		return false;
+	}
+	if(type == BlockType::BossEntrance) {
 		return false;
 	}
 	// ブロックの種類に応じて判定をとるか決める

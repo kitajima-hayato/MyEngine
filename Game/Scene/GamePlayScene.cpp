@@ -13,12 +13,10 @@
 using Engine::DirectXCommon;
 
 GamePlayScene::GamePlayScene()
-{
-}
+{}
 
 GamePlayScene::~GamePlayScene()
-{
-}
+{}
 
 void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 {
@@ -75,9 +73,14 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	startCam_->Initialize();
 	startCam_->Bind(camera, &cameraTransform);
 
-	startCam_->Start();
+	if (stageKey == "boss") {
+		baseCameraPos_ = { 14.0f,6.85f, -34.5f };
+	}
+	else {
+		startCam_->Start();
+		baseCameraPos_ = cameraTransform.translate;
+	}
 
-	baseCameraPos_ = cameraTransform.translate;
 
 	damageFeedBack_ = std::make_unique<DamageFeedBack>();
 	damageFeedBack_->Bind(player.get(), camera, &cameraTransform);
@@ -86,11 +89,19 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	respawnSequence_ = std::make_unique<RespawnSequence>();
 	respawnSequence_->Initialize();
 
-	
+
 
 	// ゲームオーバー遷移の保留フラグとタイマーをリセット
 	isGameOverPending_ = false;
 	gameOverTimer_ = 0.0f;
+
+	// ボスステージの場合ボスステージを生成する
+	if (stageKey == "boss") {
+		isBossStage_ = true;
+		// インスタンスの生成とプレイヤーとマップをセット
+		bossStageManager_ = std::make_unique<BossStageManager>();
+		bossStageManager_->Initialize(map.get(), player.get(), collision_.get());
+	}
 
 }
 
@@ -171,13 +182,16 @@ void GamePlayScene::Update()
 	//==================================================
 
 	if (!startCam_->IsRunning()) {
-		// baseCamPos_ を入力として使う（前フレームのシェイクを混ぜない）
-		cameraController_->SetCameraPosition(baseCameraPos_);
-		cameraController_->SetTargetPosition(player->GetTranslate());
-		cameraController_->Update(dt);
+		// ボスステージは追従したくないため除外する / 通常のステージは追従させる
+		if (!isBossStage_) {
+			// baseCamPos_ を入力として使う（前フレームのシェイクを混ぜない）
+			cameraController_->SetCameraPosition(baseCameraPos_);
+			cameraController_->SetTargetPosition(player->GetTranslate());
+			cameraController_->Update(dt);
 
-		// フォロー結果を「基準」として保存
-		baseCameraPos_ = cameraController_->GetCameraPosition();
+			// フォロー結果を「基準」として保存
+			baseCameraPos_ = cameraController_->GetCameraPosition();
+		}
 	} else {
 		// 開始演出中は基準位置もカメラ位置も開始演出の位置にする
 		baseCameraPos_ = cameraTransform.translate;
@@ -283,19 +297,49 @@ void GamePlayScene::Update()
 	}
 
 	//==================================================
+	// ボスステージ
+	//==================================================
+
+	// ボスステージの入り口にいるか
+	if (player->GetIsAtBossEntrance()) {
+		PlayContext::GetInstance().SetSelectedStageKey("boss");
+		sceneManager->ChangeSceneWithTransition(
+			"GAMEPLAY",
+			TransitionType::Start
+		);
+		return;
+	}
+
+	// ボスステージの更新　/ ボスステージなら
+	if (isBossStage_ && bossStageManager_) {
+		bossStageManager_->Update();
+		bossStageManager_->CheckCollision();
+
+		if (bossStageManager_->IsBossDefeated()) {
+			sceneManager->ChangeSceneWithTransition(
+				"STAGECLEAR",
+				TransitionType::Start
+			);
+			return;
+		}
+	}
+
+	//==================================================
 	// HUD / ImGui更新
 	//==================================================
 
 	gamePlayHUD_->Update();
+
+
 
 	DrawImgui();
 }
 
 void GamePlayScene::Draw()
 {
-	///////////////////
-	//  モデルの描画   //
-	///////////////////
+	//==================================================
+	// モデルの描画
+	//==================================================
 
 	// 背景の描画
 	backGround->Draw();
@@ -311,14 +355,19 @@ void GamePlayScene::Draw()
 		enemy->Draw();
 	}
 
+	// ボスステージの描画　/ ボスステージなら
+	if (isBossStage_ && bossStageManager_) {
+		bossStageManager_->Draw();
+	}
+
 	ModelParticleManager::GetInstance().Draw();
 
 	ParticleManager::GetInstance()->Draw();
-	
 
-	///////////////////
-	// スプライトの描画 //
-	///////////////////
+
+	//==================================================
+	// スプライトの描画
+	//==================================================
 
 
 	damageFeedBack_->Draw();
@@ -490,31 +539,19 @@ void GamePlayScene::Finalize()
 void GamePlayScene::DrawImgui()
 {
 #ifdef USE_IMGUI
-	ImGui::Begin("Camera Settings / GamePlayScene");
-	if (ImGui::Button("Test Shake")) {
-		damageFeedBack_->StartShake(0.6f, 0.35f, false);
+	ImGui::Begin("GamePlayScene");
+
+	bool flag = player->GetIsAtBossEntrance();
+	ImGui::Text("Player is at boss entrance: %s", flag ? "true" : "false");
+
+	if (isBossStage_) {
+		ImGui::Separator();
+		ImGui::Text("Boss Camera");
+		ImGui::DragFloat3("Position##BossCam", &baseCameraPos_.x, 0.05f);
+		ImGui::Text("{ %.2ff, %.2ff, %.2ff }",   // コード貼り付け用
+			baseCameraPos_.x, baseCameraPos_.y, baseCameraPos_.z);
 	}
 
-	// 読み込んでいるマップデータのキー
-	ImGui::Text("SelectedStage:%s", stageKey);
-
-	// カメラの配置 / 回転修正
-	cameraTransform.translate = camera->GetTranslate();
-	ImGui::DragFloat3("Camera Position", &cameraTransform.translate.x, 0.1f, -10000.0f, 10000.0f);
-
-	cameraTransform.rotate = camera->GetRotate();
-	ImGui::DragFloat3("Camera Rotation", &cameraTransform.rotate.x, 0.1f, -180.0f, 180.0f);
-
-
-
-	if (ImGui::Button("Vertical Camera")) {
-		cameraTransform.translate = { 8.0f,20.0f,0.0f };
-		cameraTransform.rotate = { 1.6f,0.0f,0.0f };
-	}
 	ImGui::End();
-
-	camera->SetTranslate(cameraTransform.translate);
-	camera->SetRotate(cameraTransform.rotate);
 #endif
-
 }

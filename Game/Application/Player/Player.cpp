@@ -1500,6 +1500,9 @@ void Player::Draw()
 
 void Player::UpdateBehavior()
 {
+	// ボス部屋の入り口にいるか
+	isAtBossEntrance_ = false;
+
 	// マップがセットされていなかったら処理しない
 	if (!map_)return;
 
@@ -1861,17 +1864,24 @@ void Player::LandingCollisionMove(CollisionMapInfo& collisionInfo)
 			IndexSet rightIndex = map_->GetMapChipIndexSetByPosition(rightBottom + checkOffset);
 			BlockType rightBlock = map_->GetMapChipTypeByIndex(rightIndex.xIndex, rightIndex.yIndex);
 
+			// どちらの足元も地面でなければ空中状態にする
 			if (!map_->IsSolidBlockAt(leftIndex.xIndex, leftIndex.yIndex) &&
 				!map_->IsSolidBlockAt(rightIndex.xIndex, rightIndex.yIndex)) {
 				onGround_ = false;
 			}
 
+			// ゴールブロックに触れているか
 			if (IsHitGoalBlockTable(leftBlock) || IsHitGoalBlockTable(rightBlock)) {
 				isGoal_ = true;
 			}
 
+			// ダメージブロックに触れているか
 			if (IsHitBlockDamageTable(leftBlock) || IsHitBlockDamageTable(rightBlock)) {
 				TakeDamage();
+			}
+			// ボス部屋の入り口にいるか判定テーブル
+			if (IsHitBossEntranceTable(leftBlock) || IsHitBossEntranceTable(rightBlock)) {
+				isAtBossEntrance_ = true;
 			}
 		}
 	}
@@ -2065,6 +2075,12 @@ bool Player::IsHitBlockDamageTable(BlockType type)
 		return true;
 	}
 	return false;
+}
+
+bool Player::IsHitBossEntranceTable(BlockType type)
+{
+	// ボスエリアの入り口ブロックかどうか
+	return type == BlockType::BossEntrance;
 }
 
 void Player::DebugPlayerReset()

@@ -19,6 +19,13 @@ public:
 	/// <param name="id">ステージの名前</param>
 	void SetSelectedStageId(uint32_t id) { selectedStageId_ = id; }
 
+
+	/// <summary>
+	/// 選択中のステージキー取得
+	/// </summary>
+	/// <param name="key"></param>
+	void SetSelectedStageKey(const std::string& key) { selectedStageKey_ = key; }
+
 	/// <summary>
 	/// 選択中のステージ設定
 	/// </summary>
