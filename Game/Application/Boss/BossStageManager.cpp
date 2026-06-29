@@ -27,9 +27,31 @@ void BossStageManager::Update()
 	// ボスエネミーの更新
     bossEnemy->Update();
 
-	// ステージ上にスポーンされたオブジェクトの更新
+    // Projectile 生成チェック
+    if (bossEnemy->HasPendingShot()) {
+        Vector3 origin = bossEnemy->ConsumeShotOrigin();
+        auto proj = std::make_unique<BossProjectile>();
+        proj->Initialize(origin);
+        bossProjectiles.push_back(std::move(proj));
+    }
+
+    // Projectile 更新 → 着弾したら SpawnedObject 生成
+    for (auto& proj : bossProjectiles) {
+        proj->Update();
+        if (proj->IsExpired()) {
+            auto obj = std::make_unique<BossSpawnedObject>();
+            obj->Initialize(proj->GetPosition(), bossEnemy.get());
+            spawnedObjects.push_back(std::move(obj));
+        }
+    }
+    // 期限切れ Projectile 削除
+    bossProjectiles.erase(
+        std::remove_if(bossProjectiles.begin(), bossProjectiles.end(),
+            [](const auto& p) { return p->IsExpired(); }),
+        bossProjectiles.end());
+
     for (auto& obj : spawnedObjects) {
-		obj->Update();
+        obj->Update();
     }
 
 }
@@ -38,6 +60,11 @@ void BossStageManager::Draw()
 {
     // ボスエネミーの描画
 	bossEnemy->Draw();
+
+	// ボスの攻撃プロジェクトタイルの描画
+	for (auto& proj : bossProjectiles) {
+        proj->Draw();
+    }
 
 	// ステージ上にスポーンされたオブジェクトの描画
     for (auto& obj : spawnedObjects) {

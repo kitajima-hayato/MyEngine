@@ -29,10 +29,6 @@ ImVec4 GetBlockColorByType(BlockType blockType) {
 
 void Map::Initialize(const std::string& mapFilePath)
 {
-	// マップデータの初期化
-	mapChipData_.mapData.resize(kMapHeight, std::vector<BlockType>(kMapWidth, BlockType::Air));
-
-	mapChipData_.hazardData.resize(kMapHeight, std::vector<HazardType>(kMapWidth, HazardType::None));
 
 	// マップ番号の保存
 	mapNumber_ = mapFilePath;
