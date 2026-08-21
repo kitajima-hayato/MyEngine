@@ -76,16 +76,23 @@ private:
 	// 選択しているアイテム
 	ClearMenuItem selectedItem_ = ClearMenuItem::NextStage;
 	// 選択時の拡縮編集用Vector2
-	Vector2 oneMoreBaseSize_ = { 250.0f, 75.0f };
-	Vector2 selectBaseSize_ = { 250.0f, 75.0f };
-	Vector2 nextBaseSize_ = { 250.0f, 75.0f };
+	Vector2 oneMoreBaseSize_ = { 180.0f, 180.0f };
+	Vector2 selectBaseSize_ = { 180.0f, 180.0f };
+	Vector2 nextBaseSize_ = { 180.0f, 180.0f };
 	// 選択時に８％程大きくする
 	float selectScale_ = 1.08f;
-
 
 	// kyeUI
 	std::unique_ptr<Sprite> keyIcon_A;
 	std::unique_ptr<Sprite> keyIcon_D;
+
+	// ===== SPACE : 決定 表示用（左下、A/Dキーの上の行） =====
+	std::unique_ptr<Sprite> keyIcon_Space;
+	Vector2 keyIcon_Space_Pos = { 72.0f, 600.0f };
+	std::unique_ptr<Sprite> colon_;
+	Vector2 colonPos_ = { 130.0f, 600.0f };
+	std::unique_ptr<Sprite> checkUI_;
+	Vector2 checkUI_Pos = { 190.0f, 600.0f };
 
 };
 

@@ -2,6 +2,7 @@
 # 目的:
 #  - resources 配下の *.png を再帰検索して TextureConverter.exe で .dds へ変換
 #  - 出力は png と同じフォルダ（同階層に .dds）
+#  - UIフォルダ配下の png は -nc（無圧縮）で変換してぼけを防ぐ
 #  - ログは resources から下の相対パスで記録（例: _Common\UI\a.png）
 
 param(
@@ -10,7 +11,7 @@ param(
   [switch]$SkipIfExists = $true
 )
 if ([string]::IsNullOrWhiteSpace($ResourcesRoot)) {
-  # 右クリック実行でも取れることが多い $PSCommandPath を優先
+  # 右クリック実行でもわかることを期待 $PSCommandPath を優先
   $scriptPath = $PSCommandPath
   if ([string]::IsNullOrWhiteSpace($scriptPath)) {
     # 最終手段：カレント
@@ -34,7 +35,7 @@ if (!(Test-Path $ResourcesRoot)) {
   throw "ResourcesRoot が見つかりません: $ResourcesRoot"
 }
 
-# ResourcesRoot を正規化（末尾の \ を除く）
+# ResourcesRoot を正規化（末尾の \ を除去）
 $ResourcesRoot = (Resolve-Path $ResourcesRoot).Path.TrimEnd('\','/')
 
 # ログは resources フォルダ直下に出す
@@ -75,18 +76,24 @@ foreach ($f in $pngFiles) {
   }
 
   try {
-    $args = @($f.FullName)
+    $exeArgs = @($f.FullName)
     if ($MipLevels -ge 0) {
-      $args += @("-ml", "$MipLevels")
+      $exeArgs += @("-ml", "$MipLevels")
+    }
+
+    # UIフォルダ配下は無圧縮(-nc)で変換（BC7圧縮によるぼけを防ぐ）
+    if ($relPng -match '(^|\\)UI(\\|$)') {
+      $exeArgs += "-nc"
     }
 
     # 実行
-    $p = Start-Process -FilePath $ExePath -ArgumentList $args -NoNewWindow -Wait -PassThru
+    $p = Start-Process -FilePath $ExePath -ArgumentList $exeArgs -NoNewWindow -Wait -PassThru
 
     # 変換結果確認
     if (Test-Path $dstDdsFull) {
       $converted++
-      $line = "{0},OK,{1},{2},{3}" -f (Get-Date -Format "s"), $relPng, $relDds, "converted"
+      $status = if ($relPng -match '(^|\\)UI(\\|$)') { "converted (no compress)" } else { "converted" }
+      $line = "{0},OK,{1},{2},{3}" -f (Get-Date -Format "s"), $relPng, $relDds, $status
       Add-Content -Encoding UTF8 -Path $LogPath -Value $line
     } else {
       $failed++

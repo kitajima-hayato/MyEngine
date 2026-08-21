@@ -52,23 +52,26 @@ void StageClearScene::Initialize(DirectXCommon* dxCommon)
 	playerObject_->SetModel("GamePlay/Player");
 
 
-	// OneMore / Select / Title UI
+	// OneMore / Select / Title UI（512x512統一セット・正方形で等倍縮小）
+	oneMorePos = { 375.0f, 645.0f };
 	oneMore_ = std::make_unique<Sprite>();
 	oneMore_->Initialize("resources/Scenes/Clear/UI/Texture/NextStage.png");
 	oneMore_->SetAnchorPoint({ 0.5f, 0.5f });
-	oneMore_->SetPosition({ 375.0f,610.0f });
+	oneMore_->SetPosition(oneMorePos);
 	oneMore_->SetSize(oneMoreBaseSize_);
 
+	selectPos = { 975.0f, 645.0f };
 	select_ = std::make_unique<Sprite>();
 	select_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_Select.png");
 	select_->SetAnchorPoint({ 0.5f, 0.5f });
-	select_->SetPosition({ 975.0f,610.0f });
+	select_->SetPosition(selectPos);
 	select_->SetSize(selectBaseSize_);
 
+	nextPos = { 675.0f, 645.0f };
 	next_ = std::make_unique<Sprite>();
 	next_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_OneMore.png");
 	next_->SetAnchorPoint({ 0.5f, 0.5f });
-	next_->SetPosition({ 675.0f,610.0f });
+	next_->SetPosition(nextPos);
 	next_->SetSize(nextBaseSize_);
 
 	// KeyIconUi　/ 左下に配置
@@ -82,6 +85,25 @@ void StageClearScene::Initialize(DirectXCommon* dxCommon)
 	keyIcon_D->Initialize("resources/_Common/UI/Texture/inputhints/D.dds");
 	keyIcon_D->SetPosition({ 80.0f, 635.0f });
 	keyIcon_D->SetSize({ 50.0f, 50.0f });
+
+	// ===== SPACE : 決定（右下に配置、ステージセレクトと同じ構成） =====
+	keyIcon_Space = std::make_unique<Sprite>();
+	keyIcon_Space->Initialize("resources/_Common/UI/Texture/inputhints/Space.png");
+	keyIcon_Space->SetAnchorPoint({ 0.5f, 0.5f });
+	keyIcon_Space->SetSize({ 100.0f, 100.0f });
+	keyIcon_Space->SetPosition(keyIcon_Space_Pos);
+
+	colon_ = std::make_unique<Sprite>();
+	colon_->Initialize("resources/_Common/UI/Texture/inputhints/Colon.png");
+	colon_->SetAnchorPoint({ 0.5f, 0.5f });
+	colon_->SetSize({ 100.0f, 60.0f });
+	colon_->SetPosition(colonPos_);
+
+	checkUI_ = std::make_unique<Sprite>();
+	checkUI_->Initialize("resources/Scenes/StageSelect/UI/Texture/Check.dds");
+	checkUI_->SetAnchorPoint({ 0.5f, 0.5f });
+	checkUI_->SetSize({ 100.0f, 100.0f });
+	checkUI_->SetPosition(checkUI_Pos);
 
 }
 
@@ -271,6 +293,9 @@ void StageClearScene::Update()
 	oneMore_->Update();
 	next_->Update();
 	select_->Update();
+	keyIcon_Space->Update();
+	colon_->Update();
+	checkUI_->Update();
 
 	DrawImgui();
 }
@@ -287,6 +312,9 @@ void StageClearScene::Draw()
 	oneMore_->Draw();
 	select_->Draw();
 	next_->Draw();
+	keyIcon_Space->Draw();
+	colon_->Draw();
+	checkUI_->Draw();
 }
 
 void StageClearScene::Finalize()

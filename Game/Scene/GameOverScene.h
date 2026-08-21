@@ -20,7 +20,7 @@ class GameOverScene : public BaseScene
 		Title,
 		Count
 	};
-	public:
+public:
 	GameOverScene();
 	~GameOverScene();
 	/// <summary>
@@ -104,24 +104,26 @@ private:
 	// 選択しているアイテム
 	ClearMenuItem selectedItem_ = ClearMenuItem::OneMore;
 	// 選択時の拡縮編集用Vector2
-	Vector2 oneMoreBaseSize_ = { 200.0f, 90.0f };
-	Vector2 selectBaseSize_ = { 200.0f, 90.0f };
-	Vector2 titleBaseSize_ = { 200.0f, 90.0f };
+	// ※OneMore/Selectは512x512統一セットなので正方形で等倍縮小
+	Vector2 oneMoreBaseSize_ = { 180.0f, 180.0f };
+	Vector2 selectBaseSize_ = { 180.0f, 180.0f };
+	// Titleのみ旧形式(1000x400)のためアスペクト比2.5:1で指定
+	Vector2 titleBaseSize_ = { 180.0f, 180.0f };
 	// 選択時に８％程大きくする
 	float selectScale_ = 1.08f;
 
 
-	// kyeUI
-	std::unique_ptr<Sprite> keyIcon_AD;
+	// kyeUI（AD.pngは廃止されたため A / D 個別画像に変更）
+	std::unique_ptr<Sprite> keyIcon_A;
+	std::unique_ptr<Sprite> keyIcon_D;
 
-	// enter
+	// ===== SPACE : 決定 表示用（左下、A/Dキーの上の行） =====
 	std::unique_ptr<Sprite> keyIcon_Space;
-	Vector2 keyIcon_Enter_Pos = { 200.0f,650.0f };
-
-	// コロン
-	std::vector<std::unique_ptr<Sprite>>colonSprites_;
-	// コロンの位置
-	std::vector<Vector2>colonPositions_;
+	Vector2 keyIcon_Space_Pos = { 72.0f, 600.0f };
+	std::unique_ptr<Sprite> colon_;
+	Vector2 colonPos_ = { 130.0f, 600.0f };
+	std::unique_ptr<Sprite> checkUI_;
+	Vector2 checkUI_Pos = { 190.0f, 600.0f };
 
 
 	Transform playerFinalTr_;
@@ -132,21 +134,21 @@ private:
 
 	float vy_ = 0.0f;
 	// 落ちる速さ（調整）
-	float gravity_ = -35.0f;        
+	float gravity_ = -35.0f;
 	// 反発（卓球っぽくするなら 0.4～0.6）
-	float restitution_ = 0.45f;    
+	float restitution_ = 0.45f;
 	// どれだけ上から落とすか
-	float spawnHeight_ = 8.0f;     
+	float spawnHeight_ = 8.0f;
 
 	// 収束判定
-	float settleEps_ = 0.05f;     
+	float settleEps_ = 0.05f;
 	// 回転補間用
-	float rotBlendT_ = 0.0f;        
+	float rotBlendT_ = 0.0f;
 
 	// バウンドの最大回数（これ以上は跳ねないで止まる）
 	int maxBounces_ = 3;
 	// 落下の減衰率
-	float bounceDamping_ = 0.75f; 
+	float bounceDamping_ = 0.75f;
 
 	enum class PlayerOutroState {
 		DropBounce,   // 落下→バウンド中
@@ -157,17 +159,16 @@ private:
 	PlayerOutroState playerOutroState_ = PlayerOutroState::DropBounce;
 
 	// 縮小しながら回転するパラメータ
-	float shrinkSpeed_ = 0.5f;    
-	float minScale_ = 0.03f;      
-	float spinSpeedY_ = 8.0f;     
-	float spinSpeedX_ = 2.5f;     
-	bool isPlayerVisible_ = true; 
+	float shrinkSpeed_ = 0.5f;
+	float minScale_ = 0.03f;
+	float spinSpeedY_ = 8.0f;
+	float spinSpeedX_ = 2.5f;
+	bool isPlayerVisible_ = true;
 
 
 	bool loopPlayerIntro_ = true;
 
-	float loopDelaySec_ = 0.0f;      
+	float loopDelaySec_ = 0.0f;
 	float loopDelayTimer_ = 0.0f;
 
 };
-

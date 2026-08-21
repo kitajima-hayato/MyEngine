@@ -134,26 +134,26 @@ private:
 	// ステージセレクトUI
 	std::unique_ptr<Sprite>stageSelect_;
 
-	// キーアイコンUI
+	// キーアイコンUI（位置はすべて「スプライト中心」基準）
 	std::unique_ptr<Sprite> keyIcon_WASD;
-	Vector2 keyIcon_WASD_Pos = { 100.0f,600.0f };
+	Vector2 keyIcon_WASD_Pos = { 77.0f, 645.0f };   // 下段
 
 	// Escキー
 	std::unique_ptr<Sprite> keyIcon_Esc;
-	Vector2 keyIcon_Esc_Pos = { 100.0f,650.0f };
+	Vector2 keyIcon_Esc_Pos = { 77.0f, 585.0f };    // 中段
 	// Enterキー
 	std::unique_ptr<Sprite> keyIcon_Space;
-	Vector2 keyIcon_Enter_Pos = { 200.0f,650.0f };
+	Vector2 keyIcon_Enter_Pos = { 77.0f, 525.0f };  // 上段
 
 	// MoveUI
 	std::unique_ptr<Sprite>moveUI_;
-	Vector2 moveUI_Pos_ = { 160.0f,620.0f };
+	Vector2 moveUI_Pos_ = { 225.0f, 645.0f };   // WASD行
 	// CheckUI
 	std::unique_ptr<Sprite>checkUI_;
-	Vector2 checkUI_Pos_ = { 160.0f, 500.0f };
+	Vector2 checkUI_Pos_ = { 225.0f, 525.0f };  // Space行
 	// BackUI
 	std::unique_ptr<Sprite>backUI_;
-	Vector2 backUI_Pos_ = { 160.0f, 560.0f };
+	Vector2 backUI_Pos_ = { 225.0f, 585.0f };   // Esc行
 
 	// コロン
 	std::vector<std::unique_ptr<Sprite>>colonSprites_;

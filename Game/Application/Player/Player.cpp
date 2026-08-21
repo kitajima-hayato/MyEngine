@@ -9,6 +9,7 @@
 #endif
 
 // 補助関数
+// コントローラー操作
 namespace
 {
 	constexpr int kControllerNo = 0;
@@ -152,14 +153,23 @@ void Player::OnCollision(Collider* other)
 			const float enemyCenter = (enemyAABB.min.y + enemyAABB.max.y) * 0.5f;
 			const float playerCenter = (playerAABB.min.y + playerAABB.max.y) * 0.5f;
 
-			if (playerCenter > enemyCenter && playerBottom < enemyTop + 0.2f) {
+			// ダメージを持たない相手は、落下中に触れれば踏みつけ扱いにして判定を甘くする
+			const bool lenient = !other->IsHarmfulToPlayer();
+
+			if (lenient || (playerCenter > enemyCenter && playerBottom < enemyTop + 0.2f)) {
 				StompEnemy(other);
 				break;
 			}
 		}
 
+		// 接触ダメージを持たない相手は、どう触れてもダメージにしない
+		if (!other->IsHarmfulToPlayer()) {
+			break;
+		}
+
 		TakeDamage();
 		break;
+
 	}
 
 	default:
@@ -231,12 +241,20 @@ void Player::StompEnemy(Collider* enemy)
 
 void Player::DefeatEnemy(Collider* enemy, bool bouncePlayer)
 {
+	// エネミーが範囲内にいなければ何もしない
 	if (!enemy) {
 		return;
 	}
 
+	// EnemyBase 型にキャストして、踏みつけ可能か確認 dynamic_castは
 	EnemyBase* enemyBase = dynamic_cast<EnemyBase*>(enemy);
 	if (!enemyBase) {
+		enemy->OnAttackCollision(this);
+		// 踏みつけなら敵を踏んだ時と同じ反動ジャンプをするようにする
+		if (bouncePlayer) {
+			velocity_.y = status_.kStompJumpPower;
+			onGround_ = false;
+		}
 		return;
 	}
 

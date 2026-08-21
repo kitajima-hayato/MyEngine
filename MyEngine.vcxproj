@@ -108,6 +108,8 @@
     </PostBuildEvent>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Game\Application\Boss\BossAttackState.cpp" />
+    <ClCompile Include="Game\Application\Boss\BossHPBar.cpp" />
     <ClCompile Include="Game\Application\Boss\BossProjectile.cpp" />
     <ClCompile Include="Game\Application\Boss\BossEnemy.cpp" />
     <ClCompile Include="Game\Application\Boss\BossSpawnedObject.cpp" />
@@ -192,6 +194,8 @@
     <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Game\Application\Boss\BossAttackState.h" />
+    <ClInclude Include="Game\Application\Boss\BossHPBar.h" />
     <ClInclude Include="Game\Application\Boss\BossProjectile.h" />
     <ClInclude Include="Game\Application\Boss\BossEnemy.h" />
     <ClInclude Include="Game\Application\Boss\BossSpawnedObject.h" />

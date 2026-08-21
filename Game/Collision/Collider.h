@@ -23,6 +23,7 @@ public:
 		Static,
 	};
 
+	// デストラクタ
 	virtual ~Collider() = default;
 
 	virtual Type GetType() const = 0;
@@ -39,4 +40,8 @@ public:
 	// 攻撃判定が当たったときの処理
 	// 処理したなら true
 	virtual bool OnAttackCollision(Collider* other) { return false; }
+
+	// プレイヤーに接触ダメージを与えるか
+	// flaseなら触れてもダメージにしない(ボスの弾を撃ち返したときのオブジェクトなど)
+	virtual bool IsHarmfulToPlayer()const { return true; }
 };
