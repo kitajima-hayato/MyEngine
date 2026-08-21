@@ -74,6 +74,7 @@ void GamePlayScene::Initialize(DirectXCommon* dxCommon)
 	startCam_->Bind(camera, &cameraTransform);
 
 	if (stageKey == "boss") {
+		// ボスステージのカメラ値
 		baseCameraPos_ = { 14.0f,6.85f, -34.5f };
 	}
 	else {
@@ -358,6 +359,7 @@ void GamePlayScene::Draw()
 	// ボスステージの描画　/ ボスステージなら
 	if (isBossStage_ && bossStageManager_) {
 		bossStageManager_->Draw();
+		bossStageManager_->DrawHUD();
 	}
 
 	ModelParticleManager::GetInstance().Draw();
@@ -504,8 +506,10 @@ void GamePlayScene::CorrectEnemyOverlap(EnemyBase* enemyA, EnemyBase* enemyB)
 }
 void GamePlayScene::ResolveEnemyVsEnemy()
 {
+	// エネミー同士の重なりを解消する処理
 	const size_t count = enemies.size();
 
+	// 二重ループで全てのエネミー同士をチェック
 	for (size_t i = 0; i < count; ++i) {
 		if (!enemies[i] || !enemies[i]->IsAlive()) {
 			continue;
@@ -548,8 +552,10 @@ void GamePlayScene::DrawImgui()
 		ImGui::Separator();
 		ImGui::Text("Boss Camera");
 		ImGui::DragFloat3("Position##BossCam", &baseCameraPos_.x, 0.05f);
-		ImGui::Text("{ %.2ff, %.2ff, %.2ff }",   // コード貼り付け用
+		ImGui::Text("{ %.2ff, %.2ff, %.2ff }",
 			baseCameraPos_.x, baseCameraPos_.y, baseCameraPos_.z);
+
+		bossStageManager_->DrawImgui(); 
 	}
 
 	ImGui::End();

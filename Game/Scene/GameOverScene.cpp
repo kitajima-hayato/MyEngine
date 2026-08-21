@@ -2,12 +2,10 @@
 #include "engine/InsideScene/Framework.h"
 
 GameOverScene::GameOverScene()
-{
-}
+{}
 
 GameOverScene::~GameOverScene()
-{
-}
+{}
 
 void GameOverScene::Initialize(Engine::DirectXCommon* dxCommon)
 {
@@ -39,37 +37,59 @@ void GameOverScene::Initialize(Engine::DirectXCommon* dxCommon)
 	gameOverUI->SetSize({ 1280.0f,720.0f });
 
 
-	// OneMore / Select / Title UI
+	// OneMore / Select / Title UI（OneMore/Selectは512x512統一セット・正方形で等倍縮小）
+	oneMorePos = { 350.0f, 615.0f };
 	oneMore_ = std::make_unique<Sprite>();
 	oneMore_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_OneMore.dds");
-	oneMore_->SetPosition({ 350.0f,615.0f });
+	oneMore_->SetAnchorPoint({ 0.5f, 0.5f });
+	oneMore_->SetPosition(oneMorePos);
 	oneMore_->SetSize(oneMoreBaseSize_);
-	oneMore_->SetAnchorPoint({ 0.5f,0.5f });
 
+	selectPos = { 650.0f, 615.0f };
 	select_ = std::make_unique<Sprite>();
 	select_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_Select.dds");
-	select_->SetPosition({ 650.0f,615.0f });
+	select_->SetAnchorPoint({ 0.5f, 0.5f });
+	select_->SetPosition(selectPos);
 	select_->SetSize(selectBaseSize_);
-	select_->SetAnchorPoint({ 0.5f,0.5f });
 
+	titlePos = { 950.0f, 615.0f };
 	title_ = std::make_unique<Sprite>();
 	title_->Initialize("resources/Scenes/Clear/UI/Texture/ClearUI_Title.dds");
-	title_->SetPosition({ 950.0f,615.0f });
+	title_->SetAnchorPoint({ 0.5f, 0.5f });
+	title_->SetPosition(titlePos);
 	title_->SetSize(titleBaseSize_);
-	title_->SetAnchorPoint({ 0.5f,0.5f });
 
 	// KeyIconUi　/ 左下に配置
 
+	// A / D キー
+	keyIcon_A = std::make_unique<Sprite>();
+	keyIcon_A->Initialize("resources/_Common/UI/Texture/inputhints/A.dds");
+	keyIcon_A->SetPosition({ 30.0f, 635.0f });
+	keyIcon_A->SetSize({ 50.0f, 50.0f });
+
+	keyIcon_D = std::make_unique<Sprite>();
+	keyIcon_D->Initialize("resources/_Common/UI/Texture/inputhints/D.dds");
+	keyIcon_D->SetPosition({ 80.0f, 635.0f });
+	keyIcon_D->SetSize({ 50.0f, 50.0f });
+
+	// ===== SPACE : 決定（A/Dキーの上の行） =====
 	keyIcon_Space = std::make_unique<Sprite>();
 	keyIcon_Space->Initialize("resources/_Common/UI/Texture/inputhints/Space.png");
-	keyIcon_Space->SetPosition({ 10.0f, 300.0f });
-	keyIcon_Space->SetSize({ 125.0f, 75.0f });
+	keyIcon_Space->SetAnchorPoint({ 0.5f, 0.5f });
+	keyIcon_Space->SetSize({ 100.0f, 100.0f });
+	keyIcon_Space->SetPosition(keyIcon_Space_Pos);
 
+	colon_ = std::make_unique<Sprite>();
+	colon_->Initialize("resources/_Common/UI/Texture/inputhints/Colon.png");
+	colon_->SetAnchorPoint({ 0.5f, 0.5f });
+	colon_->SetSize({ 100.0f, 60.0f });
+	colon_->SetPosition(colonPos_);
 
-	keyIcon_AD = std::make_unique<Sprite>();
-	keyIcon_AD->Initialize("resources/Scenes/Clear/UI/Texture/AD.png");
-	keyIcon_AD->SetPosition({ 10.0f, 350.0f });
-	keyIcon_AD->SetSize({ 60.0f, 60.0f });
+	checkUI_ = std::make_unique<Sprite>();
+	checkUI_->Initialize("resources/Scenes/StageSelect/UI/Texture/Check.dds");
+	checkUI_->SetAnchorPoint({ 0.5f, 0.5f });
+	checkUI_->SetSize({ 100.0f, 100.0f });
+	checkUI_->SetPosition(checkUI_Pos);
 
 	// scale/rotate/translate を含む最終値
 	playerFinalTr_ = playerModelTransform;
@@ -77,26 +97,6 @@ void GameOverScene::Initialize(Engine::DirectXCommon* dxCommon)
 
 	// 初期フレームから上にいる状態を反映
 	PlayerModel->SetTransform(playerAnimTr_);
-
-	// コロンのスプライト
-	colonSprites_.clear();
-	colonSprites_.reserve(2);
-
-	colonPositions_.clear();
-	colonPositions_.reserve(2);
-
-	colonPositions_.push_back({ 85.0f,305.0f });
-	colonPositions_.push_back({ 85.0f,345.0f });
-
-	for (int i = 0; i < 2; ++i) {
-		auto s = std::make_unique<Sprite>();
-		s->Initialize("resources/_Common/UI/Texture/inputhints/Colon.png");
-		s->SetSize({ 125.0f, 70.0f });
-		s->SetPosition(colonPositions_[i]);
-		colonSprites_.push_back(std::move(s));
-	}
-
-
 }
 
 void GameOverScene::Update()
@@ -226,13 +226,12 @@ void GameOverScene::Update()
 
 	gameOverUI->Update();
 
-	keyIcon_AD->Update();
-
+	// 操作キーUIの更新
+	keyIcon_A->Update();
+	keyIcon_D->Update();
 	keyIcon_Space->Update();
-
-	// コロンUIの更新
-	for (auto& s : colonSprites_) { s->Update(); }
-
+	colon_->Update();
+	checkUI_->Update();
 
 	oneMore_->Update();
 	select_->Update();
@@ -254,15 +253,15 @@ void GameOverScene::Draw()
 	// ゲームオーバーUIの描画
 	gameOverUI->Draw();
 	// 操作キーUIの描画
-	keyIcon_AD->Draw();
+	keyIcon_A->Draw();
+	keyIcon_D->Draw();
 	keyIcon_Space->Draw();
+	colon_->Draw();
+	checkUI_->Draw();
 	// 選択項目UIの描画
 	oneMore_->Draw();
 	select_->Draw();
 	title_->Draw();
-
-	// コロンUIの描画
-	for (auto& s : colonSprites_) { s->Draw(); }
 }
 
 void GameOverScene::Finalize()
@@ -310,6 +309,26 @@ void GameOverScene::DrawImgui()
 	ImGui::DragFloat3("PlayerModel Translate", &playerModelTransform.translate.x, 0.1f);
 	PlayerModel->SetTransform(playerModelTransform);
 
+
+	// 操作キーUIの調整
+	ImGui::Separator();
+	ImGui::DragFloat2("SpaceIcon_Pos", &keyIcon_Space_Pos.x, 1.0f);
+	keyIcon_Space->SetPosition(keyIcon_Space_Pos);
+	ImGui::DragFloat2("Colon_Pos", &colonPos_.x, 1.0f);
+	colon_->SetPosition(colonPos_);
+	ImGui::DragFloat2("CheckUI_Pos", &checkUI_Pos.x, 1.0f);
+	checkUI_->SetPosition(checkUI_Pos);
+
+	// 選択肢UIの調整
+	oneMorePos = oneMore_->GetPosition();
+	ImGui::DragFloat2("OneMore_Pos", &oneMorePos.x, 1.0f);
+	oneMore_->SetPosition(oneMorePos);
+	selectPos = select_->GetPosition();
+	ImGui::DragFloat2("Select_Pos", &selectPos.x, 1.0f);
+	select_->SetPosition(selectPos);
+	titlePos = title_->GetPosition();
+	ImGui::DragFloat2("Title_Pos", &titlePos.x, 1.0f);
+	title_->SetPosition(titlePos);
 
 	ImGui::End();
 #endif

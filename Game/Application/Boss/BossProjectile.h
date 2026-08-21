@@ -6,7 +6,7 @@
 class BossProjectile
 {
 public:
-    void Initialize(Vector3 origin);
+    void Initialize(Vector3 origin, Vector3 velocity = {0.0f,0.0f,-0.15f});
     void Update();
     void Draw();
 
@@ -20,6 +20,6 @@ private:
     std::unique_ptr<Object3D> model_;
     bool expired_ = false;
 
-    // Z=-2 より手前に来たら着弾とみなす
-    static constexpr float kLandZ_ = -2.0f;
+    // Z=0 より手前に来たら着弾とみなす
+    static constexpr float kLandZ_ = 0.0f;
 };

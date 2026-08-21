@@ -133,6 +133,11 @@ public:	// Setter / Getter
 	Vector3 GetMapChipPositionByIndex(uint32_t xIndex, uint32_t yIndex);
 
 	/// <summary>
+	/// ブロック配置時の座標補正量を取得
+	/// </summary>
+	float GetBlockOffset() const { return blockOffset_; }
+
+	/// <summary>
 	/// マップチップデータを取得
 	/// </summary>
 	const EnemyLayerData& GetEnemyLayerData() const { return enemyLayerData_; }

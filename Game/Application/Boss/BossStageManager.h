@@ -2,6 +2,7 @@
 #include "BossEnemy.h"
 #include "BossSpawnedObject.h"
 #include "BossProjectile.h"
+#include "BossHPBar.h"
 
 #include <memory>
 #include <vector>
@@ -47,6 +48,13 @@ public:	// メンバ関数
 	bool IsBossDefeated()const;
 
 
+	/// <summary>
+	/// ボスのHPバーを描画する
+	/// </summary>
+	void DrawHUD();
+#ifdef USE_IMGUI
+	void DrawImgui();
+#endif
 private:	// メンバ関数
 
 	/// <summary>
@@ -61,6 +69,8 @@ private:	// メンバ変数
 
 	// ボスのインスタンス
 	std::unique_ptr<BossEnemy> bossEnemy; 
+	// ボスのHPバーのインスタンス
+	std::unique_ptr<BossHPBar> bossHPBar;
 
 	// ステージ上にスポーンされたオブジェクトのリスト
 	std::vector<std::unique_ptr<BossSpawnedObject>> spawnedObjects;

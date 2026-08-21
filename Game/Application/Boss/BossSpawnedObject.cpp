@@ -22,8 +22,8 @@ void BossSpawnedObject::Initialize(Vector3 pos, BossEnemy* boss)
 
 AABB BossSpawnedObject::GetAABB() const
 {
-	// AABBは中心から0.5fの大きさの立方体とする
-	Vector3 halfSize = { 0.5f, 0.5f, 0.5f }; 
+	// 判定は見た目より大きめに取り、打ち返しの成功率を上げる
+	Vector3 halfSize = { kHalfSize_, kHalfSize_, kHalfSize_ };
 	return { pos_ - halfSize, pos_ + halfSize };
 }
 
@@ -44,26 +44,39 @@ void BossSpawnedObject::LaunchTowardBoss()
 {
 	// ボスの状態を変更
 	state_ = State::kLaunched;
+	lifeFrame_ = 0;
 
 	Vector3 dir = boss_->GetPosition() - pos_;
-	// 正規化して速度を設定 
 	float len = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
-	velocity_ = (dir / len) * 0.2f;
+	// ゼロ除算を避ける
+	if (len > 0.0001f) {
+		velocity_ = (dir / len) * kLaunchSpeed_;
+	}
 }
 
 
 void BossSpawnedObject::Update()
 {
 	// 状態に応じた更新処理
-	if (state_ == State::kLaunched) {
+	if (state_ == State::kIdel) {
+		UpdateIdle();
+	} else if (state_ == State::kLaunched) {
 		UpdateLaunched();
 	}
 
-	// モデルの位置を更新
+	// モデルの位置とスケールを更新
 	if (model_) {
+		// 消滅が近いほど小さくして、消えることを見た目で伝える
+		float scale = 1.0f;
+		if (IsVanishing()) {
+			const float t = static_cast<float>(idleFrame_ - kVanishWarnFrame_) /
+				static_cast<float>(kMaxIdleFrame_ - kVanishWarnFrame_);
+			scale = 1.0f - (1.0f - kVanishMinScale_) * t;
+		}
+
 		Transform transform;
 		transform.translate = pos_;
-		transform.scale = { 1.0f,1.0f,1.0f };
+		transform.scale = { scale, scale, scale };
 		model_->SetTransform(transform);
 		model_->Update();
 	}
@@ -71,20 +84,38 @@ void BossSpawnedObject::Update()
 
 void BossSpawnedObject::Draw()
 {
-	// ボスモデルの描画
-	if (model_) {
-		model_->Draw();
+	if (model_ == nullptr)return;
+	// 消滅予告中は点滅させる（描画を間引く）
+	if (IsVanishing() && ((idleFrame_ / kBlinkCycle_) % 2) == 1) {
+		return;
 	}
+	// モデルの描画
+	model_->Draw();
 }
 
 void BossSpawnedObject::UpdateLaunched()
 {
+	// ボスが動くので毎フレーム狙い直す（ホーミング）
+	Vector3 dir = boss_->GetPosition() - pos_;
+	float len = std::sqrt(dir.x * dir.x + dir.y * dir.y + dir.z * dir.z);
+	if (len > 0.0001f) {
+		velocity_ = (dir / len) * kLaunchSpeed_;
+	}
+
 	// 速度に応じて位置を更新
 	pos_ += velocity_;
-	// ボスに近づきすぎたら消滅
+
+	// ボスに当たったらダメージを与えて消滅
 	if (IsAABBOverLap(GetAABB(), boss_->GetAABB())) {
-		boss_->TakeDamage(1); // ボスにダメージを与える
-		state_ = State::kExpired; // オブジェクトを消滅させる
+		boss_->TakeDamage(1);
+		state_ = State::kExpired;
+		return;
+	}
+
+	// 保険：一定時間当たらなければ消滅させる
+	lifeFrame_++;
+	if (lifeFrame_ > kMaxLifeFrame_) {
+		state_ = State::kExpired;
 	}
 }
 
@@ -96,3 +127,26 @@ bool BossSpawnedObject::IsAABBOverLap(const AABB& a, const AABB& b) const
 
 
 
+void BossSpawnedObject::UpdateIdle()
+{
+	// 着弾後はゆっくり落下させる
+	// 高い位置に湧いても、待てば自機の届く高さまで降りてくるようにする
+	if (pos_.y > kRestY_) {
+		fallSpeed_ += kFallGravity_;
+		if (fallSpeed_ > kMaxFallSpeed_) {
+			fallSpeed_ = kMaxFallSpeed_;
+		}
+		pos_.y -= fallSpeed_;
+
+		if (pos_.y < kRestY_) {
+			pos_.y = kRestY_;
+			fallSpeed_ = 0.0f;
+		}
+	}
+
+	// 打ち返されないまま10秒経ったら消滅させる
+	idleFrame_++;
+	if (idleFrame_ > kMaxIdleFrame_) {
+		state_ = State::kExpired;
+	}
+}

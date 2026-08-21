@@ -207,10 +207,22 @@
     <ClCompile Include="Game\Application\Enemy\Drop\TimedDropEnemy.cpp" />
     <ClCompile Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.cpp" />
     <ClCompile Include="engine\Input\Controller.cpp" />
-    <ClCompile Include="Game\Application\Boss\BossStageManager.cpp" />
-    <ClCompile Include="Game\Application\Boss\BossEnemy.cpp" />
-    <ClCompile Include="Game\Application\Boss\BossSpawnedObject.cpp" />
-    <ClCompile Include="Game\Application\Boss\BossProjectile.cpp" />
+    <ClCompile Include="Game\Application\Boss\BossEnemy.cpp">
+      <Filter>Game\Application\Boss</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Application\Boss\BossHPBar.cpp">
+      <Filter>Game\Application\Boss</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Application\Boss\BossStageManager.cpp">
+      <Filter>Game\Application\Boss</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Application\Boss\BossSpawnedObject.cpp">
+      <Filter>Game\Application\Boss</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Application\Boss\BossProjectile.cpp">
+      <Filter>Game\Application\Boss</Filter>
+    </ClCompile>
+    <ClCompile Include="Game\Application\Boss\BossAttackState.cpp" />
   </ItemGroup>
   <!-- ヘッダーファイルのItemGroupも同様に統合する必要あり（長いためここでは省略） -->
   <ItemGroup>
@@ -423,10 +435,22 @@
     <ClInclude Include="Game\Application\Enemy\Drop\ReactiveDropEnemy.h" />
     <ClInclude Include="engine\Input\Controller.h" />
     <ClInclude Include="engine\Input\InputData.h" />
-    <ClInclude Include="Game\Application\Boss\BossStageManager.h" />
-    <ClInclude Include="Game\Application\Boss\BossEnemy.h" />
-    <ClInclude Include="Game\Application\Boss\BossSpawnedObject.h" />
-    <ClInclude Include="Game\Application\Boss\BossProjectile.h" />
+    <ClInclude Include="Game\Application\Boss\BossEnemy.h">
+      <Filter>Game\Application\Boss</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Application\Boss\BossHPBar.h">
+      <Filter>Game\Application\Boss</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Application\Boss\BossStageManager.h">
+      <Filter>Game\Application\Boss</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Application\Boss\BossSpawnedObject.h">
+      <Filter>Game\Application\Boss</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Application\Boss\BossProjectile.h">
+      <Filter>Game\Application\Boss</Filter>
+    </ClInclude>
+    <ClInclude Include="Game\Application\Boss\BossAttackState.h" />
   </ItemGroup>
   <ItemGroup>
     <Filter Include="engine">
@@ -497,6 +521,9 @@
     </Filter>
     <Filter Include="Game\Scene\Trannsition">
       <UniqueIdentifier>{94dc7f4f-9c08-4c3b-8bc6-8aadeefcb463}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Game\Application\Boss">
+      <UniqueIdentifier>{7b6e0843-3fc2-4f91-a1b1-e55d73c3d198}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
